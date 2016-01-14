@@ -12,11 +12,17 @@ if [ "$genome" == "GRCh38" ] || [ "$genome" == "GRCh37" ]; then
 	--cache --dir_cache $VEPCACHEDIR \
 	--fasta $VEPCACHEDIR/$genome.fa --species human --assembly $genome  \
 	--output ${input_vcf%.vcf}.VEP82everything.$genome.vcf \
-	--plugin ExAC,/data/mcgaugheyd/genomes/hg19/ExAC.r0.3.nonTCGA.sites.vep.vcf.gz,AC \
 	--plugin Grantham \
 	--total_length \
-	--fields Consequence, Codons, Amino_acids,Gene,SYMBOL,Feature,EXON,PolyPhen,SIFT,Protein_position,BIOTYPE,CANONICAL,CADD_raw,CADD_phred,Grantham
-	--everything --vcf --force_overwrite --fork $cores
+    --hgvs \
+	--sift b \
+    --polyphen b \
+    --symbol \
+    --numbers \
+    --biotype \
+    --total_length \
+    --fields Consequence,Codons,Amino_acids,Gene,SYMBOL,Feature,EXON,PolyPhen,SIFT,Protein_position,BIOTYPE,CANONICAL,Grantham,HGVSc,HGVSp\
+	--vcf --force_overwrite --fork $cores
 else
     echo "Pick either GRCh38 or GRCh37 genomes"
 fi

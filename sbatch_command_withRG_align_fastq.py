@@ -32,8 +32,7 @@ core = bamfile.split('.')[0]
 # runs alignment!
 run_bwa = 	('sbatch --mem=50G --cpus-per-task=10 run_bwa-mem_hg19.sh ' +
 			' ' + core + '_1.fastq' + ' ' +  core + '_2.fastq ' +
-			'"@RG\\t' + ID + '\\t' + SM + '\\t' + LB + '\\t' + 'PL:Illumina\" ' +
+			'\\"\\@RG\\\\t' + ID + '\\\\t' + SM + '\\\\t' + LB + '\\\\t' + 'PL:Illumina\\" ' +
 			core + '.bwa-mem.hg19.bam')
 print(run_bwa, sep='')
-subprocess.check_output(run_bwa, shell=True).decode('utf-8')
-
+subprocess.call(run_bwa, shell=True)

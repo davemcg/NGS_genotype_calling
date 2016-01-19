@@ -29,9 +29,11 @@ RG_core = '\\\\t'.join(['\\"\@RG',ID, SM, LB, PL])
 
 core = bamfile.split('.')[0]
 
-# prints out command which can be run to align the bam
-print('sbatch --mem=50G --cpus-per-task=10 run_bwa-mem_hg19.sh \\')
-print('\t', core + '_1.fastq', core + '_2.fastq', '\\')
-print('\t',end="")
-print(RG_core, sep='\t')
-print('\t', core + '.bwa-mem.hg19.bam')
+# runs alignment!
+run_bwa = 	('sbatch --mem=50G --cpus-per-task=10 run_bwa-mem_hg19.sh ' +
+			' ' + core + '_1.fastq' + ' ' +  core + '_2.fastq ' +
+			'"@RG\\t' + ID + '\\t' + SM + '\\t' + LB + '\\t' + 'PL:Illumina\" ' +
+			core + '.bwa-mem.hg19.bam')
+print(run_bwa, sep='')
+subprocess.check_output(run_bwa, shell=True).decode('utf-8')
+

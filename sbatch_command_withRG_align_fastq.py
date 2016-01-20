@@ -1,7 +1,8 @@
 #!/usr/local/Anaconda/envs/py3.4.3/bin/python
 
 """
-Creates bwa-mem hg19 command to align fastq files
+Creates and runs with sbatch 
+bwa-mem hg19 command to align fastq files
 with proper RG info
 """
 import argparse

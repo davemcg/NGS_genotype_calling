@@ -5,24 +5,22 @@ import subprocess
 
 parser = argparse.ArgumentParser()
 parser.add_argument('file', help= 
-	"
-	Takes in NISC bam file, extracts fastsq,
-	realigns fastq with bwa-mem to hg19, with
-	read group info extracted from NISC bam
-	Requires bam2fastq/1.1.0 and samtools/1.2 to be loaded
-
-	Invoke script with sbatch --mem=50G --cpus-per-task 10
-
-	Example:
-   		sbatch --mem=50G --cpus-per-task this_script.py A_BAM_FILE_001.bam								 
-	"
+	"Takes in NISC bam file, extracts fastsq, \
+	realigns fastq with bwa-mem to hg19, with \
+	read group info extracted from NISC bam \
+	Requires bam2fastq/1.1.0 and samtools/1.2 to be loaded \
+	\
+	Invoke script with sbatch --mem=50G --cpus-per-task 10 \
+	\
+	Example: \
+   		sbatch --mem=50G --cpus-per-task this_script.py A_BAM_FILE_001.bam")
 args = parser.parse_args()
 bamfile = args.file
 bam_name = bamfile.split('.')[0]
 
 # Extract fastq
 print("Beginning fastq extraction")
-subprocess.check_call("module list",shell=True)
+bam2fastq_call = "bam2fastq -o " + bam_name + "#.fastq " + bamfile
 subprocess.check_call(bam2fastq_call, shell=True)
 print("Done")
 
@@ -46,7 +44,8 @@ RG_core = '\\\\t'.join(['\\"\@RG',ID, SM, LB, PL])
 print("BWA run beginning")
 run_bwa =   ('run_bwa-mem_hg19.sh ' +
             bam_name + '_1.fastq ' + bam_name + '_2.fastq ' +
-            '\\"\\@RG\\\\t' + ID + '\\\\t' + SM + '\\\\t' + LB + '\\\\t' + 'PL:Illumina\\" ' +
+            '\\@RG\\\\t' + ID + '\\\\t' + SM + '\\\\t' + LB + '\\\\t' + 'PL:Illumina ' +
             bam_name + '.bwa-mem.hg19.bam')
+print(run_bwa)
 subprocess.check_call(run_bwa, shell=True)
 print("All done!")

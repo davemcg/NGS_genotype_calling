@@ -1,6 +1,6 @@
 #!/bin/bash
 
-module load VEP/82
+module load VEP/83
 
 
 input_vcf=$1
@@ -11,7 +11,7 @@ if [ "$genome" == "GRCh38" ] || [ "$genome" == "GRCh37" ]; then
 	variant_effect_predictor.pl -i $input_vcf --offline \
 	--cache --dir_cache $VEPCACHEDIR \
 	--fasta $VEPCACHEDIR/$genome.fa --species human --assembly $genome  \
-	--output ${input_vcf%.vcf}.VEP82everything.$genome.vcf \
+	--output ${input_vcf%.vcf}.VEP.$genome.vcf \
 	--plugin Grantham \
 	--total_length \
     --hgvs \

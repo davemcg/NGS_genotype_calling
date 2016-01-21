@@ -1,6 +1,6 @@
 #!/bin/bash
 
-module load GATK/3.4-46
+module load GATK/3.5-0
 
 gvcfs_list=$1
 output_vcf_name=$2

@@ -19,14 +19,14 @@ cat tmp/$VCF.AFfiltered \
 	| ~/git/vt/./vt normalize -r /fdb/GATK_resource_bundle/hg19-2.8/ucsc.hg19.fasta - \
 	> tmp/$VCF 
 
-# annotate with VEP82
+# annotate with VEP
 /home/mcgaugheyd/bin/run_VEP.sh tmp/$VCF GRCh37 $cores
 
 # move out of tmp folder
-mv tmp/${VCF%.vcf}.VEPRCh37.vcf* . 
+mv tmp/${VCF%.vcf}.VEP.GRCh37.vcf* . 
 
 # compress and index
 bgzip ${VCF%.vcf}.VEP.GRCh37.vcf
 tabix -p vcf ${VCF%.vcf}.VEP.GRCh37.vcf.gz
 
-rm -rf tmp
+#rm -rf tmp

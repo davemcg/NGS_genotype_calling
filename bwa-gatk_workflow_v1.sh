@@ -16,7 +16,7 @@ nisc_input_bam=$1
 ############
 #RE-ALIGNMENT
 # pulls bwa-formatted info (read group info, bam file, etc) then hands over to sbatch 
-j1=$(sbatch --job-name bwa.$1 --mem=50g --cpus-per-task 10 ~/bin/realign_NISC_bam_with_bwa.py $1)
+j1=$(sbatch --job-name bwa.$1 --mem=30g --cpus-per-task 10 ~/bin/realign_NISC_bam_with_bwa.py $1)
 ############
 
 ############

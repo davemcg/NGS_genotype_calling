@@ -4,12 +4,13 @@ module load GATK/3.5-0
 
 gvcfs_list=$1
 output_vcf_name=$2
-
+ped=$3
 # Merges all GVCFs into a VCF
 GATK -m 8g GenotypeGVCFs \
 	-R /fdb/GATK_resource_bundle/hg19-2.8/ucsc.hg19.fasta \
 	-o $2 \
-	-V $gvcfs_list
+	-V $gvcfs_list \
+	--pedigree $ped
 
 # Extracts all SNPs
 GATK -m 8g SelectVariants \

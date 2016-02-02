@@ -10,10 +10,10 @@ cores=$2
 mkdir tmp
 
 #only keep AF > 0.25
-vcffilter -f "AF > 0.25" $VCF > tmp/$VCF.AFfiltered
+#vcffilter -f "AF > 0.25" $VCF > tmp/$VCF.AFfiltered
 
 # vt to "left align and trim alternative variants"
-cat tmp/$VCF.AFfiltered \
+cat $VCF \
 	| sed 's/ID=AD,Number=./ID=AD,Number=R/' \
 	| ~/git/vt/./vt decompose -s - \
 	| ~/git/vt/./vt normalize -r /fdb/GATK_resource_bundle/hg19-2.8/ucsc.hg19.fasta - \

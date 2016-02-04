@@ -11,7 +11,9 @@ Returns results in a xlsx file for the clinicians/genetic counselors
 
 import argparse
 import subprocess
+import xlsxwriter
 
+#########PARSER##############
 parser = argparse.ArgumentParser(description=\
     "Queries gemini (v0.18) database to identify variants matching \
 	models of automosomal recessive, de novo, mendelian error, \
@@ -32,7 +34,6 @@ parser.add_argument('--database')
 parser.add_argument('--family')
 
 #########CODE#############
-
 def autosomal_recessive(db, family):
 	filter = " --filter \"max_aaf_all < 0.01 AND (is_coding=1 OR is_splicing=1) \
 				AND filter IS NULL\" --gt-pl-max 10 -d 5 --min-gq 20 "
@@ -44,12 +45,29 @@ def autosomal_recessive(db, family):
 	ar = subprocess.check_output(ar_query,shell=True).decode('utf-8')
 	return(ar)
 
+def output_to_xlsx(data,sheet_name):
+	workbook = xlsxwriter.Workbook('test.xlsx')
+	worksheet = workbook.add_worksheet(sheet_name)
+	row = 0
+	col = 0
+	data = data.split('\n')
+	for line in data:
+		line = line.split('\t')
+		for unit in line: 
+			print(unit)
+			worksheet.write(row, col, unit)
+			col += 1
+		col = 0
+		row += 1
+	workbook.close()
+
 def main():
 	args = parser.parse_args()
 	db = args.database
 	family = args.family
 	ar = autosomal_recessive(db, family)
-	print(ar)
+	output_to_xlsx(ar, "Autosomal Recessive")	
+		
 
 columns = 	" --columns \"chrom, start, end, codon_change, aa_change, type, impact, \
 			impact_severity, gene, vep_hgvsp, aaf_1kg_all, aaf_exac_all, \

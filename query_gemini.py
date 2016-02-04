@@ -55,6 +55,7 @@ def de_novo(db, family):
 		dn_query = "gemini de_novo" + columns + \
 					"--families " + family + " " + db + " " + filter
 	dn = subprocess.check_output(dn_query,shell=True).decode('utf-8')	
+	dn = dn.split('\n')
 	return(dn)
 
 def mendel_errors(db, family):
@@ -62,35 +63,62 @@ def mendel_errors(db, family):
 		# Can't parse by family
 		# Can't call exac numbers
 		# I can work around the first, but not the second (easily)
-	i
+	filter = " --filter \"max_aaf_all < 0.005 AND (is_coding=1 OR is_splicing=1) \
+				AND filter IS NULL\" --gt-pl-max 1 -d 5 --min-gq 20"
+	columns = 	" --columns \"chrom, start, end, codon_change, aa_change, type, impact, \
+				impact_severity, gene, vep_hgvsp, aaf_1kg_all, aaf_exac_all, \
+				gerp_bp_score, polyphen_score, \
+				cadd_raw, sift_pred, sift_score, vep_grantham, (gt_depths).(*) \" "
+	
+	me_query = "gemini mendel_errors" + columns + db + " " + filter 	
+	me = subprocess.check_output(me_query,shell=True).decode('utf-8')
+	me = me.split('\n')
+	# get the header in
+	me_out = []
+	me_out.append(me[0]) 
+	# filter for only the family we want
+	for line in me:
+		s_line = line.split('\t')
+		if line and s_line[46]==family:
+			me_out.append(line)
+	return(me_out)
 	
 def output_to_xlsx(data,sheet_name):
-	workbook = xlsxwriter.Workbook('test.xlsx')
 	worksheet = workbook.add_worksheet(sheet_name)
 	row = 0
 	col = 0
-	data = data.split('\n')
 	for line in data:
 		line = line.split('\t')
 		for unit in line: 
-			print(unit)
 			worksheet.write(row, col, unit)
 			col += 1
 		col = 0
 		row += 1
-	workbook.close()
 
 def main():
 	args = parser.parse_args()
 	db = args.database
 	family = args.family
+	
+	# output time
 	ar = autosomal_recessive(db, family)
 	output_to_xlsx(ar, "Autosomal Recessive")	
-		
 
+	dn = de_novo(db, family)
+	output_to_xlsx(dn, "De Novo")	
+	
+	me = mendel_errors(db, family)
+	output_to_xlsx(me, "Mendelian Errors")
+	workbook.close()
+	
+
+
+# global stuff
+workbook = xlsxwriter.Workbook('test.xlsx')
 columns = 	" --columns \"chrom, start, end, codon_change, aa_change, type, impact, \
 			impact_severity, gene, vep_hgvsp, aaf_1kg_all, aaf_exac_all, \
 			exac_num_hom_alt, exac_num_het, gerp_bp_score, polyphen_score, \
 			cadd_raw, sift_pred, sift_score, vep_grantham, (gt_depths).(*) \" "
 
+# run it!
 main()

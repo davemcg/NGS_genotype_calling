@@ -43,8 +43,27 @@ def autosomal_recessive(db, family):
 		ar_query = "gemini autosomal_recessive" + columns + \
 					"--families " + family + " " + db + " " + filter
 	ar = subprocess.check_output(ar_query,shell=True).decode('utf-8')
+	ar = ar.split('\n')
 	return(ar)
 
+def de_novo(db, family):
+	filter = " --filter \"max_aaf_all < 0.005 AND (is_coding=1 OR is_splicing=1) \
+				AND filter IS NULL\" --gt-pl-max 10 -d 5 --min-gq 20 "
+	if family=="-":
+		dn_query = "gemini de_novo" + columns + db + " " + filter
+	else:
+		dn_query = "gemini de_novo" + columns + \
+					"--families " + family + " " + db + " " + filter
+	dn = subprocess.check_output(dn_query,shell=True).decode('utf-8')	
+	return(dn)
+
+def mendel_errors(db, family):
+	# gemini v0.18 has two bugs with this call:
+		# Can't parse by family
+		# Can't call exac numbers
+		# I can work around the first, but not the second (easily)
+	i
+	
 def output_to_xlsx(data,sheet_name):
 	workbook = xlsxwriter.Workbook('test.xlsx')
 	worksheet = workbook.add_worksheet(sheet_name)

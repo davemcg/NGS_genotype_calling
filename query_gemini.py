@@ -1,12 +1,8 @@
 #!/usr/local/Anaconda/envs/py3.4.3/bin/python
 
+# Yes, this uses python3. 3.4.3, to be specific. Should work on other
+# versions of python3, but I haven't tested 
 
-"""
-Runs autosomal_recessive, de_novo, mendel_errors, comp_hets, autosomal_dominant, and roh
-tests on select families (trios) in a gemini database
-
-Returns results in a xlsx file for the clinicians/genetic counselors
-"""
 
 
 import argparse
@@ -71,16 +67,19 @@ def mendel_errors(db, family):
 	me_query = "gemini mendel_errors" + columns + db + " " + filter 	
 	me = subprocess.check_output(me_query,shell=True).decode('utf-8')
 	me = me.split('\n')
-	# get the header in
 	if family == '-':
 		me_out = me
 	else:
+		# Get header in, unformatted (will happen later)
 		me_out = []
-		me_out.append(me[0]) 
+		me_out.append(me[0])
+		# find family_id index 
+		header = me[0].split('\t')	
+		family_id_index = header.index('family_id') 
 		# filter for only the family we want
 		for line in me:
 			s_line = line.split('\t')
-			if line and s_line[48]==family:
+			if line and s_line[family_id_index]==family:
 				me_out.append(line)
 	return(me_out)
 
@@ -119,6 +118,8 @@ def output_to_xlsx(data,sheet_name):
 	worksheet = workbook.add_worksheet(sheet_name)
 	row = 0
 	col = 0
+	# Handling for nothing found. Don't want anyone thinking a messup happened
+	# Will print first bit of info if this logic screws up
 	if len(data) < 2:
 		worksheet.write(0,0, "No variants found")	
 		worksheet.write(1,0, data[0])

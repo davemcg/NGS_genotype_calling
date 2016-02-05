@@ -10,29 +10,33 @@ Returns results in a xlsx file for the clinicians/genetic counselors
 
 
 import argparse
+from argparse import RawTextHelpFormatter
 import subprocess
 import xlsxwriter
 
 #########PARSER##############
 parser = argparse.ArgumentParser(description=\
-    "Queries gemini (v0.18) database to identify variants matching \
-	models of automosomal recessive, de novo, mendelian error, \
-	compound hets and autosomal dominant. \
-	\
-	Returns an xlsx file of the results.\
-	\
-	Input: \
-		database to query \
-		family to analyze (use a '-' if skipping, max one family) \
-		name for output xlsx file.\
-	\
-	Examples (no need for sbatch): \
-		query_gemini.py CCG0.gemini.db CCG0_800042 CCGO_800042.variants.xlsx \
-		query_gemini.py CCGO.gemini.db - all.variants.xlsx")
+    """
+	Queries gemini (v0.18) database to identify variants matching 
+	models of automosomal recessive, de novo, mendelian error, 
+	compound hets and autosomal dominant. 
+	
+	Returns an xlsx file of the results.
+	
+	Input: 
+		database to query 
+		family to analyze (optional) 
+		name for output xlsx file.
+	
+	Examples (no need for sbatch): 
+		query_gemini.py --database CCG0.gemini.db --family CCG0_800042 CCGO_800042.variants.xlsx 
+		query_gemini.py --database CCGO.gemini.db --family all.variants.xlsx""", 
 
-parser.add_argument('--database')
-parser.add_argument('--family')
+	formatter_class=RawTextHelpFormatter)
 
+parser.add_argument('-d','--database',required=True)
+parser.add_argument('-f','--family')
+parser.add_argument('-o','--output_name', required=True)
 #########CODE#############
 def autosomal_recessive(db, family):
 	filter = " --filter \"max_aaf_all < 0.01 AND (is_coding=1 OR is_splicing=1) \
@@ -68,13 +72,16 @@ def mendel_errors(db, family):
 	me = subprocess.check_output(me_query,shell=True).decode('utf-8')
 	me = me.split('\n')
 	# get the header in
-	me_out = []
-	me_out.append(me[0]) 
-	# filter for only the family we want
-	for line in me:
-		s_line = line.split('\t')
-		if line and s_line[48]==family:
-			me_out.append(line)
+	if family == '-':
+		me_out = me
+	else:
+		me_out = []
+		me_out.append(me[0]) 
+		# filter for only the family we want
+		for line in me:
+			s_line = line.split('\t')
+			if line and s_line[48]==family:
+				me_out.append(line)
 	return(me_out)
 
 def comp_hets(db, family):
@@ -125,10 +132,11 @@ def output_to_xlsx(data,sheet_name):
 			row += 1
 
 def main():
-	args = parser.parse_args()
 	db = args.database
-	family = args.family
-	
+	if args.family:
+		family = args.family
+	else:
+		family = '-'
 	# output time
 	ar = autosomal_recessive(db, family)
 	output_to_xlsx(ar, "Autosomal Recessive")	
@@ -150,7 +158,8 @@ def main():
 
 
 # global stuff
-workbook = xlsxwriter.Workbook('test.xlsx')
+args = parser.parse_args()
+workbook = xlsxwriter.Workbook(args.output_name)
 columns = 	" --columns \"chrom, start, end, codon_change, aa_change, type, impact, \
 			impact_severity, gene, vep_hgvsp, aaf_1kg_all, aaf_exac_all, \
 			exac_num_hom_alt, exac_num_het, gerp_bp_score, polyphen_score, \

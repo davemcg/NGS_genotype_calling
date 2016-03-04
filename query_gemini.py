@@ -96,7 +96,7 @@ def comp_hets(db, family):
 		ch_query = "gemini comp_hets" + columns + db + " " + filter
 	else:
 		ch_query = "gemini comp_hets" + columns + \
-					"--families " + "CCGO_FAM_800044" + " " + db + " " + filter
+					"--families " + family + " " + db + " " + filter
 	ch = subprocess.check_output(ch_query,shell=True).decode('utf-8')
 	ch = ch.split('\n')
 	return(ch)

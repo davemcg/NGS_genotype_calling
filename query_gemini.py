@@ -102,7 +102,7 @@ def comp_hets(db, family):
 	return(ch)
 
 def autosomal_dominant(db, family):
-	filter = " --filter \"max_aaf_all < 0.01 AND (is_coding=1 OR is_splicing=1) \
+	filter = " --filter \"max_aaf_all < 0.0001 AND (is_coding=1 OR is_splicing=1) \
 				AND filter IS NULL\" --gt-pl-max 10 -d 5 --min-gq 20 "
 	if family == "-":
 		ad_query = "gemini autosomal_dominant" + columns + db + " " + filter

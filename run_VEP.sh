@@ -22,7 +22,7 @@ if [ "$genome" == "GRCh38" ] || [ "$genome" == "GRCh37" ]; then
     --numbers \
     --biotype \
     --total_length \
-    --fields Consequence,Codons,Amino_acids,Gene,SYMBOL,Feature,EXON,PolyPhen,SIFT,Protein_position,BIOTYPE,CANONICAL,Grantham,HGVSc,HGVSp\
+    --fields Consequence,Codons,Amino_acids,Gene,SYMBOL,Feature,EXON,PolyPhen,SIFT,Protein_position,BIOTYPE,CANONICAL,Grantham,MaxEntScan,HGVSc,HGVSp\
 	--vcf --force_overwrite --fork $cores
 else
     echo "Pick either GRCh38 or GRCh37 genomes"

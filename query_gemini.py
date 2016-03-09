@@ -196,8 +196,8 @@ workbook = xlsxwriter.Workbook(args.output_name)
 columns = 	" --columns \"chrom, start, end, codon_change, aa_change, type, impact, \
 			impact_severity, gene, clinvar_gene_phenotype, pfam_domain, vep_hgvsp, \
 			max_aaf_all, aaf_1kg_all, aaf_exac_all, exac_num_hom_alt, exac_num_het, \
-			gerp_bp_score, polyphen_score, cadd_scaled, sift_pred, sift_score, vep_grantham, \
-			(gt_ref_depths).(*), (gt_alt_depths).(*) \" "
+			geno2mp_hpo_ct, gerp_bp_score, polyphen_score, cadd_scaled, sift_pred, \
+			sift_score, vep_grantham, (gt_ref_depths).(*), (gt_alt_depths).(*) \" "
 
 # run it!
 main()

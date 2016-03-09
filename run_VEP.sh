@@ -13,6 +13,7 @@ if [ "$genome" == "GRCh38" ] || [ "$genome" == "GRCh37" ]; then
 	--fasta $VEPCACHEDIR/$genome.fa --species human --assembly $genome  \
 	--output ${input_vcf%.vcf}.VEP.$genome.vcf \
 	--plugin Grantham \
+	--plugin MaxEntScan \
 	--total_length \
     --hgvs \
 	--sift b \

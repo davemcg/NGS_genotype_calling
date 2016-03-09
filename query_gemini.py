@@ -40,7 +40,8 @@ def autosomal_recessive(db, family):
 	if family=='-':
 		ar_query = "gemini autosomal_recessive" + columns + db + " " + filter
 	else:
-		ar_query = "gemini autosomal_recessive" + columns + \
+		new_columns = columns.replace('*','family_id=' + '\'' + family +'\'')
+		ar_query = "gemini autosomal_recessive" + new_columns + \
 					"--families " + family + " " + db + " " + filter
 	ar = subprocess.check_output(ar_query,shell=True).decode('utf-8')
 	ar = ar.split('\n')
@@ -52,7 +53,8 @@ def de_novo(db, family):
 	if family=="-":
 		dn_query = "gemini de_novo" + columns + db + " " + filter
 	else:
-		dn_query = "gemini de_novo" + columns + \
+		new_columns = columns.replace('*','family_id=' + '\'' + family +'\'')
+		dn_query = "gemini de_novo" + new_columns + \
 					"--families " + family + " " + db + " " + filter
 	dn = subprocess.check_output(dn_query,shell=True).decode('utf-8')	
 	dn = dn.split('\n')
@@ -95,7 +97,8 @@ def comp_hets(db, family):
 	if family == "-":
 		ch_query = "gemini comp_hets" + columns + db + " " + filter
 	else:
-		ch_query = "gemini comp_hets" + columns + \
+		new_columns = columns.replace('*','family_id=' + '\'' + family +'\'')
+		ch_query = "gemini comp_hets" + new_columns + \
 					"--families " + family + " " + db + " " + filter
 	ch = subprocess.check_output(ch_query,shell=True).decode('utf-8')
 	ch = ch.split('\n')
@@ -107,7 +110,8 @@ def autosomal_dominant(db, family):
 	if family == "-":
 		ad_query = "gemini autosomal_dominant" + columns + db + " " + filter
 	else:
-		ad_query = "gemini autosomal_dominant" + columns + \
+		new_columns = columns.replace('*','family_id=' + '\'' + family +'\'')
+		ad_query = "gemini autosomal_dominant" + new_columns + \
 					"--families " + family + " " + db + " " + filter
 	ad = subprocess.check_output(ad_query,shell=True).decode('utf-8')
 	ad = ad.split('\n')
@@ -190,9 +194,10 @@ def main():
 args = parser.parse_args()
 workbook = xlsxwriter.Workbook(args.output_name)
 columns = 	" --columns \"chrom, start, end, codon_change, aa_change, type, impact, \
-			impact_severity, gene, vep_hgvsp, aaf_1kg_all, aaf_exac_all, \
-			exac_num_hom_alt, exac_num_het, gerp_bp_score, polyphen_score, \
-			cadd_scaled, sift_pred, sift_score, vep_grantham, (gt_depths).(*) \" "
+			impact_severity, gene, clinvar_gene_phenotype, pfam_domain, vep_hgvsp, \
+			max_aaf_all, aaf_1kg_all, aaf_exac_all, exac_num_hom_alt, exac_num_het, \
+			gerp_bp_score, polyphen_score, cadd_scaled, sift_pred, sift_score, vep_grantham, \
+			(gt_ref_depths).(*), (gt_alt_depths).(*) \" "
 
 # run it!
 main()

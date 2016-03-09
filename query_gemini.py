@@ -9,6 +9,7 @@ import argparse
 from argparse import RawTextHelpFormatter
 import subprocess
 import xlsxwriter
+from collections import Counter
 
 #########PARSER##############
 parser = argparse.ArgumentParser(description=\
@@ -102,7 +103,21 @@ def comp_hets(db, family):
 					"--families " + family + " " + db + " " + filter
 	ch = subprocess.check_output(ch_query,shell=True).decode('utf-8')
 	ch = ch.split('\n')
-	return(ch, ch_query)
+	# reorder to put common comp_het genes (more than 4 variants) at bottom
+	gene_index = ch[0].split().index('gene')
+	# get counts for genes
+	gene_counts = Counter([x.split()[gene_index] for x in ch[:-1]])
+	# id genes that appear more than 4 times
+	common_genes = [x[0] for x in gene_counts.items() if x[1]>4]
+	unique_ch = [x for x in ch[:-1] if x.split()[gene_index] not in common_genes]
+	common_ch = [x for x in ch[:-1] if x.split()[gene_index] in common_genes]
+	new_ch = unique_ch
+	new_ch.append('\n')
+	new_ch.append('Below are likely false positives (more than four \
+				variants in a gene are unlikely to be a deleterious comp het)')
+	new_ch.append('\n')
+	new_ch.extend(common_ch)
+	return(new_ch, ch_query)
 
 def autosomal_dominant(db, family):
 	filter = " --filter \"max_aaf_all < 0.0001 AND (is_coding=1 OR is_splicing=1) \

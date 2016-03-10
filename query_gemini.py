@@ -36,7 +36,7 @@ parser.add_argument('-f','--family')
 parser.add_argument('-o','--output_name', required=True)
 #########CODE#############
 def autosomal_recessive(db, family):
-	filter = " --filter \"max_aaf_all < 0.01 AND (is_coding=1 OR is_splicing=1) \
+	filter = " --filter \"aaf_esp_all < 0.01 AND aaf_1kg_all < 0.01 AND aaf_exac_all < 0.01 AND (is_coding=1 OR is_splicing=1) \
 				AND filter IS NULL\" --gt-pl-max 10 -d 5 --min-gq 20 "
 	if family=='-':
 		ar_query = "gemini autosomal_recessive" + columns + db + " " + filter
@@ -49,7 +49,7 @@ def autosomal_recessive(db, family):
 	return(ar,ar_query)
 
 def de_novo(db, family):
-	filter = " --filter \"max_aaf_all < 0.005 AND (is_coding=1 OR is_splicing=1) \
+	filter = " --filter \"aaf_esp_all < 0.005 AND aaf_1kg_all < 0.005 AND aaf_exac_all < 0.005 AND (is_coding=1 OR is_splicing=1) \
 				AND filter IS NULL\" --gt-pl-max 10 -d 5 --min-gq 20 "
 	if family=="-":
 		dn_query = "gemini de_novo" + columns + db + " " + filter
@@ -65,7 +65,7 @@ def mendel_errors(db, family):
 	# gemini v0.18 has a bug with this call:
 		# Can't parse by family
 		# Hence my workaround
-	filter = " --filter \"max_aaf_all < 0.005 AND (is_coding=1 OR is_splicing=1) \
+	filter = " --filter \"aaf_esp_all < 0.005 AND aaf_1kg_all < 0.005 AND aaf_exac_all < 0.005 AND (is_coding=1 OR is_splicing=1) \
 				AND filter IS NULL\" --gt-pl-max 1 -d 5 --min-gq 20 "
 	me_query = "gemini mendel_errors" + columns + db + " " + filter 	
 	me = subprocess.check_output(me_query,shell=True).decode('utf-8')
@@ -89,23 +89,26 @@ def mendel_errors(db, family):
 def comp_hets(db, family):
 	# can't call exac numbers in v0.18 (reported bug, fixed in next release)
 	columns = 	" --columns \"chrom, start, end, codon_change, aa_change, type, impact, \
-				impact_severity, gene, vep_hgvsp, aaf_1kg_all, aaf_exac_all, \
-				gerp_bp_score, polyphen_score, \
-				cadd_raw, sift_pred, sift_score, vep_grantham, (gt_depths).(*) \" "
+			impact_severity, gene, clinvar_gene_phenotype, pfam_domain, vep_hgvsp, \
+			max_aaf_all, aaf_1kg_all, aaf_exac_all, \
+			geno2mp_hpo_ct, gerp_bp_score, polyphen_score, cadd_scaled, sift_pred, \
+			sift_score, vep_maxEntScan, vep_grantham \" "
 	
-	filter = " --filter \"max_aaf_all < 0.01 AND (is_coding=1 OR is_splicing=1) \
+	filter = " --filter \"aaf_esp_all < 0.01 AND aaf_1kg_all < 0.01 AND aaf_exac_all < 0.01 AND (is_coding=1 OR is_splicing=1) \
 				AND filter IS NULL\" --gt-pl-max 10 -d 5 --min-gq 20 --max-priority 2 "
 	if family == "-":
 		ch_query = "gemini comp_hets" + columns + db + " " + filter
 	else:
-		new_columns = columns.replace('*','family_id=' + '\'' + family +'\'')
-		ch_query = "gemini comp_hets" + new_columns + \
+		ch_query = "gemini comp_hets" + columns + \
 					"--families " + family + " " + db + " " + filter
 	ch = subprocess.check_output(ch_query,shell=True).decode('utf-8')
 	ch = ch.split('\n')
+	####
 	# reorder to put common comp_het genes (more than 4 variants) at bottom
+	####
+	# find position of the gene column
 	gene_index = ch[0].split().index('gene')
-	# get counts for genes
+	# get counts for genes (last item in ch is blank)
 	gene_counts = Counter([x.split()[gene_index] for x in ch[:-1]])
 	# id genes that appear more than 4 times
 	common_genes = [x[0] for x in gene_counts.items() if x[1]>4]
@@ -120,7 +123,7 @@ def comp_hets(db, family):
 	return(new_ch, ch_query)
 
 def autosomal_dominant(db, family):
-	filter = " --filter \"max_aaf_all < 0.0001 AND (is_coding=1 OR is_splicing=1) \
+	filter = " --filter \"aaf_esp_all < 0.0001 AND aaf_1kg_all < 0.0001 AND aaf_exac_all < 0.0001 AND (is_coding=1 OR is_splicing=1) \
 				AND filter IS NULL\" --gt-pl-max 10 -d 5 --min-gq 20 "
 	if family == "-":
 		ad_query = "gemini autosomal_dominant" + columns + db + " " + filter
@@ -212,7 +215,7 @@ columns = 	" --columns \"chrom, start, end, codon_change, aa_change, type, impac
 			impact_severity, gene, clinvar_gene_phenotype, pfam_domain, vep_hgvsp, \
 			max_aaf_all, aaf_1kg_all, aaf_exac_all, exac_num_hom_alt, exac_num_het, \
 			geno2mp_hpo_ct, gerp_bp_score, polyphen_score, cadd_scaled, sift_pred, \
-			sift_score, vep_grantham, (gt_ref_depths).(*), (gt_alt_depths).(*) \" "
+			sift_score, vep_maxEntScan, vep_grantham, (gt_ref_depths).(*), (gt_alt_depths).(*) \" "
 
 # run it!
 main()

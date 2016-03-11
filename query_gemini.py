@@ -144,6 +144,8 @@ def overview(db, queries):
 	ped = subprocess.check_output(ped_query,shell=True).decode('utf-8')
 	ped = ped.split('\n')
 	output = []
+	output.append("Date and Time this file was generated")
+	output.append(str(datetime.datetime.now().date()) + '\t' + str(datetime.datetime.now().time()))
 	output.append('Overall genotypes by sample')
 	output.extend(stats)
 	output.append('PED information used for calls')

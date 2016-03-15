@@ -20,7 +20,7 @@ bam_name = bamfile.split('.bam')[0]
 
 # Extract fastq
 print("Beginning fastq extraction")
-bam2fastq_call = "bam2fastq --overwrite -o " + bam_name + "#.fastq " + bamfile
+bam2fastq_call = "bam2fastq -o " + bam_name + "#.fastq " + bamfile
 subprocess.check_call(bam2fastq_call, shell=True)
 print("Done")
 
@@ -53,7 +53,7 @@ RG_core = '\\\\t'.join(['\\"\@RG',ID, SM, LB, PL])
 
 # bwa alignment
 print("BWA run beginning")
-run_bwa =   ('run_bwa-mem_hg19.sh ' +
+run_bwa =   ('/home/mcgaugheyd/bin/exome_workflow_v01/run_bwa-mem_hg19.sh ' +
             bam_name + '_1.fastq ' + bam_name + '_2.fastq ' +
             '\\@RG\\\\t' + ID + '\\\\t' + SM + '\\\\t' + LB + '\\\\t' + 'PL:Illumina ' +
             bam_name + '.bwa-mem.hg19.bam')

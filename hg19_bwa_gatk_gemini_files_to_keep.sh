@@ -15,7 +15,7 @@ mkdir scripts
 # will find the original bam files (which don't have "bwa" in their name) and move to core_files
 find -mindepth 1 -maxdepth 1 | grep -v bwa.*bam | grep bam$ | xargs  -I{} mv {} core_files/
 # moves last bam
-mv *hg19.sorted.markDup.realigned.bam core_files/
+mv *hg19.sorted.markDup.realigned.bam* core_files/
 # moves g.vcf file. May need for re-doing genotype calls
 mv *.g.vcf* core_files/
 # moves vcf file ready for use (clinician, VEP, gemini)

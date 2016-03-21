@@ -13,7 +13,7 @@ region=$3
 if [ "$genome" == "GRCh38" ]; then
 	freebayes -v $vcf_file -f /data/mcgaugheyd/genomes/GRCh38/hs38DH.fa $bam_files
 elif [ "$genome" == "hg19" ]; then
-	freebayes -r $region -v $vcf_file -f /fdb/igenomes/Homo_sapiens/UCSC/hg19/Sequence/WholeGenomeFasta/genome.fa $bam_files
+	freebayes -v $vcf_file -f /fdb/igenomes/Homo_sapiens/UCSC/hg19/Sequence/WholeGenomeFasta/genome.fa $bam_files
 else
 	echo "Pick either GRCh38 or hg19 genomes"
 fi

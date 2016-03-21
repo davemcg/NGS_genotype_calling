@@ -6,11 +6,11 @@ gvcfs_list=$1
 output_vcf_name=$2
 ped=$3
 # Merges all GVCFs into a VCF
-#GATK -m 8g GenotypeGVCFs \
-#    -R /fdb/GATK_resource_bundle/hg19-2.8/ucsc.hg19.fasta \
-#    -o $2 \
-#    -V $gvcfs_list \
-#    --pedigree $ped
+GATK -m 8g GenotypeGVCFs \
+    -R /fdb/GATK_resource_bundle/hg19-2.8/ucsc.hg19.fasta \
+    -o $2 \
+    -V $gvcfs_list \
+    --pedigree $ped
 
 # VQSR calculation time for SNPs
 GATK -m 8g VariantRecalibrator \

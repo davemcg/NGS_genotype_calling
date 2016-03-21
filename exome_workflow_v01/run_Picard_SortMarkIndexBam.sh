@@ -6,8 +6,15 @@ module load picard
 
 echo $1
 
-java -Xmx20g -jar $PICARDJARPATH/picard.jar SortSam \
-	INPUT=$1 OUTPUT=${1%.bam}.sorted.bam SORT_ORDER=coordinate
+# "Soft-clipping beyond-end-of-reference alignments and setting MAPQ to 0 for unmapped reads"
+java -Xmx20g -jar $PICARDJARPATH/picard.jar CleanSam \
+	INPUT=$1 OUTPUT=${1%.bam}.CleanSam.bam
+
+
+# "Verify mate-pair information between mates and fix if needed."
+java -Xmx20g -jar $PICARDJARPATH/picard.jar FixMateInformation \
+	INPUT=${1%.bam}.CleanSam.bam OUTPUT=${1%.bam}.sorted.bam 
+
 
 sorted_bam=${1%.bam}.sorted.bam
 
@@ -21,5 +28,6 @@ java -Xmx20g -jar $PICARDJARPATH/picard.jar BuildBamIndex \
 
 # Delete intermediate files
 rm $1
+rm ${1%.bam}.CleanSam.bam
 rm ${1%.bam}.sorted.bam
 #rm ${sorted_bam%.bam}.markDup.bam

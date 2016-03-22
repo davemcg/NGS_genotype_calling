@@ -46,7 +46,7 @@ SM = 'SM:' + bam_name
 LB = 'LB:' + fastq_file.split('.')[2]
 PL = 'PL:Illumina\\" \\'
 
-Output = SM + '.bwa-mem.hg19.bam'
+Output = SM + '.bwa-mem.b37.bam'
 # Joins all together
 RG_core = '\\\\t'.join(['\\"\@RG',ID, SM, LB, PL])
 
@@ -56,7 +56,7 @@ print("BWA run beginning")
 run_bwa =   ('/home/mcgaugheyd/bin/exome_workflow_v01/run_bwa-mem_hs37d5.sh ' +
             bam_name + '_1.fastq ' + bam_name + '_2.fastq ' +
             '\\@RG\\\\t' + ID + '\\\\t' + SM + '\\\\t' + LB + '\\\\t' + 'PL:Illumina ' +
-            bam_name + '.bwa-mem.hg19.bam')
+            bam_name + '.bwa-mem.b37.bam')
 print(run_bwa)
 subprocess.check_call(run_bwa, shell=True)
 print("All done!")

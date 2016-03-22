@@ -12,6 +12,7 @@ module load samtools/1.2
 module load bam2fastq/1.1.0
 
 nisc_input_bam=$1 
+exome_bait_bed=$2
 
 ############
 #RE-ALIGNMENT
@@ -29,5 +30,5 @@ j2=$(sbatch --job-name sortMarkIndex.$1 --dependency=afterok:$j1 --mem=20G ~/bin
 # Call GVCF
 # Individual GVCF file, which in conjuction with other GVCFs and filtering (hard or VQSR) are used
 # to make a VCF file with called genotypes
-j3=$(sbatch --job-name callGVCF.$1 --dependency=afterok:$j2 --mem=16g --time=16:00:00 ~/bin/exome_workflow_v01/run_GATK_callGVCFs.sh ${1%.bam}.bwa-mem.hg19.sorted.markDup.bam)
+j3=$(sbatch --job-name callGVCF.$1 --dependency=afterok:$j2 --mem=16g --time=16:00:00 ~/bin/exome_workflow_v01/run_GATK_callGVCFs.sh ${1%.bam}.bwa-mem.hg19.sorted.markDup.bam $2)
 ############

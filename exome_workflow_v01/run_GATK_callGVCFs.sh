@@ -12,7 +12,7 @@ GATK -m 8g RealignerTargetCreator \
 	--known /fdb/GATK_resource_bundle/hg19-2.8/1000G_phase1.indels.hg19.vcf.gz \
 	--known /fdb/GATK_resource_bundle/hg19-2.8/Mills_and_1000G_gold_standard.indels.hg19.vcf.gz \
 	-o ${input_bam%.bam}.forIndexRealigner.intervals \
-	-L /data/mcgaugheyd/genomes/hg19/$2 \
+	-L /data/mcgaugheyd/genomes/hg19/exome_target_regions/$2 \
 	--interval_padding 100
 
 # Takes ~ 100 minutes
@@ -30,7 +30,7 @@ GATK -m 8g BaseRecalibrator \
 	--known /fdb/GATK_resource_bundle/hg19-2.8/dbsnp_138.hg19.excluding_sites_after_129.vcf.gz \
 	--known /fdb/GATK_resource_bundle/hg19-2.8/1000G_phase1.indels.hg19.vcf.gz \
 	--known /fdb/GATK_resource_bundle/hg19-2.8/Mills_and_1000G_gold_standard.indels.hg19.vcf.gz \
-	-L /data/mcgaugheyd/genomes/hg19/$2 \
+	-L /data/mcgaugheyd/genomes/hg19/exome_target_regions/$2 \
 	--interval_padding 100 \
 	-o ${input_bam%.bam}.recal_data.table1
 
@@ -59,7 +59,7 @@ GATK -m 8g AnalyzeCovariates \
 GATK -m 8g HaplotypeCaller \
 	-R /fdb/GATK_resource_bundle/hg19-2.8/ucsc.hg19.fasta \
 	-I ${input_bam%.bam}.realigned.recalibrated.bam \
-	-L /data/mcgaugheyd/genomes/hg19/$2 \
+	-L /data/mcgaugheyd/genomes/hg19/exome_target_regions/$2 \
 	--interval_padding 100 \
 	--emitRefConfidence GVCF \
 	-BQSR ${input_bam%.bam}.recal_data.table1 \

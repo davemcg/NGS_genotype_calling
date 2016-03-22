@@ -12,8 +12,9 @@ java -Xmx20g -jar $PICARDJARPATH/picard.jar CleanSam \
 
 
 # "Verify mate-pair information between mates and fix if needed."
+# also coord sorts
 java -Xmx20g -jar $PICARDJARPATH/picard.jar FixMateInformation \
-	INPUT=${1%.bam}.CleanSam.bam OUTPUT=${1%.bam}.sorted.bam 
+	INPUT=${1%.bam}.CleanSam.bam OUTPUT=${1%.bam}.sorted.bam SORT_ORDER=coordinate
 
 # name for easier downstream use
 sorted_bam=${1%.bam}.sorted.bam
@@ -29,7 +30,7 @@ java -Xmx20g -jar $PICARDJARPATH/picard.jar BuildBamIndex \
 	INPUT=$sorted_markDup_bam OUTPUT=$sorted_markDup_bam.bai
 
 # Delete intermediate files
-rm $1
-rm ${1%.bam}.CleanSam.bam
-rm ${1%.bam}.sorted.bam
+#rm $1
+#rm ${1%.bam}.CleanSam.bam
+#rm ${1%.bam}.sorted.bam
 #rm ${sorted_bam%.bam}.markDup.bam

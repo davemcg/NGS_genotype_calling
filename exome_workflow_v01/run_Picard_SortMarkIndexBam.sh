@@ -15,14 +15,16 @@ java -Xmx20g -jar $PICARDJARPATH/picard.jar CleanSam \
 java -Xmx20g -jar $PICARDJARPATH/picard.jar FixMateInformation \
 	INPUT=${1%.bam}.CleanSam.bam OUTPUT=${1%.bam}.sorted.bam 
 
-
+# name for easier downstream use
 sorted_bam=${1%.bam}.sorted.bam
 
+# Mark dups
 java -Xmx20g -jar $PICARDJARPATH/picard.jar MarkDuplicates \
 	INPUT=$sorted_bam OUTPUT=${sorted_bam%.bam}.markDup.bam METRICS_FILE=${sorted_bam%.bam}.markDup.metrics
 
 sorted_markDup_bam=${sorted_bam%.bam}.markDup.bam
 
+# Build bam index
 java -Xmx20g -jar $PICARDJARPATH/picard.jar BuildBamIndex \
 	INPUT=$sorted_markDup_bam OUTPUT=$sorted_markDup_bam.bai
 

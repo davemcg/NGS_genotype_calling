@@ -19,17 +19,17 @@ GATK -m 8g RealignerTargetCreator \
 GATK -m 8g IndelRealigner \
 	-R /fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37.fasta \
 	-I $input_bam \
-	--known /fdb/GATK_resource_bundle/b37-2.8/1000G_phase1.indels.b37.vcf \
-	--known /fdb/GATK_resource_bundle/b37-2.8/Mills_and_1000G_gold_standard.indels.b37.vcf \
+	--knownAlleles /fdb/GATK_resource_bundle/b37-2.8/1000G_phase1.indels.b37.vcf \
+	--knownAlleles /fdb/GATK_resource_bundle/b37-2.8/Mills_and_1000G_gold_standard.indels.b37.vcf \
 	-targetIntervals ${input_bam%.bam}.forIndexRealigner.intervals \
 	-o ${input_bam%.bam}.realigned.bam
 
 GATK -m 8g BaseRecalibrator \
 	-R /fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37.fasta \
 	-I ${input_bam%.bam}.realigned.bam \
-	--known /fdb/GATK_resource_bundle/b37-2.8/dbsnp_138.b37.excluding_sites_after_129.vcf \
-	--known /fdb/GATK_resource_bundle/b37-2.8/1000G_phase1.indels.b37.vcf \
-	--known /fdb/GATK_resource_bundle/b37-2.8/Mills_and_1000G_gold_standard.indels.b37.vcf \
+	--knownSites /fdb/GATK_resource_bundle/b37-2.8/dbsnp_138.b37.excluding_sites_after_129.vcf \
+	--knownSites /fdb/GATK_resource_bundle/b37-2.8/1000G_phase1.indels.b37.vcf \
+	--knownSites /fdb/GATK_resource_bundle/b37-2.8/Mills_and_1000G_gold_standard.indels.b37.vcf \
 	-L /data/mcgaugheyd/genomes/hg19/exome_target_regions/$2 \
 	--interval_padding 100 \
 	-o ${input_bam%.bam}.recal_data.table1
@@ -43,9 +43,9 @@ GATK -m 8g PrintReads \
 GATK -m 8g BaseRecalibrator \
 	-R /fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37.fasta \
 	-I ${input_bam%.bam}.realigned.bam \
-	--known /fdb/GATK_resource_bundle/b37-2.8/dbsnp_138.b37.excluding_sites_after_129.vcf \
-    --known /fdb/GATK_resource_bundle/b37-2.8/1000G_phase1.indels.b37.vcf \
-    --known /fdb/GATK_resource_bundle/b37-2.8/Mills_and_1000G_gold_standard.indels.b37.vcf \
+	--knownSites /fdb/GATK_resource_bundle/b37-2.8/dbsnp_138.b37.excluding_sites_after_129.vcf \
+    --knownSites /fdb/GATK_resource_bundle/b37-2.8/1000G_phase1.indels.b37.vcf \
+    --knownSites /fdb/GATK_resource_bundle/b37-2.8/Mills_and_1000G_gold_standard.indels.b37.vcf \
 	-BQSR ${input_bam%.bam}.recal_data.table1 \
  	-o ${input_bam%.bam}.recal_data.table2
 

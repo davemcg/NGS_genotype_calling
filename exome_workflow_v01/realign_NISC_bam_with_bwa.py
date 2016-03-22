@@ -53,7 +53,7 @@ RG_core = '\\\\t'.join(['\\"\@RG',ID, SM, LB, PL])
 
 # bwa alignment
 print("BWA run beginning")
-run_bwa =   ('/home/mcgaugheyd/bin/exome_workflow_v01/run_bwa-mem_hg19.sh ' +
+run_bwa =   ('/home/mcgaugheyd/bin/exome_workflow_v01/run_bwa-mem_hs37d5.sh ' +
             bam_name + '_1.fastq ' + bam_name + '_2.fastq ' +
             '\\@RG\\\\t' + ID + '\\\\t' + SM + '\\\\t' + LB + '\\\\t' + 'PL:Illumina ' +
             bam_name + '.bwa-mem.hg19.bam')

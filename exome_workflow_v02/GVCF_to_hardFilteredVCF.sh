@@ -5,6 +5,7 @@ module load GATK/3.5-0
 gvcfs_list=$1
 output_vcf_name=$2
 ped=$3
+exome_bait_bed=$4
 # Merges all GVCFs into a VCF
 GATK -m 20g GenotypeGVCFs \
 	-R /fdb/GATK_resource_bundle/hg19-2.8/ucsc.hg19.fasta \
@@ -16,7 +17,7 @@ GATK -m 20g GenotypeGVCFs \
 GATK -m 20g SelectVariants \
 	-R /fdb/GATK_resource_bundle/hg19-2.8/ucsc.hg19.fasta \
 	-V $2 \
-	-L /data/mcgaugheyd/genomes/hg19/SeqCap_EZ_Exome_v3_primary.bed \
+	-L $4 \
     --interval_padding 100 \
 	-selectType SNP \
 	-o ${2%.vcf}.rawSNP.vcf
@@ -25,7 +26,7 @@ GATK -m 20g SelectVariants \
 GATK -m 20g SelectVariants \
 	-R /fdb/GATK_resource_bundle/hg19-2.8/ucsc.hg19.fasta \
 	-V $2 \
-	-L /data/mcgaugheyd/genomes/hg19/SeqCap_EZ_Exome_v3_primary.bed \
+	-L $4 \
 	--interval_padding 100 \
 	-selectType INDEL \
 	-o ${2%.vcf}.rawINDEL.vcf

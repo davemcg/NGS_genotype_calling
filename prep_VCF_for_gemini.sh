@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Assumes a GATK processed VCF after GATK-recommended filtering
-# Hard coded against hg19/grch37
+# Hard coded against grch37
 # 
 module load vcftools
 
@@ -16,7 +16,7 @@ mkdir tmp
 cat $VCF \
 	| sed 's/ID=AD,Number=./ID=AD,Number=R/' \
 	| ~/git/vt/./vt decompose -s - \
-	| ~/git/vt/./vt normalize -r /fdb/GATK_resource_bundle/hg19-2.8/ucsc.hg19.fasta - \
+	| ~/git/vt/./vt normalize -r /data/mcgaugheyd/genomes/1000G_phase2_GRCh37/human_g1k_v37.fasta - \
 	> tmp/$VCF 
 
 # annotate with VEP

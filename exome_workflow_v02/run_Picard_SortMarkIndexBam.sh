@@ -30,7 +30,7 @@ java -Xmx20g -jar $PICARDJARPATH/picard.jar BuildBamIndex \
 	INPUT=$sorted_markDup_bam OUTPUT=$sorted_markDup_bam.bai
 
 # Delete intermediate files
-#rm $1
-#rm ${1%.bam}.CleanSam.bam
-#rm ${1%.bam}.sorted.bam
+rm $1
+rm ${1%.bam}.CleanSam.bam
+rm ${1%.bam}.sorted.bam
 #rm ${sorted_bam%.bam}.markDup.bam

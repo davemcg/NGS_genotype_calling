@@ -6,7 +6,7 @@ import subprocess
 parser = argparse.ArgumentParser()
 parser.add_argument('file', help= 
 	"Takes in NISC bam file, extracts fastsq, \
-	realigns fastq with bwa-mem to hg19, with \
+	realigns fastq with bwa-mem to 1000g phaseII hs37d5  with \
 	read group info extracted from NISC bam \
 	Requires bam2fastq/1.1.0 and samtools/1.2 to be loaded \
 	\

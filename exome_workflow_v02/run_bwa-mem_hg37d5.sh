@@ -9,6 +9,6 @@ rg=$3
 output_name=$4
 
 bwa mem -M -t 10 -B 4 -O 6 -E 1 -M -R $rg \
-	/data/mcgaugheyd/genomes/hs37d5_1000G/hs37d5.fa \
+	/data/mcgaugheyd/genomes/1000G_phase2_GRCh37/human_g1k_v37.fasta \
 	$1 $2 | samtools view -1 - > $4
 

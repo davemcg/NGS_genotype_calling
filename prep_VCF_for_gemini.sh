@@ -16,7 +16,7 @@ mkdir tmp
 cat $VCF \
 	| sed 's/ID=AD,Number=./ID=AD,Number=R/' \
 	| ~/git/vt/./vt decompose -s - \
-	| ~/git/vt/./vt normalize -r /data/mcgaugheyd/genomes/1000G_phase2_GRCh37/human_g1k_v37.fasta - \
+	| ~/git/vt/./vt normalize -r /data/mcgaugheyd/genomes/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta - \
 	> tmp/$VCF 
 
 # annotate with VEP

@@ -24,6 +24,12 @@ bam2fastq_call = "bam2fastq -o " + bam_name + "#.fastq " + bamfile
 subprocess.check_call(bam2fastq_call, shell=True)
 print("Done")
 
+# gzip
+gzip_call_1 = "gzip " + bam_name + "_1.fastq"
+gzip_call_2 = "gzip " + bam_name + "_2.fastq"
+subprocess.check_call(gzip_call_1, shell=True)
+subprocess.check_call(gzip_call_2, shell=True)
+
 # Runs samtools view -h and captures output
 samtools_input = 'samtools view -h ' + bamfile + '| head -n 100 | grep ^@PG'
 samtools_view = (subprocess.check_output(samtools_input, shell=True)).decode('utf-8')
@@ -54,7 +60,7 @@ RG_core = '\\\\t'.join(['\\"\@RG',ID, SM, LB, PL])
 # bwa alignment
 print("BWA run beginning")
 run_bwa =   ('/home/mcgaugheyd/bin/exome_workflow_v02/run_bwa-mem_hg37d5.sh ' +
-            bam_name + '_1.fastq ' + bam_name + '_2.fastq ' +
+            bam_name + '_1.fastq.gz ' + bam_name + '_2.fastq.gz ' +
             '\\@RG\\\\t' + ID + '\\\\t' + SM + '\\\\t' + LB + '\\\\t' + 'PL:Illumina ' +
             bam_name + '.bwa-mem.b37.bam')
 print(run_bwa)

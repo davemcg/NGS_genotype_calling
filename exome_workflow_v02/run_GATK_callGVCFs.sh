@@ -63,4 +63,4 @@ GATK -m 8g HaplotypeCaller \
 	--interval_padding 100 \
 	--emitRefConfidence GVCF \
 	-BQSR ${input_bam%.bam}.recal_data.table1 \
-	-o ${input_bam%.bam}.realigned.raw.g.vcf
+	-o ${input_bam%.bam}.realigned.raw.g.vcf.gz

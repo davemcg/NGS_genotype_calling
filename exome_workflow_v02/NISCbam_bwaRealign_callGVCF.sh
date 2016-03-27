@@ -30,5 +30,5 @@ j2=$(sbatch --job-name sortMarkIndex.$1 --dependency=afterok:$j1 --mem=20G ~/bin
 # Call GVCF
 # Individual GVCF file, which in conjuction with other GVCFs and filtering (hard or VQSR) are used
 # to make a VCF file with called genotypes
-j3=$(sbatch --job-name callGVCF.$1 --dependency=afterok:$j2 --mem=16g --time=16:00:00 ~/bin/exome_workflow_v02/run_GATK_callGVCFs.sh ${1%.bam}.bwa-mem.b37.sorted.markDup.bam $2)
+j3=$(sbatch --job-name callGVCF.$1 --dependency=afterok:$j2 --mem=16g --time=24:00:00 ~/bin/exome_workflow_v02/run_GATK_callGVCFs.sh ${1%.bam}.bwa-mem.b37.sorted.markDup.bam $2)
 ############

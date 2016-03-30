@@ -136,6 +136,16 @@ def autosomal_dominant(db, family):
 	return(ad, ad_query)
 
 def overview(db, queries):
+	# pull useful info and  parameters from vcf header
+	vcf_header_query = "gemini query --header -q \"SELECT * FROM vcf_header\" " + db
+	vcf_header = subprocess.check_output(vcf_header_query,shell=True).decode('utf-8')
+	vcf_header = vcf_header.split('\n')
+	vcf_header_bits = []
+	vcf_header_bits.extend([x for x in vcf_header if x.startswith("##FILTER")])
+	vcf_header_bits.extend([x for x in vcf_header if x.startswith("##GATKCommandLine")])
+	vcf_header_bits.extend([x for x in vcf_header if x.startswith("##reference")])
+	vcf_header_bits.extend([x for x in vcf_header if x.startswith("##VEP")])
+	vcf_header_bits.extend([x for x in vcf_header if x.startswith("#CHROM")])
 	# summary stats, queries used, ped file
 	stats_query = "gemini stats --gts-by-sample " + db
 	stats = subprocess.check_output(stats_query,shell=True).decode('utf-8')
@@ -155,6 +165,9 @@ def overview(db, queries):
 	output.extend(ped)
 	output.append('Gemini Queries')
 	output.extend(queries)
+	output.append('')
+	output.append("Info on GATK commands and filtering, reference used, VEP version, samples in VCF")
+	output.extend(vcf_header_bits)
 	return(output)
 
 def output_to_xlsx(data,sheet_name):

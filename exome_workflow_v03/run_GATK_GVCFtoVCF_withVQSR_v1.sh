@@ -30,9 +30,9 @@ GATK -m 8g VariantRecalibrator \
     -an InbreedingCoeff \
     -mode SNP \
     -tranche 100.0 -tranche 99.97 -tranche 99.0 -tranche 90.0 \
-    -recalFile ${2%.vcf}.recalibrate_SNP.recal \
-    -tranchesFile ${2%.vcf}.recalibrate_SNP.tranches \
-    -rscriptFile ${2%.vcf}.recalibrate_SNP_plots.R
+    -recalFile ${2%.vcf.gz}.recalibrate_SNP.recal \
+    -tranchesFile ${2%.vcf.gz}.recalibrate_SNP.tranches \
+    -rscriptFile ${2%.vcf.gz}.recalibrate_SNP_plots.R
 
 # Apply VQSR results to the variants now and output new SNP recalibrated vcf
 # GATK recommends using tranche of 99.9, bcbio recommend 99.97
@@ -42,9 +42,9 @@ GATK -m 8g ApplyRecalibration \
     -input $2 \
     -mode SNP \
     --ts_filter_level 99.97 \
-    -recalFile ${2%.vcf}.recalibrate_SNP.recal \
-    -tranchesFile ${2%.vcf}.recalibrate_SNP.tranches \
-    -o ${2%.vcf}.recalibrated_snps_raw_indels.vcf.gz
+    -recalFile ${2%.vcf.gz}.recalibrate_SNP.recal \
+    -tranchesFile ${2%.vcf.gz}.recalibrate_SNP.tranches \
+    -o ${2%.vcf.gz}.recalibrated_snps_raw_indels.vcf.gz
 
 # VQSR calculation time for INDELS
 GATK -m 8g VariantRecalibrator \
@@ -61,20 +61,20 @@ GATK -m 8g VariantRecalibrator \
     -mode INDEL \
     -tranche 100.0 -tranche 99.9 -tranche 98.0 -tranche 90.0 \
     --maxGaussians 4 \
-    -recalFile ${2%.vcf}.recalibrate_INDEL.recal \
-    -tranchesFile ${2%.vcf}.recalibrate_INDEL.tranches \
-    -rscriptFile ${2%.vcf}.recalibrate_INDEL_plots.R
+    -recalFile ${2%.vcf.gz}.recalibrate_INDEL.recal \
+    -tranchesFile ${2%.vcf.gz}.recalibrate_INDEL.tranches \
+    -rscriptFile ${2%.vcf.gz}.recalibrate_INDEL_plots.R
 
 # Apply VQSR results to the variants now and output new INDEL only vcf
 # GATK recommends using tranche of 99.0, bcbio recommend 98.0
 # http://bcb.io/2014/05/12/wgs-trio-variant-evaluation/
 GATK -m 8g ApplyRecalibration \
     -R /fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37_decoy.fasta \
-    -input ${2%.vcf}.recalibrated_snps_raw_indels.vcf \
+    -input ${2%.vcf.gz}.recalibrated_snps_raw_indels.vcf.gz \
     -mode INDEL \
     --ts_filter_level 98.0 \
-    -recalFile ${2%.vcf}.recalibrate_INDEL.recal \
-    -tranchesFile ${2%.vcf}.recalibrate_INDEL.tranches \
-    -o ${2%.vcf}.VQSR_recalibrated_variants.vcf.gz
+    -recalFile ${2%.vcf.gz}.recalibrate_INDEL.recal \
+    -tranchesFile ${2%.vcf.gz}.recalibrate_INDEL.tranches \
+    -o ${2%.vcf.gz}.VQSR_recalibrated_variants.vcf.gz
 
-rm ${2%.vcf}.recalibrated_snps_raw_indels.vcf.gz
+rm ${2%.vcf.gz}.recalibrated_snps_raw_indels.vcf.gz

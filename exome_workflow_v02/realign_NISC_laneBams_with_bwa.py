@@ -63,45 +63,46 @@ samples = []
 [samples.append(k) for k,v in sample_laneBam.items()]
 samples.sort()
 for one_sample in samples:
-	if os.path.isdir(one_sample):
-		continue
-	else:
+	if not os.path.isdir(one_sample):
 		mkdir_call = "mkdir " + one_sample
 		subprocess.check_call(mkdir_call, shell=True)
-	# create directory structure
+	# create Trek directory structure
 	base_dir = "/cluster/ifs/projects/solexa/reads/"
 	# loop through each laneBam and do the scp
 	for laneBam in sample_laneBam[one_sample]:
 		folder = laneBam.split('.')[0]
 		full_dir = base_dir + folder + '/' + laneBam + '*'
-		rsync_call = 'rsync -au trek.nhgri.nih.gov:' + full_dir + ' ' + one_sample + '/'
-		subprocess.check_call(rsync_call, shell=True)
+		#print("Run rsync for ", one_sample)
+		#rsync_call = 'rsync -au trek.nhgri.nih.gov:' + full_dir + ' ' + one_sample + '/'
+		#subprocess.check_call(rsync_call, shell=True)
 		
 		# extract read group info from bam
 		samtools_header_call = 'samtools view -H ' + one_sample + '/' + laneBam + '.bam ' +  '| grep ^@RG'
-		read_group = subprocess.check_call(samtools_header_call, shell=True)
+		read_group = (subprocess.check_output(samtools_header_call, shell=True)).decode('utf-8')
 		# example read_group:
 		# '@RG\tID:3\tSM:AMS0013\tLB:AMS0013_1\tPU:160129_OPTIMUS_C7NP2ANXX.3.11457313\tCN:NISC\tDT:2016-02-04T20:49:40-05:00\tPL:HiSeq2000\n'
 		# replace SM with sample name
 		read_group = read_group.split('\t')
 		read_group[2] = 'SM:' + one_sample
+		read_group[-1] = read_group[-1][:-1]
 		# https://github.com/IARCbioinfo/BAM-tricks
 		# https://github.com/samtools/samtools/issues/532#issuecomment-205877064
 		# now shuffle, extract interleaved fastq, and run bwa-mem
-		big_run = 'samtools collate -uOn 128 ' + one_sample + '/' + laneBam + '.bam' + 'TMP-' + laneBam + \
-				  '| samtools fastq - | bwa mem -M -t 10 -B 4 -O 6 -E 1 -M -R ' + \
-				  "\"" + '\t'.join(read_group) + "\"" + \
-			 	  ' /data/mcgaugheyd/genomes/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta \
-				  - | samtools view -1 - > ' + one_sample + '/' + laneBam + '.bwa-mem.b37.bam' 
-
+		big_run = 'samtools collate -uOn 128 ' + one_sample + '/' + laneBam + '.bam' + ' /tmp/TMP-' + laneBam + \
+				  '| samtools fastq - | bwa mem -t 10 -B 4 -O 6 -E 1 -M -p -R ' + \
+				  "\"" + '\\t'.join(read_group) + "\"" + \
+			 	  ' /data/mcgaugheyd/genomes/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta -\
+				  | samtools view -1 - > ' + one_sample + '/' + laneBam + '.bwa-mem.b37.bam' 
+		print(big_run)
+		subprocess.check_call(big_run,shell=True)
 # merge laneBams into one bam for downstream GATK workflow
 for one_sample in samples:
 	bams = glob.glob(one_sample + '/*b37.bam')
 	gatk_bam_input = []
 	for i in bams:
-		gatk_bam_input.append("I=" + one_sample + '/' + i)
+		gatk_bam_input.append("I=" + i)
 	MergeSamFiles_call = 'java -Xmx20g -jar $PICARDJARPATH/picard.jar MergeSamFiles ' + \
-						 ' '.join(gatk_bam_input) + 'O=' + one_sample + 'bwa-mem.b37.merged.bam'
+						 ' '.join(gatk_bam_input) + ' O=' + one_sample + 'bwa-mem.b37.merged.bam'
 	subprocess.check_call(MergeSamFiles_call, shell=True)
 
 	# write commands to be run with wrapper script, if given

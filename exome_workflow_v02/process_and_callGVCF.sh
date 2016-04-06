@@ -17,7 +17,7 @@ rm $1
 # "Verify mate-pair information between mates and fix if needed."
 # also coord sorts
 java -Xmx20g -jar $PICARDJARPATH/picard.jar FixMateInformation \
-    INPUT=${1%.bam}.CleanSam.bam OUTPUT=${1%.bam}.sorted.bam
+    INPUT=${1%.bam}.CleanSam.bam OUTPUT=${1%.bam}.sorted.bam SORT_ORDER=coordinate
 rm ${1%.bam}.CleanSam.bam
 
 # name for easier downstream use

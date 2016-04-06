@@ -1,11 +1,18 @@
 #!/bin/bash
 
 ##################
-# Takes NISC bam file, extracts fastq, aligns with bwa
-# Processes bam with various Picard tools to sort, mark dups, and index
-# Calls GVCF for the bam
+# Exome Workflow v02
+# David McGaughey, NEI, NIH
 
+# Transfers lane bam from NISC to subfolder per sample
+# Takes the lane bam files, extracts fastq, aligns with bwa-mem, then creates merged bam
+# Processes the merged bam with various Picard tools to sort, mark dups, and index
+# Calls GVCF
 # The resulting GVCF can be combined with other GVCFs with run_GATK_GVCFtoFilteredVCF.sh 
+
+# IT IS HIGHLY RECOMMENDED THAT YOU ONLY GIVE ONE SAMPLE AT A TIME
+# This workflow does the bwa mem alignment for the lane bams in serial
+
 ##################
 
 # modules needed for python j1 job
@@ -18,14 +25,23 @@ swarm_job_name=$2
 exome_bait_bed=$3 #Give full path
 
 ############
+# PREP
+# Create scp job and swarm job (j2)
+~/bin/exome_workflow_v02/create_scp_and_swarm_jobs_for_NISC_laneBams.py -f $1 -j $2 -b $3
+chmod +x $2.scp.sh	 # make executable
+./$2.scp.sh &		 # execute in background
+wait				 # don't proceed until all transfers are complete
+############
+
+############
 #RE-ALIGNMENT
 # pulls bwa-formatted info (read group info, bam file, etc) then hands over to sbatch 
-j1=$(sbatch --job-name bwa.$1 --time=12:00:00 --mem=30g --cpus-per-task 10 ~/bin/exome_workflow_v02/realign_NISC_laneBams_with_bwa.py $1 -S $2 -B $3)
+j1=$(sbatch --job-name bwa.$2 --time=12:00:00 --mem=30g --cpus-per-task 10 ~/bin/exome_workflow_v02/realign_NISC_laneBams_with_bwa.py $1)
 ############
 
 ############
 # BAM processing and GVCF calling
 # sort, mark duplicates, and index bam
-j2=$(swarm -f $2 --dependency=afterok:$j1 --time 24:00:00 -g 20 --module picard/2.1.1,GATK/3.5-0)
+j2=$(swarm -f $2 --dependency=afterany:$j1 --time 24:00:00 -g 20 --module picard/2.1.1,GATK/3.5-0)
 ############
 

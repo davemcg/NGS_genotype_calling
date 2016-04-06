@@ -18,7 +18,7 @@ parser.add_argument('filelist', help=
 	I HIGHLY SUGGEST YOU ONLY DO ONE SAMPLE AT A TIME!!!! \
 	This script does NOT parallelize any of the tasks. \
 	\
-	Invoke script with sbatch --mem=20G --cpus-per-task 10 \
+	Invoke script with sbatch --mem=30G --cpus-per-task 10 \
 	\
 	Example (of the input list): \
 		CCGO_800014	150223_OPTIMUS_C6HGHANXX.8.9477663 \
@@ -34,16 +34,6 @@ parser.add_argument('filelist', help=
 	\
 	Example (exome): \
    		sbatch --mem=20G --cpus-per-task 10 this_script.py list_of_laneBams.txt")
-parser.add_argument('-S', '--SWARM_job_name', help = 
-	"Give optional name for a GATK job swarm job file. \
-	This can be invoked by a shell wrapper script to \
-	continue with the realigned and merged BAM file \
-	created by this script and further process and call \
-	a GATK GVCF file.")
-parser.add_argument('-B', '--exome_target_bed_file', help =
-	"Give full path for exome target bed file used \
-	for the capture process. They should be located \
-	in biowulf2:/data/mcgaugheyd/genomes/1000G_phase2_GRCh37/converted_exome_bait_beds/")
 
 args = parser.parse_args()
 bamlist = args.filelist
@@ -57,6 +47,7 @@ for line in open(bamlist):
 		sys.exit(0)
 	sample_laneBam[line[0]].append(line[1])
 
+# As I can't figure out a way to 
 # create subfolders for each sample
 # Use scp to move lane Bams from Trek to biowulf2
 samples = []
@@ -64,18 +55,12 @@ samples = []
 samples.sort()
 for one_sample in samples:
 	if not os.path.isdir(one_sample):
-		mkdir_call = "mkdir " + one_sample
-		subprocess.check_call(mkdir_call, shell=True)
+		print("Subfolder for ", one_sample, " missing!!!!")
+		sys.exit()
 	# create Trek directory structure
 	base_dir = "/cluster/ifs/projects/solexa/reads/"
 	# loop through each laneBam and do the scp
 	for laneBam in sample_laneBam[one_sample]:
-		folder = laneBam.split('.')[0]
-		full_dir = base_dir + folder + '/' + laneBam + '*'
-		#print("Run rsync for ", one_sample)
-		#rsync_call = 'rsync -au trek.nhgri.nih.gov:' + full_dir + ' ' + one_sample + '/'
-		#subprocess.check_call(rsync_call, shell=True)
-		
 		# extract read group info from bam
 		samtools_header_call = 'samtools view -H ' + one_sample + '/' + laneBam + '.bam ' +  '| grep ^@RG'
 		read_group = (subprocess.check_output(samtools_header_call, shell=True)).decode('utf-8')
@@ -102,15 +87,6 @@ for one_sample in samples:
 	for i in bams:
 		gatk_bam_input.append("I=" + i)
 	MergeSamFiles_call = 'java -Xmx20g -jar $PICARDJARPATH/picard.jar MergeSamFiles ' + \
-						 ' '.join(gatk_bam_input) + ' O=' + one_sample + 'bwa-mem.b37.merged.bam'
+						 ' '.join(gatk_bam_input) + ' O=' + one_sample + '.bwa-mem.b37.merged.bam'
 	subprocess.check_call(MergeSamFiles_call, shell=True)
-
-	# write commands to be run with wrapper script, if given
-	if args.SWARM_job_name and args.exome_target_bed_file:
-		file_name = args.SWARM_job_name
-		bed_path = args.exome_target_bed_file
-		swarm_commands = open(file_name, 'w')
-		output = '/home/mcgaugheyd/bin/exome_workflow_v02/process_and_callGVCF.sh' + \
-				 one_sample + 'bwa-mem.b37.merged.bam ' + bed_path
-		swarm_commands.write(output)
 

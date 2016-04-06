@@ -20,7 +20,7 @@ exome_bait_bed=$3 #Give full path
 ############
 #RE-ALIGNMENT
 # pulls bwa-formatted info (read group info, bam file, etc) then hands over to sbatch 
-j1=$(sbatch --job-name bwa.$1 --mem=30g --cpus-per-task 10 ~/bin/exome_workflow_v02/realign_NISC_laneBams_with_bwa.py $1 -S $2 -B $3)
+j1=$(sbatch --job-name bwa.$1 --time=12:00:00 --mem=30g --cpus-per-task 10 ~/bin/exome_workflow_v02/realign_NISC_laneBams_with_bwa.py $1 -S $2 -B $3)
 ############
 
 ############

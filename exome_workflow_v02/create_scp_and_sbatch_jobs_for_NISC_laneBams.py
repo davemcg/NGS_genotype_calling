@@ -14,18 +14,18 @@ parser.add_argument('-f', '--filelist', help=
 	bash job transfer the bams over \
     from Trek via scp into subfolders. \
 	\
-	Can also create swarm job file. \
+	Can also create sbatch job file. \
 	\
     Example (of the input list): \
         CCGO_800014 150223_OPTIMUS_C6HGHANXX.8.9477663 \
         CCGO_800015 150306_YOSHI_C6HDMANXX.5.9477645 \
         CCGO_800015 150223_OPTIMUS_C6HGHANXX.8.9477645") 
 parser.add_argument('-j', '--job_name', help =
-    "Give name for a GATK job swarm job file. \
-	(It will also be used for the temporary sh script\
+    "Give name for a GATK job sbatch job file. \
+	(It will also be used for the sh script\
 	for the scp transfer) \
 	\
-    The swarm job can be invoked by a shell wrapper script to \
+    The sbatch job can be invoked by a shell wrapper script to \
     continue with the realigned and merged BAM file \
     created by this script and further process and call \
     a GATK GVCF file.")
@@ -53,15 +53,15 @@ samples = list(set(samples))
 samples.sort()
 
 # Pull names and create files
-swarm_file_name = args.job_name
+sbatch_file_name = args.job_name + '.sh'
 scp_file_name = args.job_name + ".scp.sh"
-swarm_commands = open(swarm_file_name, 'w')
+sbatch_commands = open(sbatch_file_name, 'w')
 scp_commands = open(scp_file_name, 'w')
 bed_path = args.exome_target_bed_file
 
 
 # loop to create the sh script for scp 
-# and the swarm script to run GATK after realignment
+# and the sbatch script to run GATK after realignment
 for one_sample in samples:
 	# make sure the directory doesn't already exist
 	if not os.path.isdir(one_sample):
@@ -76,10 +76,13 @@ for one_sample in samples:
 		# create scp command
 		scp_call = 'scp trek.nhgri.nih.gov:' + full_dir + ' ' + one_sample + '/\n'
 		scp_commands.write(scp_call)
-	# create swarm command
-	swarm_call = '/home/mcgaugheyd/bin/exome_workflow_v02/process_and_callGVCF.sh ' + \
-			     one_sample + '/' + one_sample + '.bwa-mem.b37.merged.bam ' + bed_path + '\n'
-	swarm_commands.write(swarm_call)
+	# create sbatch command(s)
+	sbatch_commands.write("#!/bin/bash\n")
+	sbatch_call = 'sbatch -J ' + one_sample + 'GVCFcall --mem=20G --time=24:00:00 \
+				  /home/mcgaugheyd/bin/exome_workflow_v02/process_and_callGVCF.sh ' + \
+			      one_sample + '/' + one_sample + '.bwa-mem.b37.merged.bam ' + bed_path + '\n'
+	sbatch_commands.write(sbatch_call)
+	sbatch_commands.write("sleep 1\n")
 
 
 

@@ -69,7 +69,7 @@ for one_sample in samples:
 		# replace SM with sample name
 		read_group = read_group.split('\t')
 		read_group[2] = 'SM:' + one_sample
-		read_group[-1] = read_group[-1][:-1]
+		read_group[-1] = 'PL:ILLUMINA'
 		# https://github.com/IARCbioinfo/BAM-tricks
 		# https://github.com/samtools/samtools/issues/532#issuecomment-205877064
 		# now shuffle, extract interleaved fastq, and run bwa-mem

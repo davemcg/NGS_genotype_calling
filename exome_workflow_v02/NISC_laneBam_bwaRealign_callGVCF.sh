@@ -42,6 +42,6 @@ j1=$(sbatch --job-name bwa.$2 --time=12:00:00 --mem=30g --cpus-per-task 10 ~/bin
 ############
 # BAM processing and GVCF calling
 # sort, mark duplicates, and index bam
-sbatch --dependency=afterok:$j1 $2
+sbatch --dependency=afterok:$j1 $2.sh
 ############
 

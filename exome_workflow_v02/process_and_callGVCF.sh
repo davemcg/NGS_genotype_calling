@@ -6,8 +6,10 @@ module load GATK/3.5-0
 ###############################################################
 # Picard
 # cleaning, verify mate-pair, marking dups, and creating index
+#
+# Input Bam  must be aligned against GRCh37 (e.g. chromsomes
+# are 1, not chr1. 
 ###############################################################
-input_bam_from_realign_NISC_laneBams_with_bwa.py=$1
 
 # "Soft-clipping beyond-end-of-reference alignments and setting MAPQ to 0 for unmapped reads"
 java -Xmx20g -jar $PICARDJARPATH/picard.jar CleanSam \

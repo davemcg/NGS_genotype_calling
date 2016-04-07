@@ -21,13 +21,13 @@ module load bwa/0.7.12
 module load picard/2.1.1
 
 NISC_laneBam_matrix=$1 
-swarm_job_name=$2
+sbatch_job_name=$2
 exome_bait_bed=$3 #Give full path
 
 ############
 # PREP
-# Create scp job and swarm job (j2)
-~/bin/exome_workflow_v02/create_scp_and_swarm_jobs_for_NISC_laneBams.py -f $1 -j $2 -b $3
+# Create scp job and sbatch job (j2)
+~/bin/exome_workflow_v02/create_scp_and_sbatch_jobs_for_NISC_laneBams.py -f $1 -j $2 -b $3
 chmod +x $2.scp.sh	 # make executable
 ./$2.scp.sh &		 # execute in background
 wait				 # don't proceed until all transfers are complete
@@ -42,6 +42,6 @@ j1=$(sbatch --job-name bwa.$2 --time=12:00:00 --mem=30g --cpus-per-task 10 ~/bin
 ############
 # BAM processing and GVCF calling
 # sort, mark duplicates, and index bam
-j2=$(swarm -f $2 --dependency=afterany:$j1 --time 24:00:00 -g 20 --module picard/2.1.1,GATK/3.5-0)
+sbatch --dependency=afterok:$j1 $2
 ############
 

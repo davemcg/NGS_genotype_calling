@@ -87,6 +87,7 @@ for one_sample in samples:
 	for i in bams:
 		gatk_bam_input.append("I=" + i)
 	MergeSamFiles_call = 'java -Xmx20g -jar $PICARDJARPATH/picard.jar MergeSamFiles ' + \
-						 ' '.join(gatk_bam_input) + ' O=' + one_sample + '.bwa-mem.b37.merged.bam'
+						 ' '.join(gatk_bam_input) + ' O=' + one_sample + '/' + one_sample + \
+						 '.bwa-mem.b37.merged.bam'
 	subprocess.check_call(MergeSamFiles_call, shell=True)
 

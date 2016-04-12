@@ -56,7 +56,7 @@ samples.sort()
 for one_sample in samples:
 	if not os.path.isdir(one_sample):
 		print("Subfolder for ", one_sample, " missing!!!!")
-		sys.exit()
+		sys.exit(0)
 	# create Trek directory structure
 	base_dir = "/cluster/ifs/projects/solexa/reads/"
 	# loop through each laneBam and do the scp
@@ -80,6 +80,9 @@ for one_sample in samples:
 				  | samtools view -1 - > ' + one_sample + '/' + laneBam + '.bwa-mem.b37.bam' 
 		print(big_run)
 		subprocess.check_call(big_run,shell=True)
+		# rm NISC lane bams
+		rm_call = 'rm ' + one_sample + '/' + laneBam + '.bam*'
+		subprocess.check_call(rm_call,shell=True)
 # merge laneBams into one bam for downstream GATK workflow
 for one_sample in samples:
 	bams = glob.glob(one_sample + '/*b37.bam')

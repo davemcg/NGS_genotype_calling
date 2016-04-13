@@ -86,6 +86,7 @@ GATK -m 8g BaseRecalibrator \
     --knownSites /fdb/GATK_resource_bundle/b37-2.8/Mills_and_1000G_gold_standard.indels.b37.vcf \
     -BQSR ${input_bam%.bam}.recal_data.table1 \
     -o ${input_bam%.bam}.recal_data.table2
+rm ${input_bam%.bam}.realigned.bam
 
 GATK -m 8g AnalyzeCovariates \
     -R /fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37_decoy.fasta \
@@ -102,4 +103,4 @@ GATK -m 8g HaplotypeCaller \
     --emitRefConfidence GVCF \
     -BQSR ${input_bam%.bam}.recal_data.table1 \
     -o ${input_bam%.bam}.realigned.raw.g.vcf.gz
-
+rm ${input_bam%.bam}.realigned.recalibrated.bam

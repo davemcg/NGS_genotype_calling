@@ -78,7 +78,8 @@ for one_sample in samples:
 				  "\"" + '\\t'.join(read_group) + "\"" + \
 			 	  ' /data/mcgaugheyd/genomes/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta -\
 				  | samtools view -1 - > ' + one_sample + '/' + laneBam + '.bwa-mem.b37.bam' 
-		print(big_run)
+		bwa_commands = open(one_sample + '/' + one_sample + '.realignmentCommands.txt','a')
+		bwa_commands.write(big_run + '\n')
 		subprocess.check_call(big_run,shell=True)
 		# rm NISC lane bams
 		rm_call = 'rm ' + one_sample + '/' + laneBam + '.bam*'
@@ -93,4 +94,5 @@ for one_sample in samples:
 						 ' '.join(gatk_bam_input) + ' O=' + one_sample + '/' + one_sample + \
 						 '.bwa-mem.b37.merged.bam'
 	subprocess.check_call(MergeSamFiles_call, shell=True)
-
+	bwa_commands = open(one_sample + '/' + one_sample + '.realignmentCommands.txt','a')
+	bwa_commands.write('\n\n' + MergeSameFiles_call)

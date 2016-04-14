@@ -78,7 +78,7 @@ for one_sample in samples:
 		scp_commands.write(scp_call)
 	# create sbatch command(s)
 	sbatch_commands.write("#!/bin/bash\n")
-	sbatch_call = 'sbatch -J ' + one_sample + 'GVCFcall --mem=20G --time=24:00:00 \
+	sbatch_call = 'sbatch -J ' + one_sample + 'GVCFcall --mem=20G --time=36:00:00 \
 				  /home/mcgaugheyd/bin/exome_workflow_v02/process_and_callGVCF.sh ' + \
 			      one_sample + '/' + one_sample + '.bwa-mem.b37.merged.bam ' + bed_path + '\n'
 	sbatch_commands.write(sbatch_call)

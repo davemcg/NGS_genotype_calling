@@ -95,4 +95,4 @@ for one_sample in samples:
 						 '.bwa-mem.b37.merged.bam'
 	subprocess.check_call(MergeSamFiles_call, shell=True)
 	bwa_commands = open(one_sample + '/' + one_sample + '.realignmentCommands.txt','a')
-	bwa_commands.write('\n\n' + MergeSameFiles_call)
+	bwa_commands.write('\n\n' + MergeSamFiles_call)

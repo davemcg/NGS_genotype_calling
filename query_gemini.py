@@ -11,6 +11,7 @@ import subprocess
 import xlsxwriter
 from collections import Counter
 import datetime
+import sys
 #########PARSER##############
 parser = argparse.ArgumentParser(description=\
     """
@@ -34,6 +35,8 @@ parser = argparse.ArgumentParser(description=\
 parser.add_argument('-d','--database',required=True)
 parser.add_argument('-f','--family')
 parser.add_argument('-o','--output_name', required=True)
+parser.add_argument('-l','--lenient', default='No', help="Use '-l Yes' to  to use lenient settings on Autosome Dominant. Useful \
+					for situations where phenotype of parents uncertain or unknown")
 #########CODE#############
 def autosomal_recessive(db, family):
 	filter = " --filter \"aaf_esp_all < 0.01 AND aaf_1kg_all < 0.01 AND aaf_exac_all < 0.01 AND (is_coding=1 OR is_splicing=1) \
@@ -71,6 +74,9 @@ def mendel_errors(db, family):
 	me = subprocess.check_output(me_query,shell=True).decode('utf-8')
 	me = me.split('\n')
 	if family == '-':
+		me_out = me
+	# i.e. there are no mendelian errors
+	if me == ['']:
 		me_out = me
 	else:
 		# Get header in, unformatted (will happen later)
@@ -122,11 +128,15 @@ def comp_hets(db, family):
 	new_ch.extend(common_ch)
 	return(new_ch, ch_query)
 
-def autosomal_dominant(db, family):
+def autosomal_dominant(db, family, lenient):
 	filter = " --filter \"aaf_esp_all < 0.0001 AND aaf_1kg_all < 0.0001 AND aaf_exac_all < 0.0001 AND (is_coding=1 OR is_splicing=1) \
 				AND filter IS NULL\" --gt-pl-max 10 -d 5 --min-gq 20 "
 	if family == "-":
 		ad_query = "gemini autosomal_dominant" + columns + db + " " + filter
+	if lenient == 'yes':
+		new_columns = columns.replace('*','family_id=' + '\'' + family +'\'')
+		ad_query = "gemini autosomal_dominant --lenient" + new_columns + \
+					"--families " + family + " " + db + " " + filter
 	else:
 		new_columns = columns.replace('*','family_id=' + '\'' + family +'\'')
 		ad_query = "gemini autosomal_dominant" + new_columns + \
@@ -194,6 +204,11 @@ def main():
 		family = args.family
 	else:
 		family = '-'
+	lenient = args.lenient
+	lenient = lenient.lower()
+#	if lenient != 'no' or lenient != 'yes':
+#		print("-l --lenient must be 'Yes' or 'No'")
+#		sys.exit()
 	# output time
 	ar, ar_query = autosomal_recessive(db, family)
 	output_to_xlsx(ar, "Autosomal Recessive")	
@@ -207,7 +222,7 @@ def main():
 	ch, ch_query = comp_hets(db, family)
 	output_to_xlsx(ch, "Compound Hets")
 
-	ad, ad_query = autosomal_dominant(db, family)
+	ad, ad_query = autosomal_dominant(db, family, lenient)
 	output_to_xlsx(ad, "Autosomal Dominant")
 
 	# get all queries in one list

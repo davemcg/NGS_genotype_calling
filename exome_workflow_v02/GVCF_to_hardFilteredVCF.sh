@@ -53,3 +53,9 @@ GATK -m 20g CombineVariants \
 	--variant ${2%.vcf.gz}.hardFilterINDEL.vcf.gz \
 	-o ${2%.vcf.gz}.hardFilterSNP-INDEL.vcf.gz \
 	--genotypemergeoption UNSORTED
+
+# delete intermediate files
+rm ${2%.vcf.gz}.rawSNP.vcf.gz
+rm ${2%.vcf.gz}.rawINDEL.vcf.gz
+rm ${2%.vcf.gz}.hardFilterSNP.vcf.gz
+rm ${2%.vcf.gz}.hardFilterINDEL.vcf.gz

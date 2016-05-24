@@ -113,13 +113,13 @@ def comp_hets(db, family):
 	# reorder to put common comp_het genes (more than 4 variants) at bottom
 	####
 	# find position of the gene column
-	gene_index = ch[0].split().index('gene')
+	gene_index = ch[0].split('\t').index('gene')
 	# get counts for genes (last item in ch is blank)
-	gene_counts = Counter([x.split()[gene_index] for x in ch[:-1]])
+	gene_counts = Counter([x.split('\t')[gene_index] for x in ch[:-1]])
 	# id genes that appear more than 4 times
 	common_genes = [x[0] for x in gene_counts.items() if x[1]>4]
-	unique_ch = [x for x in ch[:-1] if x.split()[gene_index] not in common_genes]
-	common_ch = [x for x in ch[:-1] if x.split()[gene_index] in common_genes]
+	unique_ch = [x for x in ch[:-1] if x.split('\t')[gene_index] not in common_genes]
+	common_ch = [x for x in ch[:-1] if x.split('\t')[gene_index] in common_genes]
 	new_ch = unique_ch
 	new_ch.append('\n')
 	new_ch.append('Below are likely false positives (more than four \

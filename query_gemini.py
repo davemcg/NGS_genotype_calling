@@ -40,7 +40,7 @@ parser.add_argument('-l','--lenient', default='No', help="Use '-l Yes' to  to us
 #########CODE#############
 def autosomal_recessive(db, family):
 	filter = " --filter \"aaf_esp_all < 0.01 AND aaf_1kg_all < 0.01 AND aaf_exac_all < 0.01 AND (is_coding=1 OR is_splicing=1) \
-				AND filter IS NULL\" --gt-pl-max 10 -d 5 --min-gq 20 "
+				AND filter IS NULL\" --gt-pl-max 10 --min-gq 20 "
 	if family=='-':
 		ar_query = "gemini autosomal_recessive" + columns + db + " " + filter
 	else:
@@ -53,7 +53,7 @@ def autosomal_recessive(db, family):
 
 def de_novo(db, family):
 	filter = " --filter \"aaf_esp_all < 0.005 AND aaf_1kg_all < 0.005 AND aaf_exac_all < 0.005 AND (is_coding=1 OR is_splicing=1) \
-				AND filter IS NULL\" --gt-pl-max 10 -d 5 --min-gq 20 "
+				AND filter IS NULL\" --gt-pl-max 10 --min-gq 20 "
 	if family=="-":
 		dn_query = "gemini de_novo" + columns + db + " " + filter
 	else:
@@ -69,7 +69,7 @@ def mendel_errors(db, family):
 		# Can't parse by family
 		# Hence my workaround
 	filter = " --filter \"aaf_esp_all < 0.005 AND aaf_1kg_all < 0.005 AND aaf_exac_all < 0.005 AND (is_coding=1 OR is_splicing=1) \
-				AND filter IS NULL\" --gt-pl-max 1 -d 5 --min-gq 20 "
+				AND filter IS NULL\" --gt-pl-max 1 --min-gq 20 "
 	me_query = "gemini mendel_errors" + columns + db + " " + filter 	
 	me = subprocess.check_output(me_query,shell=True).decode('utf-8')
 	me = me.split('\n')
@@ -101,7 +101,7 @@ def comp_hets(db, family):
 			sift_score, vep_maxEntScan, vep_grantham \" "
 	
 	filter = " --filter \"aaf_esp_all < 0.01 AND aaf_1kg_all < 0.01 AND aaf_exac_all < 0.01 AND (is_coding=1 OR is_splicing=1) \
-				AND filter IS NULL\" --gt-pl-max 10 -d 5 --min-gq 20 --max-priority 2 "
+				AND filter IS NULL\" --gt-pl-max 10 --min-gq 20 --max-priority 2 "
 	if family == "-":
 		ch_query = "gemini comp_hets" + columns + db + " " + filter
 	else:
@@ -130,7 +130,7 @@ def comp_hets(db, family):
 
 def autosomal_dominant(db, family, lenient):
 	filter = " --filter \"aaf_esp_all < 0.0001 AND aaf_1kg_all < 0.0001 AND aaf_exac_all < 0.0001 AND (is_coding=1 OR is_splicing=1) \
-				AND filter IS NULL\" --gt-pl-max 10 -d 5 --min-gq 20 "
+				AND filter IS NULL\" --gt-pl-max 10 --min-gq 20 "
 	if family == "-":
 		ad_query = "gemini autosomal_dominant" + columns + db + " " + filter
 	if lenient == 'yes':

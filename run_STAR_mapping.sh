@@ -21,4 +21,5 @@ STAR \
 	--alignIntronMax 1000000 \
 	--alignMatesGapMax 1000000 \
 	--outSAMtype BAM SortedByCoordinate \
-	--outFileNamePrefix STAR_bams/${2%_1.fastq}.  
+	--readFilesCommand zcat \
+	--outFileNamePrefix STAR_bams/${2%_1.fq.gz}.  

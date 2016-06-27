@@ -18,7 +18,7 @@ if [ $index == 'HUMAN' ]; then
            -t $SLURM_CPUS_PER_TASK \
 		   $read_1 $read_2 
 elif [ $index == 'MOUSE' ]; then
-		kallisto quant -i /data/mcgaugheyd/genomes/GRCm38/kallisto_index/gencode.vM8.idx \
+		kallisto quant -i /data/mcgaugheyd/genomes/GRCm38/kallisto_index/gencode.vM9.idx \
     	   -o ${2%_*}_kallisto \
            -b 100 \
            -t $SLURM_CPUS_PER_TASK \

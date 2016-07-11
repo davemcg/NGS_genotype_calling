@@ -26,21 +26,21 @@ rm ${1%.bam}.CleanSam.bam
 sorted_bam=${1%.bam}.sorted.bam
 
 # Mark dups
-java -Xmx20g -jar $PICARDJARPATH/picard.jar MarkDuplicates \
-    INPUT=$sorted_bam OUTPUT=${sorted_bam%.bam}.markDup.bam METRICS_FILE=${sorted_bam%.bam}.markDup.metrics
-sorted_markDup_bam=${sorted_bam%.bam}.markDup.bam
+#java -Xmx20g -jar $PICARDJARPATH/picard.jar MarkDuplicates \
+#    INPUT=$sorted_bam OUTPUT=${sorted_bam%.bam}.markDup.bam METRICS_FILE=${sorted_bam%.bam}.markDup.metrics
+#sorted_markDup_bam=${sorted_bam%.bam}.markDup.bam
 
 # Build bam index
 java -Xmx20g -jar $PICARDJARPATH/picard.jar BuildBamIndex \
-    INPUT=$sorted_markDup_bam OUTPUT=$sorted_markDup_bam.bai
-rm ${1%.bam}.sorted.bam
+    INPUT=$sorted_bam OUTPUT=${sorted_bam%.bam}.bai
+#rm ${1%.bam}.sorted.bam
 
 
 ###############################################################
 # GATK
 # realign, recalibrate, call GVCF
 ###############################################################
-input_bam=$sorted_markDup_bam
+input_bam=$sorted_bam
 exome_bait_bed=$2
 
 # Takes ~ 90 minutes

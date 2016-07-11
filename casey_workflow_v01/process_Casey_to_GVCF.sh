@@ -20,7 +20,7 @@ output_bam=$folder'/'$folder'_'$panel'.bwa-mem.b37.bam'
 
 ############
 # BAM processing and GVCF calling
-sbatch --mem=20G --time=8:00:00 --dependency=afterok:$j1 ~/bin/exome_workflow_v02/process_and_callGVCF.sh $output_bam $bed
+sbatch --mem=20G --time=16:00:00 --dependency=afterok:$j1 ~/bin/casey_workflow_v01/process_and_callGVCF.sh $output_bam $bed
 ############
 
 

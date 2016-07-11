@@ -5,7 +5,7 @@ module load GATK/3.5-0
 gvcfs_list=$1
 output_vcf_name=$2
 ped=$3
-exome_bait_bed=$4
+#exome_bait_bed=$4
 # Merges all GVCFs into a VCF
 GATK -m 20g GenotypeGVCFs \
 	-R /fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37_decoy.fasta \
@@ -17,7 +17,6 @@ GATK -m 20g GenotypeGVCFs \
 GATK -m 20g SelectVariants \
 	-R /fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37_decoy.fasta \
 	-V $2 \
-	-L $4 \
     --interval_padding 100 \
 	-selectType SNP \
 	-o ${2%.vcf.gz}.rawSNP.vcf.gz
@@ -26,7 +25,6 @@ GATK -m 20g SelectVariants \
 GATK -m 20g SelectVariants \
 	-R /fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37_decoy.fasta \
 	-V $2 \
-	-L $4 \
 	--interval_padding 100 \
 	-selectType INDEL \
 	-o ${2%.vcf.gz}.rawINDEL.vcf.gz
@@ -53,3 +51,9 @@ GATK -m 20g CombineVariants \
 	--variant ${2%.vcf.gz}.hardFilterINDEL.vcf.gz \
 	-o ${2%.vcf.gz}.hardFilterSNP-INDEL.vcf.gz \
 	--genotypemergeoption UNSORTED
+
+# delete intermediate files
+rm ${2%.vcf.gz}.rawSNP.vcf.gz
+rm ${2%.vcf.gz}.rawINDEL.vcf.gz
+rm ${2%.vcf.gz}.hardFilterSNP.vcf.gz
+rm ${2%.vcf.gz}.hardFilterINDEL.vcf.gz

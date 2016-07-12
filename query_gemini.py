@@ -12,6 +12,9 @@ import xlsxwriter
 from collections import Counter
 import datetime
 import sys
+from textwrap import dedent
+import re
+
 #########PARSER##############
 parser = argparse.ArgumentParser(description=\
     """
@@ -145,6 +148,46 @@ def autosomal_dominant(db, family, lenient):
 	ad = ad.split('\n')
 	return(ad, ad_query)
 
+def acmg_incidentals(db, family):
+	#ACMG http://www.ncbi.nlm.nih.gov/clinvar/docs/acmg/ (list pulled 2016-07-11) incidental gene list
+	filter = "aaf_esp_all < 0.005 AND aaf_1kg_all < 0.005 AND aaf_exac_all < 0.005 AND (is_coding=1 OR is_splicing=1) \
+				AND filter IS NULL"
+	acmg_genes = 'ACTA2','ACTC1','APC','APOB','BRCA1','BRCA2','CACNA1S','COL3A1','DSC2','DSG2','DSP','FBN1','GLA','KCNH2','KCNQ1',\
+				 'LDLR','LMNA','MEN1','MLH1','MSH2','MSH6','MUTYH','MYBPC3','MYH11','MYH7','MYL2','MYL3','MYLK','NF2','PCSK9','PKP2',\
+				 'PMS2','PRKAG2','PTEN','RB1','RET','RYR1','RYR2','SCN5A','SDHAF2','SDHB','SDHC','SDHD','SMAD3','STK11','TGFBR1',\
+				 'TGFBR2','TMEM43','TNNI3','TNNT2','TP53','TPM1','TSC1','TSC2','VHL','WT1'
+	columns = "chrom, start, end, codon_change, aa_change, type, impact, \
+           	   impact_severity, gene, clinvar_gene_phenotype, clinvar_sig, pfam_domain, vep_hgvsp, \
+         	   max_aaf_all, aaf_1kg_all, aaf_exac_all, exac_num_hom_alt, exac_num_het, \
+           	   geno2mp_hpo_ct, gerp_bp_score, polyphen_score, cadd_scaled, sift_pred, \
+           	   sift_score, vep_maxEntScan, vep_grantham, (gts).(*), (gt_ref_depths).(*), (gt_alt_depths).(*)"
+
+	if family == "-":
+		acmg_query = "gemini query --header -q \"SELECT " + columns + "FROM variants WHERE \
+					  (gene IN (" + ",".join("'%s'" % g for g in acmg_genes) + ")) AND \
+					  (clinvar_sig LIKE '%pathogenic%' OR impact_severity='HIGH') AND (" + filter + ")\"" + \
+				 	  "--gt-pl-max 10 --min-gq 20 " + \
+					  "--gt-filter \"(gt_types).(*).(!=HOM_REF).(count>=1)\" " + db
+	else:
+		new_columns = columns.replace('*','family_id=' + '\'' + family +'\'')
+		acmg_query = "gemini query --header -q \"SELECT " + new_columns + "FROM variants WHERE \
+					  (gene IN (" + ",".join("'%s'" % g for g in acmg_genes) + ")) AND \
+					  (clinvar_sig LIKE '%pathogenic%' OR impact_severity='HIGH') AND (" + filter + ")\"" + \
+					  " --gt-filter \"(gt_types).(family_id==" + "\'" + family + "\').(!=HOM_REF).(count>=1)\" " + db
+	acmg = subprocess.check_output(acmg_query,shell=True).decode('utf-8')
+	acmg = acmg.split('\n')
+	if acmg[1] == '': 
+		# most likely to be empty
+		acmg = list('')
+		acmg.append(dedent("""\
+				No ACMG incidental findings to return. This does NOT mean there are no mutations in the ACMG 56 list, as sequencing
+				technology does not fully cover every single relevant nucleotide."""))
+	else:
+		acmg.insert(0, dedent("""\
+					POTENTIAL ACMG incidental findings found. This does NOT mean that the subject has damaging and actionable mutations. 
+					This list of variants should be reviewed by a genetic counselor""")) 
+	return(acmg, acmg_query)
+
 def overview(db, queries):
 	# pull useful info and  parameters from vcf header
 	vcf_header_query = "gemini query --header -q \"SELECT * FROM vcf_header\" " + db
@@ -210,26 +253,35 @@ def main():
 #		print("-l --lenient must be 'Yes' or 'No'")
 #		sys.exit()
 	# output time
+	print('Running Autosomal Recessive')
 	ar, ar_query = autosomal_recessive(db, family)
 	output_to_xlsx(ar, "Autosomal Recessive")	
 
+	print('Running De Novo')
 	dn, dn_query = de_novo(db, family)
 	output_to_xlsx(dn, "De Novo")	
 	
+	print('Running Mendelian Errors')
 	me, me_query = mendel_errors(db, family)
 	output_to_xlsx(me, "Mendelian Errors")
 
+	print('Running Compound Hets')
 	ch, ch_query = comp_hets(db, family)
 	output_to_xlsx(ch, "Compound Hets")
 
+	print('Running Autosomal Dominant')
 	ad, ad_query = autosomal_dominant(db, family, lenient)
 	output_to_xlsx(ad, "Autosomal Dominant")
 
+	print('Running ACMG incidental findings')
+	acmg, acmg_query = acmg_incidentals(db, family)
+	output_to_xlsx(acmg, "ACMG Incidental Findings")
+
 	# get all queries in one list
 	queries = []
-	queries.append(ar_query.replace('\t',' ')), queries.append(dn_query.replace('\t',' '))
-	queries.append(me_query.replace('\t',' ')), queries.append(ch_query.replace('\t',' '))
-	queries.append(ad_query.replace('\t',' '))
+	queries.append(re.sub(r'\s+',' ',ar_query)), queries.append(re.sub(r'\s+',' ',dn_query))
+	queries.append(re.sub(r'\s+',' ',me_query)), queries.append(re.sub(r'\s+',' ',ch_query))
+	queries.append(re.sub(r'\s+',' ',ad_query)), queries.append(re.sub(r'\s+',' ',acmg_query))
 
 	# Create the info worksheet
 	overview_info = overview(db, queries)
@@ -242,10 +294,10 @@ def main():
 args = parser.parse_args()
 workbook = xlsxwriter.Workbook(args.output_name)
 columns = 	" --columns \"chrom, start, end, codon_change, aa_change, type, impact, \
-			impact_severity, gene, clinvar_gene_phenotype, pfam_domain, vep_hgvsp, \
+			impact_severity, gene, clinvar_gene_phenotype, clinvar_sig, pfam_domain, vep_hgvsp, \
 			max_aaf_all, aaf_1kg_all, aaf_exac_all, exac_num_hom_alt, exac_num_het, \
 			geno2mp_hpo_ct, gerp_bp_score, polyphen_score, cadd_scaled, sift_pred, \
-			sift_score, vep_maxEntScan, vep_grantham, (gt_ref_depths).(*), (gt_alt_depths).(*) \" "
+			sift_score, vep_maxEntScan, vep_grantham, (gts).(*), (gt_ref_depths).(*), (gt_alt_depths).(*) \" "
 
 # run it!
 main()

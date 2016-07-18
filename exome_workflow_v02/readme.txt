@@ -21,7 +21,8 @@ Then you have a single VCF containing the genotypes for your cohort. The next st
 
 
 * The matrix file contains the 'common' and the lane bam file name, which can be used to find the exact file on Trek
-```
+
+```bash
 sqlite3 ~/NISC_laneBam.sqlite3.db "SELECT NISC_LaneBams.Sample, LaneBam_File FROM NISC_LaneBams INNER JOIN Sample_Info ON NISC_LaneBams.Sample=Sample_Info.Sample WHERE Sample_Info.Project='DDL' AND Sample_Info.DateAdded='2016-05-04'" | sort | cut -d"|" -f1,2,3 --output-delimiter=' '
 1232 160229_OPTIMUS_C855NANXX.8.11961896
 1232 160311_OPTIMUS_C8E3LANXX.3.11961896

@@ -43,7 +43,7 @@ parser.add_argument('-l','--lenient', default='No', help="Use '-l Yes' to  to us
 #########CODE#############
 def autosomal_recessive(db, family):
 	filter = " --filter \"aaf_esp_all < 0.01 AND aaf_1kg_all < 0.01 AND aaf_exac_all < 0.01 AND (is_coding=1 OR is_splicing=1) \
-				AND filter IS NULL\" --gt-pl-max 10 --min-gq 20 "
+				AND filter IS NULL\" --min-gq 20 "
 	if family=='-':
 		ar_query = "gemini autosomal_recessive" + columns + db + " " + filter
 	else:
@@ -56,7 +56,7 @@ def autosomal_recessive(db, family):
 
 def de_novo(db, family):
 	filter = " --filter \"aaf_esp_all < 0.005 AND aaf_1kg_all < 0.005 AND aaf_exac_all < 0.005 AND (is_coding=1 OR is_splicing=1) \
-				AND filter IS NULL\" --gt-pl-max 10 --min-gq 20 "
+				AND filter IS NULL\" --min-gq 20 "
 	if family=="-":
 		dn_query = "gemini de_novo" + columns + db + " " + filter
 	else:
@@ -67,48 +67,83 @@ def de_novo(db, family):
 	dn = dn.split('\n')
 	return(dn, dn_query)
 
-def mendel_errors(db, family):
-	# gemini v0.18 has a bug with this call:
-		# Can't parse by family
-		# Hence my workaround
-	filter = " --filter \"aaf_esp_all < 0.005 AND aaf_1kg_all < 0.005 AND aaf_exac_all < 0.005 AND (is_coding=1 OR is_splicing=1) \
-				AND filter IS NULL\" --gt-pl-max 1 --min-gq 20 "
-	me_query = "gemini mendel_errors" + columns + db + " " + filter 	
-	me = subprocess.check_output(me_query,shell=True).decode('utf-8')
-	me = me.split('\n')
-	if family == '-':
-		me_out = me
-	# i.e. there are no mendelian errors
-	if me == ['']:
-		me_out = me
+def autosomal_dominant(db, family, lenient):
+	filter = " --filter \"aaf_esp_all < 0.0001 AND aaf_1kg_all < 0.0001 AND aaf_exac_all < 0.0001 AND (is_coding=1 OR is_splicing=1) \
+				AND filter IS NULL\" --min-gq 20 "
+	if family == "-":
+		ad_query = "gemini autosomal_dominant" + columns + db + " " + filter
+	if lenient == 'yes':
+		new_columns = columns.replace('*','family_id=' + '\'' + family +'\'')
+		ad_query = "gemini autosomal_dominant --lenient" + new_columns + \
+					"--families " + family + " " + db + " " + filter
 	else:
-		# Get header in, unformatted (will happen later)
-		me_out = []
-		me_out.append(me[0])
-		# find family_id index 
-		header = me[0].split('\t')	
-		family_id_index = header.index('family_id') 
-		# filter for only the family we want
-		for line in me:
-			s_line = line.split('\t')
-			if line and s_line[family_id_index]==family:
-				me_out.append(line)
-	return(me_out, me_query)
+		new_columns = columns.replace('*','family_id=' + '\'' + family +'\'')
+		ad_query = "gemini autosomal_dominant" + new_columns + \
+					"--families " + family + " " + db + " " + filter
+	ad = subprocess.check_output(ad_query,shell=True).decode('utf-8')
+	ad = ad.split('\n')
+	return(ad, ad_query)
+
+def x_linked_recessive(db, family):
+	filter = " --filter \"aaf_esp_all < 0.005 AND aaf_1kg_all < 0.005 AND aaf_exac_all < 0.005 AND (is_coding=1 OR is_splicing=1) \
+				AND filter IS NULL\" --min-gq 20 "
+	if family == "-":
+		xlr_query = "gemini x_linked_recessive" + columns + db + " " + filter
+	else:
+		new_columns = columns.replace('*','family_id=' + '\'' + family +'\'')
+		xlr_query = "gemini x_linked_recessive" + new_columns + \
+					"--families " + family + " " + db + " " + filter
+	xlr = subprocess.check_output(xlr_query,shell=True).decode('utf-8')
+	xlr = xlr.split('\n')
+	return(xlr, xlr_query)
+	
+def x_linked_dom(db, family):
+	filter = " --filter \"aaf_esp_all < 0.005 AND aaf_1kg_all < 0.005 AND aaf_exac_all < 0.005 AND (is_coding=1 OR is_splicing=1) \
+				AND filter IS NULL\" --min-gq 20 "
+	if family == "-":
+		xld_query = "gemini x_linked_dominant" + columns + db + " " + filter
+	else:
+		new_columns = columns.replace('*','family_id=' + '\'' + family +'\'')
+		xld_query = "gemini x_linked_dominant" + new_columns + \
+					"--families " + family + " " + db + " " + filter
+	xld = subprocess.check_output(xld_query,shell=True).decode('utf-8')
+	xld = xld.split('\n')
+	return(xld, xld_query)
+
+def x_linked_de_novo(db, family):
+	filter = " --filter \"aaf_esp_all < 0.005 AND aaf_1kg_all < 0.005 AND aaf_exac_all < 0.005 AND (is_coding=1 OR is_splicing=1) \
+				AND filter IS NULL\" --min-gq 20 "
+	if family == "-":
+		xldn_query = "gemini x_linked_de_novo" + columns + db + " " + filter
+	else:
+		new_columns = columns.replace('*','family_id=' + '\'' + family +'\'')
+		xldn_query = "gemini x_linked_de_novo" + new_columns + \
+					"--families " + family + " " + db + " " + filter
+	xldn = subprocess.check_output(xldn_query,shell=True).decode('utf-8')
+	xldn = xldn.split('\n')
+	return(xldn, xldn_query)
+
+def mendel_errors(db, family):
+	filter = " --filter \"aaf_esp_all < 0.005 AND aaf_1kg_all < 0.005 AND aaf_exac_all < 0.005 AND (is_coding=1 OR is_splicing=1) \
+				AND filter IS NULL\" --min-gq 20 "
+	if family == '-':
+		me_query = "gemini mendel_errors" + columns + db + " " + filter
+	else:
+		new_columns = columns.replace('*','family_id=' + '\'' + family +'\'')
+		me_query = "gemini mendel_errors" + new_columns + \
+					"--families " + family + " " + db + " " + filter
+	me = subprocess.check_output(me_query,shell=True).decode('utf-8')
+	me = me.split('\n')	
+	return(me, me_query)
 
 def comp_hets(db, family):
-	# can't call exac numbers in v0.18 (reported bug, fixed in next release)
-	columns = 	" --columns \"chrom, start, end, codon_change, aa_change, type, impact, \
-			impact_severity, gene, clinvar_gene_phenotype, pfam_domain, vep_hgvsp, \
-			max_aaf_all, aaf_1kg_all, aaf_exac_all, \
-			geno2mp_hpo_ct, gerp_bp_score, polyphen_score, cadd_scaled, sift_pred, \
-			sift_score, vep_maxEntScan, vep_grantham \" "
-	
 	filter = " --filter \"aaf_esp_all < 0.01 AND aaf_1kg_all < 0.01 AND aaf_exac_all < 0.01 AND (is_coding=1 OR is_splicing=1) \
-				AND filter IS NULL\" --gt-pl-max 10 --min-gq 20 --max-priority 2 "
+				AND filter IS NULL\" --min-gq 20 --max-priority 2 "
 	if family == "-":
 		ch_query = "gemini comp_hets" + columns + db + " " + filter
 	else:
-		ch_query = "gemini comp_hets" + columns + \
+		new_columns = columns.replace('*','family_id=' + '\'' + family +'\'')
+		ch_query = "gemini comp_hets" + new_columns + \
 					"--families " + family + " " + db + " " + filter
 	ch = subprocess.check_output(ch_query,shell=True).decode('utf-8')
 	ch = ch.split('\n')
@@ -131,23 +166,6 @@ def comp_hets(db, family):
 	new_ch.extend(common_ch)
 	return(new_ch, ch_query)
 
-def autosomal_dominant(db, family, lenient):
-	filter = " --filter \"aaf_esp_all < 0.0001 AND aaf_1kg_all < 0.0001 AND aaf_exac_all < 0.0001 AND (is_coding=1 OR is_splicing=1) \
-				AND filter IS NULL\" --gt-pl-max 10 --min-gq 20 "
-	if family == "-":
-		ad_query = "gemini autosomal_dominant" + columns + db + " " + filter
-	if lenient == 'yes':
-		new_columns = columns.replace('*','family_id=' + '\'' + family +'\'')
-		ad_query = "gemini autosomal_dominant --lenient" + new_columns + \
-					"--families " + family + " " + db + " " + filter
-	else:
-		new_columns = columns.replace('*','family_id=' + '\'' + family +'\'')
-		ad_query = "gemini autosomal_dominant" + new_columns + \
-					"--families " + family + " " + db + " " + filter
-	ad = subprocess.check_output(ad_query,shell=True).decode('utf-8')
-	ad = ad.split('\n')
-	return(ad, ad_query)
-
 def acmg_incidentals(db, family):
 	#ACMG http://www.ncbi.nlm.nih.gov/clinvar/docs/acmg/ (list pulled 2016-07-11) incidental gene list
 	filter = "aaf_esp_all < 0.005 AND aaf_1kg_all < 0.005 AND aaf_exac_all < 0.005 AND (is_coding=1 OR is_splicing=1) \
@@ -166,8 +184,7 @@ def acmg_incidentals(db, family):
 		acmg_query = "gemini query --header -q \"SELECT " + columns + "FROM variants WHERE \
 					  (gene IN (" + ",".join("'%s'" % g for g in acmg_genes) + ")) AND \
 					  (clinvar_sig LIKE '%pathogenic%' OR impact_severity='HIGH') AND (" + filter + ")\"" + \
-				 	  "--gt-pl-max 10 --min-gq 20 " + \
-					  "--gt-filter \"(gt_types).(*).(!=HOM_REF).(count>=1)\" " + db
+				 	  "--gt-filter \"(gt_types).(*).(!=HOM_REF).(count>=1)\" " + db
 	else:
 		new_columns = columns.replace('*','family_id=' + '\'' + family +'\'')
 		acmg_query = "gemini query --header -q \"SELECT " + new_columns + "FROM variants WHERE \
@@ -261,6 +278,18 @@ def main():
 	dn, dn_query = de_novo(db, family)
 	output_to_xlsx(dn, "De Novo")	
 	
+	print('Running Autosomal Dominant')
+	ad, ad_query = autosomal_dominant(db, family, lenient)
+	output_to_xlsx(ad, "Autosomal Dominant")
+	
+	print('Running X-Linked Tests')
+	xlr, xlr_query = x_linked_recessive(db, family)
+	output_to_xlsx(xlr, "XLR")
+	xld, xld_query = x_linked_dom(db, family)
+	output_to_xlsx(xld, "XLD")
+	xldn, xldn_query = x_linked_de_novo(db, family)
+	output_to_xlsx(xldn, "XLDeNovo")
+	
 	print('Running Mendelian Errors')
 	me, me_query = mendel_errors(db, family)
 	output_to_xlsx(me, "Mendelian Errors")
@@ -269,20 +298,18 @@ def main():
 	ch, ch_query = comp_hets(db, family)
 	output_to_xlsx(ch, "Compound Hets")
 
-	print('Running Autosomal Dominant')
-	ad, ad_query = autosomal_dominant(db, family, lenient)
-	output_to_xlsx(ad, "Autosomal Dominant")
-
 	print('Running ACMG incidental findings')
 	acmg, acmg_query = acmg_incidentals(db, family)
 	output_to_xlsx(acmg, "ACMG Incidental Findings")
+
 
 	# get all queries in one list
 	queries = []
 	queries.append(re.sub(r'\s+',' ',ar_query)), queries.append(re.sub(r'\s+',' ',dn_query))
 	queries.append(re.sub(r'\s+',' ',me_query)), queries.append(re.sub(r'\s+',' ',ch_query))
 	queries.append(re.sub(r'\s+',' ',ad_query)), queries.append(re.sub(r'\s+',' ',acmg_query))
-
+	queries.append(re.sub(r'\s+',' ',xlr_query)), queries.append(re.sub(r'\s+',' ',xld_query))
+	queries.append(re.sub(r'\s+',' ',xldn_query))
 	# Create the info worksheet
 	overview_info = overview(db, queries)
 	output_to_xlsx(overview_info, "Info")

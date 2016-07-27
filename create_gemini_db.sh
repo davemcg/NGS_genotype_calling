@@ -1,6 +1,6 @@
 #!/bin/bash
 
-module load gemini/0.18
+module load gemini/0.19.0
 
 VCF=$1
 PED=$2

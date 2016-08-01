@@ -1,6 +1,6 @@
 #!/bin/bash
 
-module load QoRTs/1.0.1
+module load QoRTs/1.1.6
 
 
 mkdir qorts

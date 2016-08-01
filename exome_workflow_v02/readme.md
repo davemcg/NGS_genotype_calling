@@ -15,9 +15,11 @@ Afterwards we have GVCF (raw genonotype) files for each exome sample. The next s
 
 Then you have a single VCF containing the genotypes for your cohort. The next steps are to run the Gemini workflow to prioritize variants for examination. 
 
-
-
-
+Notes:
+1. /data/mcgaugheyd/genomes/1000G_phase2_GRCh37/converted_exome_bait_beds/Nimblegen_exome_v3_UTR_EZ.b37.bed is the current exome target file for NISC exomes  (2016-08-01)
+2. /data/mcgaugheyd/genomes/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta is used as the reference
+- https://www.biostars.org/p/73100/
+- http://www.1000genomes.org/faq/which-reference-assembly-do-you-use
 
 \* The matrix file contains the 'common' and the lane bam file name, which can be used to find the exact file on Trek
 

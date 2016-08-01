@@ -3,7 +3,7 @@
 # Assumes a GATK processed VCF after GATK-recommended filtering
 # Hard coded against grch37
 module load vcftools
-module load gemini/0.18
+module load gemini/0.19
 
 VCF=$1
 PED=$2

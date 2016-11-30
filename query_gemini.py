@@ -49,7 +49,6 @@ def autosomal_recessive(db, family):
 					"--families " + family + " " + db + " " + filter
 	ar = subprocess.check_output(ar_query,shell=True).decode('utf-8')
 	ar = ar.split('\n')
-	ar = reorder(ar)
 	return(ar,ar_query)
 
 def de_novo(db, family):
@@ -174,7 +173,7 @@ def acmg_incidentals(db, family):
 				 'PMS2','PRKAG2','PTEN','RB1','RET','RYR1','RYR2','SCN5A','SDHAF2','SDHB','SDHC','SDHD','SMAD3','STK11','TGFBR1',\
 				 'TGFBR2','TMEM43','TNNI3','TNNT2','TP53','TPM1','TSC1','TSC2','VHL','WT1'
 	columns = "chrom, start, end, codon_change, aa_change, type, impact, \
-           	   impact_severity, gene, clinvar_gene_phenotype, clinvar_sig, pfam_domain, vep_hgvsp, \
+           	   impact_severity, gene, clinvar_gene_phenotype, clinvar_sig,vep_pubmed, vep_phenotypes, pfam_domain, vep_hgvsp, \
          	   max_aaf_all, aaf_1kg_all, aaf_exac_all, exac_num_hom_alt, exac_num_het, \
            	   geno2mp_hpo_ct, gerp_bp_score, polyphen_score, cadd_scaled, sift_pred, \
            	   sift_score, vep_maxEntScan, vep_grantham, (gts).(*), (gt_ref_depths).(*), (gt_alt_depths).(*)"
@@ -258,18 +257,26 @@ def output_to_xlsx(data,sheet_name):
 			row += 1
 
 def reorder(data):
-	list_of_list = [item.split('\t') for item in data[0]]
+	list_of_list = [item.split('\t') for item in data]
 	# into pandas data frame
-	ar=pd.DataFrame(list_of_list[1:-1],columns=list_of_list[0])
-	# custom ordering
-	ar['impact_severity'] = pd.Categorical(ar['impact_severity'],['HIGH','MED','LOW'])
-	#clinvar_sig_order = list(set(ar['clinvar_sig']))
-	ar['max_aaf_all'] = ar['max_aaf_all'].astype(float)
-	ar['cadd_scaled'] = ar['cadd_scaled'].replace(to_replace='None')
-	ar['cadd_scaled'] = ar['cadd_scaled'].astype(float)
-	ar = ar.sort_values(by=['impact_severity', 'impact', 'clinvar_sig', 'pfam_domain','vep_phenotypes','vep_pubmed','max_aaf_all'])	
-	out = ar.to_csv(index=False,sep='\t').split('\n')
-	return(out)
+	try:
+		ar=pd.DataFrame(list_of_list[1:-1],columns=list_of_list[0])
+		# custom ordering
+		ar['impact_severity'] = pd.Categorical(ar['impact_severity'],['HIGH','MED','LOW'])
+		#clinvar_sig_order = list(set(ar['clinvar_sig']))
+		ar['max_aaf_all'] = ar['max_aaf_all'].astype(float)
+	#	ar['cadd_scaled'] = ar['cadd_scaled'].replace(to_replace='None')
+	#	ar['cadd_scaled'] = ar['cadd_scaled'].astype(float)
+		ar = ar.sort_values(by=['impact_severity', 'impact', 'clinvar_sig', 'pfam_domain','vep_phenotypes','vep_pubmed','max_aaf_all'])	
+		# create exac friendly chr:start-end
+		ar['chrom:start-end'] = ar['chrom'].str.split('chr').str.get(1) + ':' + ar['start'].map(str) + '-' + ar['end'].map(str)
+		newcols = cols[-1:] + cols[3:-1]
+		ar = ar[newcols]
+		data = ar.to_csv(index=False,sep='\t').split('\n')
+	except:
+		print('Failed to reorder')
+		pass
+	return(data)
 
 def main():
 	db = args.database
@@ -285,27 +292,27 @@ def main():
 	# output time
 	print('Running Autosomal Recessive')
 	ar, ar_query = autosomal_recessive(db, family)
-	output_to_xlsx(ar, "Autosomal Recessive")	
+	output_to_xlsx(reorder(ar), "Autosomal Recessive")	
 
 	print('Running De Novo')
 	dn, dn_query = de_novo(db, family)
-	output_to_xlsx(dn, "De Novo")	
+	output_to_xlsx(reorder(dn), "De Novo")	
 	
 	print('Running Autosomal Dominant')
 	ad, ad_query = autosomal_dominant(db, family, lenient)
-	output_to_xlsx(ad, "Autosomal Dominant")
+	output_to_xlsx(reorder(ad), "Autosomal Dominant")
 	
 	print('Running X-Linked Tests')
 	xlr, xlr_query = x_linked_recessive(db, family)
-	output_to_xlsx(xlr, "XLR")
+	output_to_xlsx(reorder(xlr), "XLR")
 	xld, xld_query = x_linked_dom(db, family)
-	output_to_xlsx(xld, "XLD")
+	output_to_xlsx(reorder(xld), "XLD")
 	xldn, xldn_query = x_linked_de_novo(db, family)
-	output_to_xlsx(xldn, "XLDeNovo")
+	output_to_xlsx(reorder(xldn), "XLDeNovo")
 	
 	print('Running Mendelian Errors')
 	me, me_query = mendel_errors(db, family)
-	output_to_xlsx(me, "Mendelian Errors")
+	output_to_xlsx(reorder(me), "Mendelian Errors")
 
 	print('Running Compound Hets')
 	ch, ch_query = comp_hets(db, family)
@@ -313,7 +320,7 @@ def main():
 
 	print('Running ACMG incidental findings')
 	acmg, acmg_query = acmg_incidentals(db, family)
-	output_to_xlsx(acmg, "ACMG Incidental Findings")
+	output_to_xlsx(reorder(acmg), "ACMG Incidental Findings")
 
 
 	# get all queries in one list

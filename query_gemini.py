@@ -321,11 +321,11 @@ def main():
 # global stuff
 args = parser.parse_args()
 workbook = xlsxwriter.Workbook(args.output_name)
-columns = 	" --columns \"chrom, start, end, codon_change, aa_change, type, impact, \
-			impact_severity, gene, clinvar_gene_phenotype, clinvar_sig, pfam_domain, vep_hgvsp, \
-			max_aaf_all, aaf_1kg_all, aaf_exac_all, exac_num_hom_alt, exac_num_het, \
-			geno2mp_hpo_ct, gerp_bp_score, polyphen_score, cadd_scaled, sift_pred, \
-			sift_score, vep_maxEntScan, vep_grantham, (gts).(*), (gt_ref_depths).(*), (gt_alt_depths).(*) \" "
+columns = 	" --columns \"chrom, start, end, codon_change, aa_change, type, vep_hgvsc, vep_hgvsp, gene, \
+			clinvar_gene_phenotype, impact, clinvar_sig, impact_severity, vep_pubmed, vep_phenotypes, \
+			pfam_domain, max_aaf_all, gerp_bp_score, cadd_scaled, aaf_1kg_all, aaf_exac_all, \
+			exac_num_hom_alt, exac_num_het, geno2mp_hpo_ct, polyphen_score, sift_pred, sift_score, \
+			vep_maxEntScan, vep_grantham, variant_id, (gts).(*), (gt_ref_depths).(*), (gt_alt_depths).(*) \" "
 
 # run it!
 main()

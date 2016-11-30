@@ -1,8 +1,4 @@
-#!/usr/local/Anaconda/envs/py3.4.3/bin/python
-
-# Yes, this uses python3. 3.4.3, to be specific. Should work on other
-# versions of python3, but I haven't tested 
-
+#!/usr/local/Anaconda/envs/py3.5/bin/python
 
 
 import argparse
@@ -14,6 +10,7 @@ import datetime
 import sys
 from textwrap import dedent
 import re
+import pandas as pd
 
 #########PARSER##############
 parser = argparse.ArgumentParser(description=\
@@ -52,6 +49,7 @@ def autosomal_recessive(db, family):
 					"--families " + family + " " + db + " " + filter
 	ar = subprocess.check_output(ar_query,shell=True).decode('utf-8')
 	ar = ar.split('\n')
+	ar = reorder(ar)
 	return(ar,ar_query)
 
 def de_novo(db, family):
@@ -258,6 +256,20 @@ def output_to_xlsx(data,sheet_name):
 				col += 1
 			col = 0
 			row += 1
+
+def reorder(data):
+	list_of_list = [item.split('\t') for item in data[0]]
+	# into pandas data frame
+	ar=pd.DataFrame(list_of_list[1:-1],columns=list_of_list[0])
+	# custom ordering
+	ar['impact_severity'] = pd.Categorical(ar['impact_severity'],['HIGH','MED','LOW'])
+	#clinvar_sig_order = list(set(ar['clinvar_sig']))
+	ar['max_aaf_all'] = ar['max_aaf_all'].astype(float)
+	ar['cadd_scaled'] = ar['cadd_scaled'].replace(to_replace='None')
+	ar['cadd_scaled'] = ar['cadd_scaled'].astype(float)
+	ar = ar.sort_values(by=['impact_severity', 'impact', 'clinvar_sig', 'pfam_domain','vep_phenotypes','vep_pubmed','max_aaf_all'])	
+	out = ar.to_csv(index=False,sep='\t').split('\n')
+	return(out)
 
 def main():
 	db = args.database

@@ -238,7 +238,7 @@ def overview(db, queries):
 	output.extend(vcf_header_bits)
 	return(output)
 
-def output_to_xlsx(data,sheet_name):
+def output_to_xlsx(data,sheet_name,skip):
 	worksheet = workbook.add_worksheet(sheet_name)
 #	format_bold = workbook.add_format({'bold': True})
 	row = 0
@@ -248,7 +248,11 @@ def output_to_xlsx(data,sheet_name):
 	if len(data) < 2:
 		worksheet.write(0,0, "No variants found")	
 		worksheet.write(1,0, data[0])
-	else:		
+	else:
+		if skip == 'yes':
+			data = data
+		else:
+			data = reorder(data)	
 		for line in data:
 			line = line.split('\t')
 			for unit in line: 
@@ -295,35 +299,35 @@ def main():
 	# output time
 	print('Running Autosomal Recessive')
 	ar, ar_query = autosomal_recessive(db, family)
-	output_to_xlsx(reorder(ar), "Autosomal Recessive")	
+	output_to_xlsx(ar, "Autosomal Recessive", 'no')	
 
 	print('Running De Novo')
 	dn, dn_query = de_novo(db, family)
-	output_to_xlsx(reorder(dn), "De Novo")	
+	output_to_xlsx(dn, "De Novo", 'no')	
 	
 	print('Running Autosomal Dominant')
 	ad, ad_query = autosomal_dominant(db, family, lenient)
-	output_to_xlsx(reorder(ad), "Autosomal Dominant")
+	output_to_xlsx(ad, "Autosomal Dominant", 'no')
 	
 	print('Running X-Linked Tests')
 	xlr, xlr_query = x_linked_recessive(db, family)
-	output_to_xlsx(reorder(xlr), "XLR")
+	output_to_xlsx(xlr, "XLR", 'no')
 	xld, xld_query = x_linked_dom(db, family)
-	output_to_xlsx(reorder(xld), "XLD")
+	output_to_xlsx(xld, "XLD", 'no')
 	xldn, xldn_query = x_linked_de_novo(db, family)
-	output_to_xlsx(reorder(xldn), "XLDeNovo")
+	output_to_xlsx(xldn, "XLDeNovo", 'no')
 	
 	print('Running Mendelian Errors')
 	me, me_query = mendel_errors(db, family)
-	output_to_xlsx(reorder(me), "Mendelian Errors")
+	output_to_xlsx(me, "Mendelian Errors", 'no')
 
 	print('Running Compound Hets')
 	ch, ch_query = comp_hets(db, family)
-	output_to_xlsx(ch, "Compound Hets")
+	output_to_xlsx(ch, "Compound Hets", 'yes')
 
 	print('Running ACMG incidental findings')
 	acmg, acmg_query = acmg_incidentals(db, family)
-	output_to_xlsx(reorder(acmg), "ACMG Incidental Findings")
+	output_to_xlsx(acmg, "ACMG Incidental Findings", 'no')
 
 
 	# get all queries in one list
@@ -335,7 +339,7 @@ def main():
 	queries.append(re.sub(r'\s+',' ',xldn_query))
 	# Create the info worksheet
 	overview_info = overview(db, queries)
-	output_to_xlsx(overview_info, "Info")
+	output_to_xlsx(overview_info, "Info", 'yes')
 	workbook.close()
 	
 

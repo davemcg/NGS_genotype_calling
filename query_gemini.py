@@ -1,4 +1,4 @@
-#!/usr/local/Anaconda/envs/py3.5/bin/python
+#!/usr/local/Anaconda/envs/py3.5/bin/python3
 
 
 import argparse
@@ -240,6 +240,7 @@ def overview(db, queries):
 
 def output_to_xlsx(data,sheet_name):
 	worksheet = workbook.add_worksheet(sheet_name)
+#	format_bold = workbook.add_format({'bold': True})
 	row = 0
 	col = 0
 	# Handling for nothing found. Don't want anyone thinking a messup happened
@@ -251,15 +252,16 @@ def output_to_xlsx(data,sheet_name):
 		for line in data:
 			line = line.split('\t')
 			for unit in line: 
+				#worksheet.write(row, col, unit, format_bold)
 				worksheet.write(row, col, unit)
 				col += 1
 			col = 0
 			row += 1
 
 def reorder(data):
-	list_of_list = [item.split('\t') for item in data]
 	# into pandas data frame
 	try:
+		list_of_list = [item.split('\t') for item in data]
 		ar=pd.DataFrame(list_of_list[1:-1],columns=list_of_list[0])
 		# custom ordering
 		ar['impact_severity'] = pd.Categorical(ar['impact_severity'],['HIGH','MED','LOW'])
@@ -270,6 +272,7 @@ def reorder(data):
 		ar = ar.sort_values(by=['impact_severity', 'impact', 'clinvar_sig', 'pfam_domain','vep_phenotypes','vep_pubmed','max_aaf_all'])	
 		# create exac friendly chr:start-end
 		ar['chrom:start-end'] = ar['chrom'].str.split('chr').str.get(1) + ':' + ar['start'].map(str) + '-' + ar['end'].map(str)
+		cols = ar.columns.tolist()
 		newcols = cols[-1:] + cols[3:-1]
 		ar = ar[newcols]
 		data = ar.to_csv(index=False,sep='\t').split('\n')

@@ -249,10 +249,8 @@ def output_to_xlsx(data,sheet_name,skip):
 		worksheet.write(0,0, "No variants found")	
 		worksheet.write(1,0, data[0])
 	else:
-		if skip == 'yes':
-			data = data
-		else:
-			data = reorder(data)	
+		if skip != 'yes':
+			data = reorder(data)
 		for line in data:
 			line = line.split('\t')
 			for unit in line: 
@@ -263,7 +261,8 @@ def output_to_xlsx(data,sheet_name,skip):
 			row += 1
 
 def reorder(data):
-	# into pandas data frame
+	# takes output from gemini and reorders based on impact_severity and other metrics
+	# turns chr start end notation into chr:start-end
 	try:
 		list_of_list = [item.split('\t') for item in data]
 		ar=pd.DataFrame(list_of_list[1:-1],columns=list_of_list[0])

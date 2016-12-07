@@ -24,15 +24,26 @@ cat $VCF \
 # annotate with VEP
 /home/mcgaugheyd/bin/run_VEP.sh tmp/${VCF%.gz} GRCh37 $SLURM_CPUS_PER_TASK
 
-# move out of tmp folder
-mv tmp/${VCF%.vcf.gz}.VEP.GRCh37.vcf* . 
-
 # compress and index
-bgzip ${VCF%.vcf.gz}.VEP.GRCh37.vcf
-tabix -p vcf ${VCF%.vcf.gz}.VEP.GRCh37.vcf.gz
+bgzip tmp/${VCF%.vcf.gz}.VEP.GRCh37.vcf
+tabix -p vcf tmp/${VCF%.vcf.gz}.VEP.GRCh37.vcf.gz
 
+# annotate with Rob's eye gene list overlap and exac gene scores
+vcfanno -p $SLURM_CPUS_PER_TASK ~/bin/gemini_exomes.toml tmp/${VCF%.vcf.gz}.VEP.GRCh37.vcf.gz | bgzip > tmp/${VCF%.vcf.gz}.VEP.GRCh37.anno.vcf.gz
+tabix -p vcf tmp/${VCF%.vcf.gz}.VEP.GRCh37.anno.vcf.gz
+
+# move out of tmp folder
+mv tmp/${VCF%.vcf.gz}.VEP.GRCh37.anno.vcf.* . 
+
+# delete temp files
 rm -rf tmp
 
+######## Now create Gemini DB #############
+gemini load --cores $SLURM_CPUS_PER_TASK -t VEP -v ${VCF%.vcf.gz}.VEP.GRCh37.anno.vcf.gz -p $PED $DBNAME
 
-######## Now create gemini DB #############
-gemini load --cores $SLURM_CPUS_PER_TASK -t VEP -v ${VCF%.vcf.gz}.VEP.GRCh37.vcf.gz -p $PED $DBNAME
+# add annotations to Gemini DB 
+gemini annotate -f ${VCF%.vcf.gz}.VEP.GRCh37.anno.vcf.gz \
+	-o uniq_list,uniq_list,uniq_list,uniq_list,uniq_list,uniq_list,uniq_list,uniq_list,uniq_list,uniq_list,uniq_list,uniq_list,uniq_list \
+	-t text,text,text,text,text,text,text,text,text,text,text,text,text \
+	-e Gene_EyeDiseaseClass,n_syn,adj_exp_syn,n_mis,adj_exp_mis,n_lof,adj_exp_lof,syn_z,mis_z,lof_z,pRecessive,pNull,pLI \
+	$DBNAME

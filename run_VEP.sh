@@ -14,7 +14,7 @@ if [ "$genome" == "GRCh38" ] || [ "$genome" == "GRCh37" ]; then
 	--output ${input_vcf%.vcf}.VEP.$genome.vcf \
 	--plugin Grantham \
 	--plugin MaxEntScan,/home/mcgaugheyd/bin/MaxEntScan \
-	--plugin Phenotypes,file=$VEPCACHEDIR/Phenotypes.pm_human_86_GRCh37.bed.gz,include_sources=HGMD_PUBLIC \
+	--plugin CADD,/fdb/CADD/1.3/prescored/whole_genome_SNVs.tsv.gz,/fdb/CADD/1.3/prescored/InDels.tsv.gz \
 	--total_length \
     --hgvs \
 	--sift b \
@@ -24,7 +24,9 @@ if [ "$genome" == "GRCh38" ] || [ "$genome" == "GRCh37" ]; then
     --biotype \
     --total_length \
 	--pubmed \
-    --fields Consequence,Codons,Amino_acids,Gene,SYMBOL,Feature,EXON,PolyPhen,SIFT,Protein_position,BIOTYPE,CANONICAL,Grantham,MaxEntScan,HGVSc,HGVSp,PUBMED,Phenotypes \
+	--domains \
+	--gene_phenotype \
+    --fields Consequence,Codons,Amino_acids,Gene,SYMBOL,Feature,EXON,PolyPhen,SIFT,Protein_position,BIOTYPE,CANONICAL,DOMAINS,CLIN_SIG,Grantham,MaxEntScan,HGVSc,HGVSp,PUBMED,Phenotypes,CADD_RAW,CADD_PHRED \
 	--vcf --force_overwrite --fork $cores
 else
     echo "Pick either GRCh38 or GRCh37 genomes"

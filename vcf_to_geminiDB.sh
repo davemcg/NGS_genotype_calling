@@ -3,6 +3,7 @@
 # Assumes a GATK processed VCF after GATK-recommended filtering
 # Hard coded against grch37
 module load vcftools
+module load vcfanno/0.0.10
 module load gemini/0.19.0
 
 VCF=$1
@@ -10,6 +11,7 @@ PED=$2
 DBNAME=$3
 
 mkdir tmp
+
 
 #only keep AF > 0.25
 #vcffilter -f "AF > 0.25" $VCF > tmp/$VCF.AFfiltered

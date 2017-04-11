@@ -21,9 +21,14 @@ hgvs = open(sys.argv[1], 'r')
 gtf = open(sys.argv[2], 'r')
 refseq = open(sys.argv[3], 'r')
 
-hgvs_gene_gtf = {}
 
-# Collapse tx info to the gene name
+# ensembl tx as key, refseq as value
+tx_refseq = {}
+for line in refseq:
+	tx_refseq[line.split('.')[0]] = line.split()[1]
+
+hgvs_gene_gtf = {}
+# Collapse tx info to the gene name, skipping tx who aren't a key in tx_refseq
 for line in gtf:
 	if line[0] == '#':
 		continue
@@ -31,6 +36,10 @@ for line in gtf:
 	if 'transcript' in line.split()[2] and 'gene_name' in line:
 		gene_index = re.split('[;\s+]',line).index('gene_name')
 		gene = re.split('[;\s+]',line)[gene_index+1].replace('\"','')
+		tx_index = re.split('[;\s+]',line).index('transcript_id')
+		tx = re.split('[;\s+]',line)[tx_index+1].replace('\"','').split('.')[0]
+		if tx not in tx_refseq.keys():
+			continue
 		#tx = line.split()[11].split(';')[0][1:-1]
 		if gene not in hgvs_gene_gtf:
 			hgvs_gene_gtf[gene] = line
@@ -55,23 +64,33 @@ appris_ranking = \
 	'appris_candidate_longest_ccds',
 	'appris_candidate_longest_seq']
 
-gene_best_tx = {}
-for gene in hgvs:
-	gene = gene[:-1]
+gene_best_tx = [] 
+for line in hgvs:
+	line = line[:-1]
+	gene = line.split()[0]
 	if gene in hgvs_gene_gtf.keys():
 		for rank in appris_ranking:
 			if rank in hgvs_gene_gtf[gene]:
-				tx_index = re.split('[;\s+]',hgvs_gene_gtf[gene]).index('transcript_id')
-				gene_best_tx[gene] = re.split('[;\s+]',hgvs_gene_gtf[gene])[tx_index+1].replace('\"','').split('.')[0]
+				info = hgvs_gene_gtf[gene].split('___')
+				rank_truth = [rank in s for s in info]
+				rank_index = [i for i, x in enumerate(rank_truth) if x][0]
+				tx_index = re.split('[;\s+]',info[rank_index]).index('transcript_id')
+				out = [line, gene, re.split('[;\s+]',info[rank_index])[tx_index+1].replace('\"','').split('.')[0]]
+				gene_best_tx.append(out)
 				break
-			else:
-				gene_best_tx[gene] = 'No appris'
+			# case where no appris info, but there's still a refseq tx, just take the first one
+			else: 
+				info = hgvs_gene_gtf[line].split('___')[0]
+				tx_index = re.split('[;\s+]',info).index('transcript_id')
+				out = [line, gene, re.split('[;\s+]',info)[tx_index+1].replace('\"','').split('.')[0]]
+				gene_best_tx.append(out)
 	else:
-		gene_best_tx[gene] = 'Not in Gencode GTF'
+		out = [line, gene, 'Not in Gencode GTF/RefSeq']
+		gene_best_tx.append(out)
 
-tx_refseq = {}
-for line in refseq:
-	tx_refseq[line.split('.')[0]] = line.split()[1]
 
-for k,v in gene_best_tx.items():
-	
+for k,v in gene_best_tx.iteritems():
+	if v in tx_refseq.keys():
+		print(k,v,tx_refseq[v])
+	else:
+		print(k,v,'Not in refseq?')

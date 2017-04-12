@@ -49,7 +49,8 @@ hgvs_file = open(args.hgvs_file, 'r')
 gtf = open(args.gtf, 'r')
 refseq_gencode = open(args.refseq_gencode, 'r')
 refseq_ucsc = open(args.refseq_ucsc, 'r')
-manual_conversion = open(args.manual_conversion, 'r')
+if args.manual_conversion is not None:
+	manual_conversion = open(args.manual_conversion, 'r')
 exhaustive_flag = args.exhaustive
 output_file = open(args.output, 'w')
 
@@ -147,7 +148,7 @@ for line in gene_best_tx:
 			line[2] = tx_refseq_name[line[1]][0]
 
 # now use user given conversion table to override choices made in assignment RefSeq tx to gene name
-if manual_conversion is not None:
+if args.manual_conversion is not None:
 	# build dict
 	manual_con = {}
 	for line in manual_conversion:

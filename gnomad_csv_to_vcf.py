@@ -32,11 +32,11 @@ region_info = subprocess.check_output(tabix_call, shell = True)
 
 # pull header
 header = [x.split('\t') for x in region_info.decode('utf-8').split('\n')[:-1] if x.split('\t')[0][0:2]=='##']
-header.append(['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO', 'FORMAT', 'HET', 'HOM'])
+header.append(['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO', 'FORMAT', 'HET'])
 # pull dbSNP ids
 ids=[x.split('\t')[2] for x in region_info.decode('utf-8').split('\n')[:-1] if x.split('\t')[0][0]!='#']
 # pull variants
-variation = [x.split('\t') + ['GT','0/1','1/1'] \
+variation = [x.split('\t') + ['GT','0/1'] \
 			for x in region_info.decode('utf-8').split('\n')[:-1] \
 			if x.split('\t')[0][0]!='#']
 
@@ -50,7 +50,7 @@ for line in open(gnomad):
 			line[2], \
 			line[3], \
 			line[4], \
-			"100", "PASS", ".", "GT", "0/1", "1/1"]
+			"100", "PASS", ".", "GT", "0/1"]
 		variation.append(gnomad_line)
 
 

@@ -1,20 +1,5 @@
-#!/bin/env python2
+#!/bin/env python
 from __future__ import print_function
-
-# Multi-step script that:
-# Takes HGVS in GeneName:c. notation (e.g. CHD7:c.3404C>A)
-# Converts gene name to RefSeq NM in two steps:
-# First creates a dict with Ensembl TX - NCBI TX | key - value
-#  ftp://ftp.sanger.ac.uk/pub/gencode/Gencode_human/release_26/GRCh37_mapping/gencode.v26lift37.metadata.RefSeq.gz
-# Grabs the highest appris rating from the GencodeGenes GRCh37 Basic GTF, skipping those which don't match to NCBI
-#  ftp://ftp.sanger.ac.uk/pub/gencode/Gencode_human/release_26/GRCh37_mapping/gencode.v26lift37.basic.annotation.gtf.gz
-# Uses the Ensembl transcript name (e.g. ENST00000423902.6) then map over
-# If the two step approach above fails to find a gene, then try the full RefSeq tx file (from UCSC) and grab the longest tx
-#  http://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/ncbiRefSeqCurated.txt.gz
-# The validate the new HGVS NM.c notation with biocommons (invitae) HGVS
-#  https://github.com/biocommons/hgvs
-# and convert to GRCh37 and 38 g. and output the name
-# also indicate failure at any stage (variant will then require hand conversion)
 
 import sys
 import re
@@ -23,12 +8,50 @@ import hgvs.exceptions
 import hgvs.dataproviders.uta
 import hgvs.parser
 import hgvs.assemblymapper
+import argparse
+from argparse import RawTextHelpFormatter
 
-hgvs_file= open(sys.argv[1], 'r')
-gtf = open(sys.argv[2], 'r')
-refseq_gencode = open(sys.argv[3], 'r')
-refseq_ucsc = open(sys.argv[3], 'r')
-output_file = open(sys.argv[4], 'w')
+parser = argparse.ArgumentParser(description = \
+		"""
+ Uses python2!!!!!!
+
+ Script that:
+ Takes HGVS in GeneName:c. notation (e.g. CHD7:c.3404C>A)
+
+ Converts gene name to RefSeq NM with several steps:
+ First creates a dict with Ensembl TX - NCBI TX | key - value
+  ftp://ftp.sanger.ac.uk/pub/gencode/Gencode_human/release_26/GRCh37_mapping/gencode.v26lift37.metadata.RefSeq.gz
+ Grabs the highest appris rating from the GencodeGenes GRCh37 Basic GTF, skipping those which don't match to NCBI
+  ftp://ftp.sanger.ac.uk/pub/gencode/Gencode_human/release_26/GRCh37_mapping/gencode.v26lift37.basic.annotation.gtf.gz
+ Uses the Ensembl transcript name (e.g. ENST00000423902.6) then map over
+ 
+ If the two step approach above fails to find a gene, then try the full RefSeq tx file (from UCSC) and grab the longest tx
+  http://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/ncbiRefSeqCurated.txt.gz
+ 
+ Then validate the new HGVS NM.c notation with biocommons (invitae) HGVS
+  https://github.com/biocommons/hgvs
+ and convert to GRCh37 and 38 g. and output the name.
+
+ Also indicate failure at any stage (variant may require hand conversion)
+		""",
+formatter_class=RawTextHelpFormatter)
+
+parser.add_argument('hgvs_file', help = 'line separated HGVS file in GeneName:c. format for conversion and liftover\n\n')
+parser.add_argument('gtf', help = 'GTF file from ftp://ftp.sanger.ac.uk/pub/gencode/Gencode_human/release_26/GRCh37_mapping/gencode.v26lift37.basic.annotation.gtf.gz\n\n')
+parser.add_argument('refseq_gencode', help = 'Ensembl RefSeq transcript match file from ftp://ftp.sanger.ac.uk/pub/gencode/Gencode_human/release_26/GRCh37_mapping/gencode.v26lift37.metadata.RefSeq.gz\n\n')
+parser.add_argument('refseq_ucsc', help = 'Curated RefSeq transcript info from UCSC http://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/ncbiRefSeqCurated.txt.gz\n\n')
+parser.add_argument('--manual_conversion', help = 'User can give conversion table in with the GeneName and the accompanying RefSeq transcript. One set (space separated) per line\n\n')
+parser.add_argument('--exhaustive', default = 'off', help = 'Default is \'off\'. Setting to \'on\' will query each variant with every available RefSeq transcript\n\n')
+parser.add_argument('output', help = 'Output file name. Output will be tsv\n\n')
+
+args = parser.parse_args()
+hgvs_file = open(args.hgvs_file, 'r')
+gtf = open(args.gtf, 'r')
+refseq_gencode = open(args.refseq_gencode, 'r')
+refseq_ucsc = open(args.refseq_ucsc, 'r')
+manual_conversion = open(args.manual_conversion, 'r')
+exhaustive_flag = args.exhaustive
+output_file = open(args.output, 'w')
 
 # ensembl tx as key, refseq as value
 tx_gencode_refseq = {}
@@ -123,6 +146,16 @@ for line in gene_best_tx:
 		if line[1] in tx_refseq_name:
 			line[2] = tx_refseq_name[line[1]][0]
 
+# now use user given conversion table to override choices made in assignment RefSeq tx to gene name
+if manual_conversion is not None:
+	# build dict
+	manual_con = {}
+	for line in manual_conversion:
+		manual_con[line.split()[0]] = line.split()[1]
+	for line in gene_best_tx:
+		if line[1] in manual_con:
+			line[2] = manual_con[line[1]]
+
 # setup biommons hgvs tooling
 hp = hgvs.parser.Parser()
 hdp = hgvs.dataproviders.uta.connect()
@@ -143,20 +176,29 @@ for variant in gene_best_tx:
 			variant = hp.parse_hgvs_variant(new_hgvs)
 			vr.validate(variant)
 			# on successful validation, try to convert
+			error = 'Success'
 			try:
 				p_dot = str(vm37.c_to_p(variant))
-				g37_dot = str(vm37.c_to_g(variant))
-				g38_dot = str(vm38.c_to_g(variant))
-				out = [original_hgvs, new_hgvs, p_dot, g37_dot, g38_dot, 'Success']
 			except:
-				out = [original_hgvs, new_hgvs, 'null', 'null', 'null', 'Liftover failure']
+				error = "Cannot make p.: " + str(sys.exc_info()[0])
+				p_dot = 'null'
+			try:
+				g37_dot = str(vm37.c_to_g(variant))
+			except:
+				error = "Cannot make GRCh37 g.: " + str(sys.exc_info()[0])
+				g37_dot = 'null'
+			try:
+				g38_dot = str(vm38.c_to_g(variant))
+			except:
+				error = "Cannot make GRCh38 g.: " + str(sys.exc_info()[0])
+				g38_dot = 'null'
+			out = [original_hgvs, new_hgvs, p_dot, g37_dot, g38_dot, error]
 			converted_hgvs.append(out)
 		except hgvs.exceptions.HGVSError as e:
 			out = [original_hgvs, new_hgvs, 'null', 'null', 'null', str(e)]
 			converted_hgvs.append(out)
 	else:
 		converted_hgvs.append([original_hgvs, 'null', 'null', 'null', 'null', 'Gene not in Gencode GTF or RefSeq'])
-
 
 # output!
 output_file.write('Original_HGVS\tValidated_HGVS_c.\tHGVS_p.\tHGVS_g._hg19\tHGVS_g._hg38\tStatus')

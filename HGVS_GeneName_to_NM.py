@@ -28,6 +28,7 @@ hgvs_file= open(sys.argv[1], 'r')
 gtf = open(sys.argv[2], 'r')
 refseq_gencode = open(sys.argv[3], 'r')
 refseq_ucsc = open(sys.argv[3], 'r')
+output_file = open(sys.argv[4], 'w')
 
 # ensembl tx as key, refseq as value
 tx_gencode_refseq = {}
@@ -157,7 +158,10 @@ for variant in gene_best_tx:
 		converted_hgvs.append([original_hgvs, 'null', 'null', 'null', 'null', 'Gene not in Gencode GTF or RefSeq'])
 
 
-
-
+# output!
+output_file.write('Original_HGVS\tValidated_HGVS_c.\tHGVS_p.\tHGVS_g._hg19\tHGVS_g._hg38\tStatus')
+for line in converted_hgvs:
+	output_file.write('\t'.join(line))
+	output_file.write('\n')
 
 

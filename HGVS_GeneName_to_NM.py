@@ -132,6 +132,7 @@ vm38 = hgvs.assemblymapper.AssemblyMapper(
 # Run through each line, build new HGVS and validate
 converted_hgvs = []
 for variant in gene_best_tx:
+	original_hgvs = variant[0] 
 	tx = variant[2]
 	hgvs_right = variant[0].split(':')[1]
 	new_hgvs = tx + ':' + hgvs_right
@@ -144,15 +145,15 @@ for variant in gene_best_tx:
 				p_dot = str(vm37.c_to_p(variant))
 				g37_dot = str(vm37.c_to_g(variant))
 				g38_dot = str(vm38.c_to_g(variant))
-				out = [new_hgvs, p_dot, g37_dot, g38_dot, 'Success']
+				out = [original_hgvs, new_hgvs, p_dot, g37_dot, g38_dot, 'Success']
 			except:
-				out = [new_hgvs, 'null', 'null', 'null', 'Liftover failure']
+				out = [original_hgvs, new_hgvs, 'null', 'null', 'null', 'Liftover failure']
 			converted_hgvs.append(out)
 		except hgvs.exceptions.HGVSError as e:
-			out = [new_hgvs, 'null', 'null', 'null', e]
+			out = [original_hgvs, new_hgvs, 'null', 'null', 'null', e]
 			converted_hgvs.append(out)
 	else:
-		converted_hgvs.append([variant[0], 'null', 'null', 'null', 'Gene not in Gencode GTF or RefSeq'])
+		converted_hgvs.append([original_hgvs, 'null', 'null', 'null', 'null', 'Gene not in Gencode GTF or RefSeq'])
 
 
 

@@ -151,7 +151,7 @@ for variant in gene_best_tx:
 				out = [original_hgvs, new_hgvs, 'null', 'null', 'null', 'Liftover failure']
 			converted_hgvs.append(out)
 		except hgvs.exceptions.HGVSError as e:
-			out = [original_hgvs, new_hgvs, 'null', 'null', 'null', e]
+			out = [original_hgvs, new_hgvs, 'null', 'null', 'null', str(e)]
 			converted_hgvs.append(out)
 	else:
 		converted_hgvs.append([original_hgvs, 'null', 'null', 'null', 'null', 'Gene not in Gencode GTF or RefSeq'])

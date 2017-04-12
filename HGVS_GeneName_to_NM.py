@@ -202,7 +202,7 @@ for variant in gene_best_tx:
 		converted_hgvs.append([original_hgvs, 'null', 'null', 'null', 'null', 'Gene not in Gencode GTF or RefSeq'])
 
 # output!
-output_file.write('Original_HGVS\tValidated_HGVS_c.\tHGVS_p.\tHGVS_g._hg19\tHGVS_g._hg38\tStatus')
+output_file.write('Original_HGVS\tValidated_HGVS_c.\tHGVS_p.\tHGVS_g._hg19\tHGVS_g._hg38\tStatus\n')
 for line in converted_hgvs:
 	output_file.write('\t'.join(line))
 	output_file.write('\n')

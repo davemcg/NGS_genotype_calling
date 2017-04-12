@@ -164,4 +164,6 @@ for line in converted_hgvs:
 	output_file.write('\t'.join(line))
 	output_file.write('\n')
 
+output_file.close()
+
 

@@ -123,6 +123,7 @@ for line in gene_best_tx:
 			line[2] = tx_refseq_name[line[1]][0]
 
 # setup biommons hgvs tooling
+hp = hgvs.parser.Parser()
 hdp = hgvs.dataproviders.uta.connect()
 vr = hgvs.validator.Validator(hdp=hdp)
 vm37 = hgvs.assemblymapper.AssemblyMapper(

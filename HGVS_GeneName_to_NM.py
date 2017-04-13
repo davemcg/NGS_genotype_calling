@@ -12,28 +12,25 @@ import argparse
 from argparse import RawTextHelpFormatter
 
 parser = argparse.ArgumentParser(description = \
-		"""
- Uses python2!!!!!!
+"""
+This script takes HGVS in GeneName:c. notation (e.g. CHD7:c.3404C>A), with
+one variant per line, and outputs a tab separated text file with the original
+HGVS notation, a proper HGVS with the RefSeq transcript name, then several 
+different conversion and liftovers to p. and g. For example if given CHD7:c.3404C>A,
+the following is returned:
+Original_HGVS   Validated_HGVS_c.       HGVS_p. HGVS_g._hg19    HGVS_g._hg38    Status
+CHD7:c.3404C>A  NM_017780.3:c.3404C>A   NP_060250.2:p.(Thr1135Asn)      NC_000008.10:g.61741247C>A      NC_000008.11:g.60828688C>A      Success
 
- Script that:
- Takes HGVS in GeneName:c. notation (e.g. CHD7:c.3404C>A)
+The Status field will indicate failure (and the reason).
 
- Converts gene name to RefSeq NM with several steps:
- First creates a dict with Ensembl TX - NCBI TX | key - value
-  ftp://ftp.sanger.ac.uk/pub/gencode/Gencode_human/release_26/GRCh37_mapping/gencode.v26lift37.metadata.RefSeq.gz
- Grabs the highest appris rating from the GencodeGenes GRCh37 Basic GTF, skipping those which don't match to NCBI
-  ftp://ftp.sanger.ac.uk/pub/gencode/Gencode_human/release_26/GRCh37_mapping/gencode.v26lift37.basic.annotation.gtf.gz
- Uses the Ensembl transcript name (e.g. ENST00000423902.6) then map over
- 
- If the two step approach above fails to find a gene, then try the full RefSeq tx file (from UCSC) and grab the longest tx
-  http://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/ncbiRefSeqCurated.txt.gz
- 
- Then validate the new HGVS NM.c notation with biocommons (invitae) HGVS
-  https://github.com/biocommons/hgvs
- and convert to GRCh37 and 38 g. and output the name.
+The four most common errors will relate to:
+1. Failure to find a transcript for a gene name. 
+2. Intronic variants cannot be validated (fuzzyness on where exactly they lie)
+3. HGVS reference does not agree with genome reference (either because the HGVS is wrong or the wrong transcript was picked)
+4. Liftover fails (p. cannot always be generated, occasionally cannot match hg19 to hg38)
 
- Also indicate failure at any stage (variant may require hand conversion)
-		""",
+Run this script with -h to get a listing of the types of input files required (and some optional ones)
+""",
 formatter_class=RawTextHelpFormatter)
 
 parser.add_argument('hgvs_file', help = 'line separated HGVS file in GeneName:c. format for conversion and liftover\n\n')

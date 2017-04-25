@@ -1,4 +1,4 @@
-#!/bin/env python
+#!/usr/local/bin/python
 from __future__ import print_function
 
 import sys
@@ -100,6 +100,7 @@ appris_ranking = \
 gene_best_tx = [] 
 for line in hgvs_file:
 	line = line[:-1]
+	line = line.strip()
 	gene = line.split(':')[0]
 	if gene in hgvs_gene_gtf:
 		for rank in appris_ranking:
@@ -112,19 +113,14 @@ for line in hgvs_file:
 				out = [line, gene, tx_gencode_refseq[ensembl_tx]]
 				gene_best_tx.append(out)
 				break
-			# case where no appris info, but there's still a refseq tx, just take the first one
-			# else: 
-			#	info = hgvs_gene_gtf[line].split('___')[0]
-			#	tx_index = re.split('[;\s+]',info).index('transcript_id')
-			#	out = [line, gene, re.split('[;\s+]',info)[tx_index+1].replace('\"','').split('.')[0]]
-			#	gene_best_tx.append(out)
 	else:
 		out = [line, gene, 'Not in Gencode GTF/RefSeq']
 		gene_best_tx.append(out)
 
-# Now run through the list again and try to fill in the missing with the longest RefSeq transcript
-# But first, build the dict, using the longest tx
+# But first, build the dict, using the longest tx as the value with gene as the key
+# also build a second dictionary for the --exhaustive search with all tx as the values
 tx_refseq_name = {}
+alltx_refseq_name = {}
 for line in refseq_ucsc:
 	line = line[:-1]
 	refseq_tx = line.split()[1]
@@ -134,7 +130,12 @@ for line in refseq_ucsc:
 	size = abs(stop-start)
 	if gene not in tx_refseq_name:
 		tx_refseq_name[gene] = [refseq_tx, size]
+		alltx_refseq_name[gene] = [refseq_tx]
 	else:
+		orig_tx = alltx_refseq_name[gene]
+		new_tx = orig_tx.append(refseq_tx)
+		alltx_refseq_name[gene] = new_tx
+
 		old_size = tx_refseq_name[gene][1]
 		if size > old_size:
 			tx_refseq_name[gene] = [refseq_tx, size]
@@ -199,9 +200,9 @@ for variant in gene_best_tx:
 		converted_hgvs.append([original_hgvs, 'null', 'null', 'null', 'null', 'Gene not in Gencode GTF or RefSeq'])
 
 # output!
-output_file.write('Original_HGVS\tValidated_HGVS_c.\tHGVS_p.\tHGVS_g._hg19\tHGVS_g._hg38\tStatus\n')
+output_file.write('Original_HGVS,HGVS_c.,HGVS_p.,HGVS_g._hg19,HGVS_g._hg38,Status\n')
 for line in converted_hgvs:
-	output_file.write('\t'.join(line))
+	output_file.write(','.join(line))
 	output_file.write('\n')
 
 output_file.close()

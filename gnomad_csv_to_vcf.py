@@ -36,7 +36,7 @@ header.append(['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO', 'F
 # pull dbSNP ids
 ids=[x.split('\t')[2] for x in region_info.decode('utf-8').split('\n')[:-1] if x.split('\t')[0][0]!='#']
 # pull variants
-variation = [x.split('\t') + ['GT','0/1'] \
+variation = [x.split('\t')[0:4] + ['100'] + x.split('\t')[5:] + ['GT','0/1'] \
 			for x in region_info.decode('utf-8').split('\n')[:-1] \
 			if x.split('\t')[0][0]!='#']
 

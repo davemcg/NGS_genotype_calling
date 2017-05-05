@@ -2,7 +2,7 @@
 
 module load picard/2.1.1
 module load GATK/3.5-0
-
+mkdir /scratch/mcgaugheyd/tmp
 ###############################################################
 # Picard
 # cleaning, verify mate-pair, marking dups, and creating index
@@ -19,19 +19,21 @@ rm $1
 # "Verify mate-pair information between mates and fix if needed."
 # also coord sorts
 java -Xmx20g -jar $PICARDJARPATH/picard.jar FixMateInformation \
-    INPUT=${1%.bam}.CleanSam.bam OUTPUT=${1%.bam}.sorted.bam SORT_ORDER=coordinate
+    INPUT=${1%.bam}.CleanSam.bam OUTPUT=${1%.bam}.sorted.bam \
+	SORT_ORDER=coordinate TMP_DIR=/scratch/mcgaugheyd/tmp
 rm ${1%.bam}.CleanSam.bam
 
 # name for easier downstream use
 sorted_bam=${1%.bam}.sorted.bam
 
 # Mark dups
-java -Xmx20g -jar $PICARDJARPATH/picard.jar MarkDuplicates \
-    INPUT=$sorted_bam OUTPUT=${sorted_bam%.bam}.markDup.bam METRICS_FILE=${sorted_bam%.bam}.markDup.metrics
-sorted_markDup_bam=${sorted_bam%.bam}.markDup.bam
+java -Xmx6g -jar $PICARDJARPATH/picard.jar MarkDuplicates \
+    INPUT=$sorted_bam OUTPUT=${sorted_bam%.bam}.markDup.bam \
+	METRICS_FILE=${sorted_bam%.bam}.markDup.metrics TMP_DIR=/scratch/mcgaugheyd/tmp
+sorted_markDup_bam=${sorted_bam%.bam}.markDup.bam 
 
 # Build bam index
-java -Xmx20g -jar $PICARDJARPATH/picard.jar BuildBamIndex \
+java -Xmx6g -jar $PICARDJARPATH/picard.jar BuildBamIndex \
     INPUT=$sorted_markDup_bam OUTPUT=$sorted_markDup_bam.bai
 rm ${1%.bam}.sorted.bam
 
@@ -43,7 +45,7 @@ rm ${1%.bam}.sorted.bam
 input_bam=$sorted_markDup_bam
 
 # Takes ~ 90 minutes
-GATK -m 8g RealignerTargetCreator \
+GATK -m 32g RealignerTargetCreator \
     -R /fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37_decoy.fasta  \
     -I $input_bam \
     --known /fdb/GATK_resource_bundle/b37-2.8/1000G_phase1.indels.b37.vcf \
@@ -52,7 +54,7 @@ GATK -m 8g RealignerTargetCreator \
     --interval_padding 100
 
 # Takes ~ 100 minutes
-GATK -m 8g IndelRealigner \
+GATK -m 32g IndelRealigner \
     -R /fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37_decoy.fasta \
     -I $input_bam \
     --knownAlleles /fdb/GATK_resource_bundle/b37-2.8/1000G_phase1.indels.b37.vcf \
@@ -61,7 +63,7 @@ GATK -m 8g IndelRealigner \
     -o ${input_bam%.bam}.realigned.bam
 rm $input_bam
 
-GATK -m 8g BaseRecalibrator \
+GATK -m 32g BaseRecalibrator \
     -R /fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37_decoy.fasta \
     -I ${input_bam%.bam}.realigned.bam \
     --knownSites /fdb/GATK_resource_bundle/b37-2.8/dbsnp_138.b37.excluding_sites_after_129.vcf \
@@ -70,13 +72,13 @@ GATK -m 8g BaseRecalibrator \
     --interval_padding 100 \
     -o ${input_bam%.bam}.recal_data.table1
 
-GATK -m 8g PrintReads \
+GATK -m 32g PrintReads \
     -R /fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37_decoy.fasta \
     -I ${input_bam%.bam}.realigned.bam \
     -BQSR ${input_bam%.bam}.recal_data.table1 \
     -o ${input_bam%.bam}.realigned.recalibrated.bam
 
-GATK -m 8g BaseRecalibrator \
+GATK -m 32g BaseRecalibrator \
     -R /fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37_decoy.fasta \
     -I ${input_bam%.bam}.realigned.bam \
     --knownSites /fdb/GATK_resource_bundle/b37-2.8/dbsnp_138.b37.excluding_sites_after_129.vcf \
@@ -86,14 +88,14 @@ GATK -m 8g BaseRecalibrator \
     -o ${input_bam%.bam}.recal_data.table2
 rm ${input_bam%.bam}.realigned.bam
 
-GATK -m 8g AnalyzeCovariates \
+GATK -m 32g AnalyzeCovariates \
     -R /fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37_decoy.fasta \
     -before ${input_bam%.bam}.recal_data.table1 \
     -after  ${input_bam%.bam}.recal_data.table2 \
     -plots ${input_bam%.bam}.BQSRplots.pdf
 
 # Takes ~ 180 minutes
-GATK -m 8g HaplotypeCaller \
+GATK -m 32g HaplotypeCaller \
     -R /fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37_decoy.fasta \
     -I ${input_bam%.bam}.realigned.recalibrated.bam \
     --interval_padding 100 \

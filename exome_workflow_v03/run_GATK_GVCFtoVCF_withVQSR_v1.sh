@@ -28,7 +28,7 @@ GATK -m 8g VariantRecalibrator \
     -an MQRankSum \
     -an ReadPosRankSum \
     -mode SNP \
-    -tranche 100.0 -tranche 99.9 -tranche 99.5 -tranche 99.0 -tranch 95.0 -tranche 90.0 \
+    -tranche 100.0 -tranche 99.9 -tranche 99.5 -tranche 99.0 -tranche 95.0 -tranche 90.0 \
     -recalFile ${2%.vcf.gz}.recalibrate_SNP.recal \
     -tranchesFile ${2%.vcf.gz}.recalibrate_SNP.tranches \
     -rscriptFile ${2%.vcf.gz}.recalibrate_SNP_plots.R
@@ -40,7 +40,7 @@ GATK -m 8g ApplyRecalibration \
     -R /fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37_decoy.fasta \
     -input $2 \
     -mode SNP \
-    --ts_filter_level 95.0 \
+    --ts_filter_level 99.97 \
     -recalFile ${2%.vcf.gz}.recalibrate_SNP.recal \
     -tranchesFile ${2%.vcf.gz}.recalibrate_SNP.tranches \
     -o ${2%.vcf.gz}.recalibrated_snps_raw_indels.vcf.gz
@@ -58,7 +58,7 @@ GATK -m 8g VariantRecalibrator \
     -an ReadPosRankSum \
     -mode INDEL \
     -tranche 100.0 -tranche 99.9 -tranche 99.0  -tranche 98.0 -tranche 90.0 \
-    -maxGaussians 4 \
+    --maxGaussians 4 \
     -recalFile ${2%.vcf.gz}.recalibrate_INDEL.recal \
     -tranchesFile ${2%.vcf.gz}.recalibrate_INDEL.tranches \
     -rscriptFile ${2%.vcf.gz}.recalibrate_INDEL_plots.R

@@ -2,6 +2,10 @@
 
 # outside (i.e. not NISC) trio of exomes
 
+# try sbatch --cpus-per-task 10 ~/bin/exome_workflow_v02/run_bwa-mem_hg37d5_fromBam.sh input_bam \\@RG\\\\tID:ambry_16_114290\\\\tSM:16_114290\\\\tPL:ILLUMINA 16_114290.realigned.g1k_decoy.bwa.bam
+
+
+########## old flow ##########
 # first create fastq from the bam
 for i in *bam; do sbatch ~/bin/run_bam2fastq $i; done
 

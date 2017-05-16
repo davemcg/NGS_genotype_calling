@@ -1,4 +1,4 @@
-#!/usr/local/bin/python
+#!/usr/local/Anaconda/envs_app/hgvs/1.0.0/bin/python 
 from __future__ import print_function
 
 import sys
@@ -120,7 +120,7 @@ for line in hgvs_file:
 # But first, build the dict, using the longest tx as the value with gene as the key
 # also build a second dictionary for the --exhaustive search with all tx as the values
 tx_refseq_name = {}
-alltx_refseq_name = {}
+#alltx_refseq_name = {}
 for line in refseq_ucsc:
 	line = line[:-1]
 	refseq_tx = line.split()[1]
@@ -130,11 +130,11 @@ for line in refseq_ucsc:
 	size = abs(stop-start)
 	if gene not in tx_refseq_name:
 		tx_refseq_name[gene] = [refseq_tx, size]
-		alltx_refseq_name[gene] = [refseq_tx]
+#		alltx_refseq_name[gene] = [refseq_tx]
 	else:
-		orig_tx = alltx_refseq_name[gene]
-		new_tx = orig_tx.append(refseq_tx)
-		alltx_refseq_name[gene] = new_tx
+#		orig_tx = alltx_refseq_name[gene]
+#		new_tx = orig_tx.append(refseq_tx)
+#		alltx_refseq_name[gene] = new_tx
 
 		old_size = tx_refseq_name[gene][1]
 		if size > old_size:
@@ -150,6 +150,8 @@ if args.manual_conversion is not None:
 	# build dict
 	manual_con = {}
 	for line in manual_conversion:
+		if line.split('\t') != 2:
+			continue
 		manual_con[line.split()[0]] = line.split()[1]
 	for line in gene_best_tx:
 		if line[1] in manual_con:
@@ -168,7 +170,15 @@ converted_hgvs = []
 for variant in gene_best_tx:
 	original_hgvs = variant[0] 
 	tx = variant[2]
-	hgvs_right = variant[0].split(':')[1]
+	try:
+		hgvs_right = variant[0].split(':')[1]
+	except:
+		converted_hgvs.append([original_hgvs, 'null', 'null', 'null', 'null', 'Missing c dot'])
+	try:
+		hgvs_right.decode('ascii')
+	except:
+		converted_hgvs.append([original_hgvs, 'null', 'null', 'null', 'null', 'Improper formatting. Ascii in input'])
+		continue
 	new_hgvs = tx + ':' + hgvs_right
 	if tx != 'Not in Gencode GTF/RefSeq':
 		try:

@@ -70,7 +70,7 @@ GATK -m 8g ApplyRecalibration \
     -R /fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37_decoy.fasta \
     -input ${2%.vcf.gz}.recalibrated_snps_raw_indels.vcf.gz \
     -mode INDEL \
-    --ts_filter_level 98.0 \
+    --ts_filter_level 99.97 \
     -recalFile ${2%.vcf.gz}.recalibrate_INDEL.recal \
     -tranchesFile ${2%.vcf.gz}.recalibrate_INDEL.tranches \
     -o ${2%.vcf.gz}.VQSR_recalibrated_variants.vcf.gz

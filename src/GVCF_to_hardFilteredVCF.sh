@@ -6,6 +6,7 @@ gvcfs_list=$1
 output_vcf_name=$2
 ped=$3
 exome_bait_bed=$4
+
 # Merges all GVCFs into a VCF
 GATK -m 20g GenotypeGVCFs \
 	-R /fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37_decoy.fasta \
@@ -13,23 +14,41 @@ GATK -m 20g GenotypeGVCFs \
 	-V $gvcfs_list \
 	--pedigree $ped
 
-# Extracts all SNPs
-GATK -m 20g SelectVariants \
-	-R /fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37_decoy.fasta \
-	-V $2 \
-	-L $4 \
-    --interval_padding 100 \
-	-selectType SNP \
-	-o ${2%.vcf.gz}.rawSNP.vcf.gz
+if [[ $4 -eq 0 ]]; then
+	# Extracts all SNPs
+	GATK -m 20g SelectVariants \
+		-R /fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37_decoy.fasta \
+		-V $2 \
+		-selectType SNP \
+		-o ${2%.vcf.gz}.rawSNP.vcf.gz
 
-# Extracts all INDELS
-GATK -m 20g SelectVariants \
-	-R /fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37_decoy.fasta \
-	-V $2 \
-	-L $4 \
-	--interval_padding 100 \
-	-selectType INDEL \
-	-o ${2%.vcf.gz}.rawINDEL.vcf.gz
+	# Extracts all INDELS
+	GATK -m 20g SelectVariants \
+		-R /fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37_decoy.fasta \
+		-V $2 \
+		--interval_padding 100 \
+		-selectType INDEL \
+		-o ${2%.vcf.gz}.rawINDEL.vcf.gz
+# if bed provided, then limit extractionn to those regions
+else
+	# Extracts all SNPs
+	GATK -m 20g SelectVariants \
+		-R /fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37_decoy.fasta \
+		-V $2 \
+		-L $4 \
+   		--interval_padding 100 \
+		-selectType SNP \
+		-o ${2%.vcf.gz}.rawSNP.vcf.gz
+
+	# Extracts all INDELS
+	GATK -m 20g SelectVariants \
+		-R /fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37_decoy.fasta \
+		-V $2 \
+		-L $4 \
+		--interval_padding 100 \
+		-selectType INDEL \
+		-o ${2%.vcf.gz}.rawINDEL.vcf.gz
+fi
 
 # Hard filters on GATK best practices for SNPs with MQ mod from bcbio
 GATK -m 20g VariantFiltration \

@@ -79,7 +79,7 @@ for one_sample in samples:
 	# create sbatch command(s)
 	sbatch_commands.write("#!/bin/bash\n")
 	sbatch_call = 'sbatch -J ' + one_sample + 'GVCFcall --mem=20G --time=36:00:00 \
-				  /home/mcgaugheyd/git/NGS_genotype_calling/exome_workflow_v02/process_and_callGVCF.sh ' + \
+				  /home/mcgaugheyd/git/NGS_genotype_calling/src/process_and_callGVCF.sh ' + \
 			      one_sample + '/' + one_sample + '.bwa-mem.b37.merged.bam ' + bed_path + '\n'
 	sbatch_commands.write(sbatch_call)
 	sbatch_commands.write("sleep 1\n")

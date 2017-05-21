@@ -59,7 +59,7 @@ RG_core = '\\\\t'.join(['\\"\@RG',ID, SM, LB, PL])
 
 # bwa alignment
 print("BWA run beginning")
-run_bwa =   ('/home/mcgaugheyd/bin/exome_workflow_v02/run_bwa-mem_hg37d5.sh ' +
+run_bwa =   ('/home/mcgaugheyd/git/NGS_genotype_calling/exome_workflow_v02/run_bwa-mem_hg37d5.sh ' +
             bam_name + '_1.fastq.gz ' + bam_name + '_2.fastq.gz ' +
             '\\@RG\\\\t' + ID + '\\\\t' + SM + '\\\\t' + LB + '\\\\t' + 'PL:Illumina ' +
             bam_name + '.bwa-mem.b37.bam')

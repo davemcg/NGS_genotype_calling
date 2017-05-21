@@ -5,7 +5,7 @@ GATK/3.5-0 with Haplotype Caller and hard filters (using GATK and bcbio best pra
 
 NISC_laneBam_bwaRealign_callGVCF.sh is the wrapper script. It is fed a matrix file*, the sbatch job name, and the location of the exome bait bed file (specific to certain library prep kits). 
 
-The script calls ~/bin/exome_workflow_v02/create_scp_and_sbatch_jobs_for_NISC_laneBams.py which creates scripts that are executed to scp the NISC lane bam files from Trek (1), process thems with BWA (2), and creates the script to call raw genotypes (1, 3). 
+The script calls ~/git/NGS_genotype_calling/exome_workflow_v02/create_scp_and_sbatch_jobs_for_NISC_laneBams.py which creates scripts that are executed to scp the NISC lane bam files from Trek (1), process thems with BWA (2), and creates the script to call raw genotypes (1, 3). 
 
 1. create_scp_and_sbatch_jobs_for_NISC_laneBams.py
 2. realign_NISC_laneBams_with_bwa.py

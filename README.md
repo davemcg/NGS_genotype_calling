@@ -6,8 +6,8 @@
 
 # Overview
 1. (Re)Align with bwa-mem against 1000G GRCh37 with decoy
-- NGS/generic/workflow/run_bwa-mem_hg37d5_fromBam.sh (if starting from a bam)
-- NGS/generic/workflow/run_bwa-mem_hg37d5.sh (if starting from fastq)
+- NGS_generic_workflow/run_bwa-mem_hg37d5_fromBam.sh (if starting from a bam)
+- NGS_generic_workflow/run_bwa-mem_hg37d5.sh (if starting from fastq)
 2. Call GVCF with GATK (v3.5-0 right now)
 - src/process_and_callGVCF.sh
 3. Filter GVCF to VCF

@@ -6,6 +6,8 @@ gvcfs_list=$1
 output_vcf_name=$2
 ped=$3
 exome_bait_bed=$4
+git_repo_url=$5
+git_commit=$6
 
 # Merges all GVCFs into a VCF
 GATK -m 20g GenotypeGVCFs \
@@ -78,3 +80,12 @@ rm ${2%.vcf.gz}.rawSNP.vcf.gz*
 rm ${2%.vcf.gz}.rawINDEL.vcf.gz*
 rm ${2%.vcf.gz}.hardFilterSNP.vcf.gz*
 rm ${2%.vcf.gz}.hardFilterINDEL.vcf.gz*
+
+# add git repo url and commit info to vcf 
+if [[ $git_repo_url && $git_commit ]]; then
+	/home/mcgaugheyd/git/NGS_genotype_calling/src/add_gitCommit_tag_to_GVCF.sh \
+		${2%.vcf.gz}.hardFilterSNP-INDEL.vcf.gz \
+		$git_repo_url \
+		$git_commit
+fi
+

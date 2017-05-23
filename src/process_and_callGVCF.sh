@@ -3,6 +3,12 @@
 module load picard/2.1.1
 module load GATK/3.5-0
 
+input_bam=$1
+bed_file=$2
+git_repo_url=$3
+git_commit=$4
+
+
 ###############################################################
 # Picard
 # cleaning, verify mate-pair, marking dups, and creating index
@@ -169,4 +175,12 @@ else
     	-BQSR ${input_bam%.bam}.recal_data.table1 \
     	-o ${input_bam%.bam}.realigned.raw.g.vcf.gz
 
+fi
+
+# add git repo url and commit info to vcf
+if [[ $git_repo_url && $git_commit ]]; then
+	/home/mcgaugheyd/git/NGS_genotype_calling/src/add_gitCommit_tag_to_GVCF.sh \
+		${input_bam%.bam}.realigned.raw.g.vcf.gz \
+		$git_repo_url \
+		$git_commit
 fi

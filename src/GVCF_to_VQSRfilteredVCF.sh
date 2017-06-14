@@ -6,6 +6,15 @@ gvcfs_list=$1
 output_vcf_name=$2
 ped=$3
 bed=$4
+git_repo_url="$( git --git-dir=/home/mcgaugheyd/git/NGS_genotype_calling/.git config --get remote.origin.url )"
+git_commit="$( git --git-dir=/home/mcgaugheyd/git/NGS_genotype_calling/.git rev-parse --short HEAD )"
+
+# Make sure we are on the master branch
+git_dir="$( git --git-dir=/home/mcgaugheyd/git/NGS_genotype_calling/.git config --get remote.origin.url )"
+if [[ "$git_branch" -ne master ]]; then
+    echo $git_dir not on master!!!
+    exit 1
+fi
 
 if [[ $4 -eq 0 ]]; then
 	# Merges all GVCFs into a VCF
@@ -156,5 +165,14 @@ else
 		-L $4 \
         --interval_padding 100
 fi
+
+# add git repo url and commit info to vcf
+if [[ $git_repo_url && $git_commit ]]; then
+    /home/mcgaugheyd/git/NGS_genotype_calling/src/add_gitCommit_tag_to_GVCF.sh \
+        ${2%.vcf.gz}.hardFilterSNP-INDEL.vcf.gz \
+        $git_repo_url \
+        $git_commit
+fi
+
 
 rm ${2%.vcf.gz}.recalibrated_snps_raw_indels.vcf.gz

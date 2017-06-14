@@ -5,9 +5,14 @@ module load GATK/3.5-0
 
 input_bam=$1
 bed_file=$2
-git_repo_url=$3
-git_commit=$4
+git_repo_url="$( git --git-dir=/home/mcgaugheyd/git/NGS_genotype_calling/.git config --get remote.origin.url )"
+git_commit="$( git --git-dir=/home/mcgaugheyd/git/NGS_genotype_calling/.git rev-parse --short HEAD )"
 
+# Make sure we are on the master branch
+git_dir="$( git --git-dir=/home/mcgaugheyd/git/NGS_genotype_calling/.git config --get remote.origin.url )"
+if [ "$git_branch" -ne master ]
+	echo $git_dir not on master!!!
+	exit 1
 
 ###############################################################
 # Picard

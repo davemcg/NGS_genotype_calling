@@ -16,13 +16,6 @@ if [[ "$git_branch" -ne master ]]; then
     exit 1
 fi
 
-# Make sure we are on the master branch
-git_dir="$( git --git-dir=/home/mcgaugheyd/git/NGS_genotype_calling/.git config --get remote.origin.url )"
-if [ "$git_branch" -ne master ]
-    echo $git_dir not on master!!!
-    exit 1
-
-
 # Merges all GVCFs into a VCF
 GATK -m 20g GenotypeGVCFs \
 	-R /fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37_decoy.fasta \
@@ -89,11 +82,19 @@ GATK -m 20g CombineVariants \
 	-o ${2%.vcf.gz}.hardFilterSNP-INDEL.vcf.gz \
 	--genotypemergeoption UNSORTED
 
+# phase by transmission
+GATK -m 20g PhaseByTransmission \
+    -R /fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37_decoy.fasta \
+    -V ${2%.vcf.gz}.hardFilterSNP-INDEL.vcf.gz \
+    -ped $3 \
+    -o ${2%.vcf.gz}.hardFilterSNP-INDEL.PBT.vcf.gz
+
 # delete intermediate files
 rm ${2%.vcf.gz}.rawSNP.vcf.gz*
 rm ${2%.vcf.gz}.rawINDEL.vcf.gz*
 rm ${2%.vcf.gz}.hardFilterSNP.vcf.gz*
 rm ${2%.vcf.gz}.hardFilterINDEL.vcf.gz*
+rm ${2%.vcf.gz}.hardFilterSNP-INDEL.vcf.gz*
 
 # add git repo url and commit info to vcf 
 if [[ $git_repo_url && $git_commit ]]; then
@@ -102,4 +103,9 @@ if [[ $git_repo_url && $git_commit ]]; then
 		$git_repo_url \
 		$git_commit
 fi
+
+
+
+
+
 

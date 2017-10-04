@@ -10,9 +10,10 @@ git_commit="$( git --git-dir=/home/mcgaugheyd/git/NGS_genotype_calling/.git rev-
 
 # Make sure we are on the master branch
 git_dir="$( git --git-dir=/home/mcgaugheyd/git/NGS_genotype_calling/.git config --get remote.origin.url )"
-if [ "$git_branch" -ne master ]
+if [ "$git_branch" -ne master ]; then
 	echo $git_dir not on master!!!
 	exit 1
+fi
 
 ###############################################################
 # Picard
@@ -61,7 +62,7 @@ if [[ $2 -eq 0 ]] ; then
    		-I $input_bam \
    		--known /fdb/GATK_resource_bundle/b37-2.8/1000G_phase1.indels.b37.vcf \
    		--known /fdb/GATK_resource_bundle/b37-2.8/Mills_and_1000G_gold_standard.indels.b37.vcf \
-    	-o ${input_bam%.bam}.forIndexRealigner.intervals \
+    	-o ${input_bam%.bam}.forIndexRealigner.intervals
 
 	# Takes ~ 100 minutes
 	GATK -m 8g IndelRealigner \

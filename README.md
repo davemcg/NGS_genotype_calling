@@ -15,3 +15,4 @@
 - src/GVCF_to_VQSRfilteredVCF.sh (if WGS or >30 exomes)
 4. Annotate variants
 - New repository: https://github.com/davemcg/variant_prioritization
+

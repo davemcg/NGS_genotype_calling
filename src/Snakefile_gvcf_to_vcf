@@ -1,0 +1,330 @@
+#configfile: ""
+
+CHRS=["1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","X","Y","MT_contigs"]
+
+
+def return_correct_chr_set(wildcards):
+	# replaces 'MT_contigs' with actual values
+	MT_CONTIGS="MT GL000207.1 GL000226.1 GL000229.1 GL000231.1 GL000210.1 GL000239.1 GL000235.1 GL000201.1 GL000247.1 GL000245.1 GL000197.1 GL000203.1 GL000246.1 GL000249.1 GL000196.1 GL000248.1 GL000244.1 GL000238.1 GL000202.1 GL000234.1 GL000232.1 GL000206.1 GL000240.1 GL000236.1 GL000241.1 GL000243.1 GL000242.1 GL000230.1 GL000237.1 GL000233.1 GL000204.1 GL000198.1 GL000208.1 GL000191.1 GL000227.1 GL000228.1 GL000214.1 GL000221.1 GL000209.1 GL000218.1 GL000220.1 GL000213.1 GL000211.1 GL000199.1 GL000217.1 GL000216.1 GL000215.1 GL000205.1 GL000219.1 GL000224.1 GL000223.1 GL000195.1 GL000212.1 GL000222.1 GL000200.1 GL000193.1 GL000194.1 GL000225.1 GL000192.1 NC_007605"
+	chr = str(wildcards.chr)
+	if chr == 'MT_contigs':
+		chr = MT_CONTIGS
+	return(chr)
+
+def chr_VCF_to_single_VCF_hardFilter(wildcards):
+	# creates the filenames for the chr level VCFs to use to concatenate to a single file
+	# ensures that input VCF chrs are provided in order (same as CHRS) below
+	output_name = str(wildcards.output_name)
+	by_chr = []
+	for chrom in CHRS:
+		by_chr.append('temp/' + output_name + '_' + str(chrom) + '.filter.vcf.gz')
+	return(by_chr)	
+
+def chr_VCF_to_single_VCF_VQSR(wildcards):
+	# creates the filenames for the chr level VCFs to use to concatenate to a single file
+	# ensures that input VCF chrs are provided in order (same as CHRS) below
+	output_name = str(wildcards.output_name)
+	by_chr = []
+	for chrom in CHRS:
+		by_chr.append('temp/' + output_name + '_' + str(chrom) + '.PBT.vcf.gz')
+	return(by_chr)	
+
+def input_builder(wildcards):
+	# takes path given in config and returns all gvcfs
+	# assumes all gvcfs are in one folder
+	import glob
+	path = str(config['gvcf_path'])
+	gvcf_files = glob.glob(path + '/' + '*g.vcf.gz')
+	return(gvcf_files)
+
+
+wildcard_constraints:
+	chr='[0-9]+|MT_contigs|X|Y',
+	variant_type='SNP|INDEL'
+
+rule all:
+	input:
+		expand('{output_name}.GATK.vcf.gz', output_name = config['output_name'])
+	#	expand('temp/{output_name}_{chr}.hardFilter.PBT.vcf.gz', output_name=config['output_name'], chr=CHRS)
+
+rule GenotypeGVCFs:
+# process by chr
+	input:
+		input_builder
+	output:
+		temp('temp/{output_name}_{chr}.vcf.gz')
+	params:
+		chromosome = return_correct_chr_set
+	shell:
+		"""
+		chromosome_interval=$(sed 's/^\|\s/ -L /g' <(echo {params.chromosome}))
+		module load {config[gatk_version]}
+		inputs=""
+		for gvcf in {input}; do
+			inputs+="-V $gvcf "
+		done
+		GATK -m 20g GenotypeGVCFs \
+			-R {config[ref_genome]} \
+			-o {output} \
+			$chromosome_interval \
+			--pedigree {config[pedigree]} \
+			$inputs
+		"""
+
+rule PhaseByTransmission:
+	input:
+		'temp/{output_name}_{chr}.vcf.gz'
+	output:
+		temp('temp/{output_name}_{chr}.PBT.vcf.gz')
+	params:
+		chromosome = return_correct_chr_set
+	shell:
+		"""
+		if [ {config[phase_by_transmission]} = "Yes" ]; then
+			chromosome_interval=$(sed 's/^\|\s/ -L /g' <(echo {params.chromosome}))
+			module load {config[gatk_version]}
+			GATK -m 20g PhaseByTransmission \
+				-R {config[ref_genome]} \
+				$chromosome_interval \
+				-o {output} \
+				-ped {config[pedigree]} \
+				-V {input}
+		else
+			mv {input} {output}
+		fi
+		"""
+
+# Run Hard Filtering on VCF
+if str(config['VQSR']).upper() == 'NO':
+	
+	rule SelectVariants:
+		input:
+			'temp/{output_name}_{chr}.PBT.vcf.gz'
+		output:
+			temp('temp/{output_name}_{chr}.raw{variant_type}.vcf.gz')
+		params:
+			chromosome = return_correct_chr_set
+		shell:
+			"""
+			chromosome_interval=$(sed 's/^\|\s/ -L /g' <(echo {params.chromosome}))
+			module load {config[gatk_version]}
+			GATK -m 20g SelectVariants \
+				-R {config[ref_genome]} \
+				-o {output} \
+				$chromosome_interval \
+				-selectType {wildcards.variant_type} \
+				-V {input} 
+			"""
+
+	rule VariantFiltration:
+		input:
+			'temp/{output_name}_{chr}.raw{variant_type}.vcf.gz'
+		output:
+			temp('temp/{output_name}_{chr}.{variant_type}.filter.vcf.gz')
+		params:
+			chromosome = return_correct_chr_set
+		shell:
+			"""
+			chromosome_interval=$(sed 's/^\|\s/ -L /g' <(echo {params.chromosome}))
+			if [ {wildcards.variant_type} = "SNP" ]; then
+				module load {config[gatk_version]}
+				GATK -m 20g VariantFiltration \
+					-R {config[ref_genome]} \
+					$chromosome_interval \
+					{config[filterExpression_SNP]} \
+					--filterName \"FAIL_McGaughey_SNP_filter_v01\" \
+					-o {output} \
+					-V {input} 
+			else
+				module load {config[gatk_version]}
+				GATK -m 20g VariantFiltration \
+					-R {config[ref_genome]} \
+					$chromosome_interval \
+					{config[filterExpression_INDEL]} \
+					--filterName \"FAIL_McGaughey_INDEL_filter_v01\" \
+					-o {output} \
+					-V {input}
+			fi
+			"""
+
+	rule CombineVariants:
+		# combining SNP and INDEL
+		# NOT combining chr files yet
+		input:
+			expand('temp/{{output_name}}_{{chr}}.{variant_type}.filter.vcf.gz', variant_type = ['SNP','INDEL'])
+		output:
+			temp('temp/{output_name}_{chr}.filter.vcf.gz')
+		params:
+			chromosome = return_correct_chr_set
+		shell:
+			"""
+			chromosome_interval=$(sed 's/^\|\s/ -L /g' <(echo {params.chromosome}))
+			module load {config[gatk_version]}
+			inputs=""
+			for file in {input}; do
+				inputs+="-V $file ";
+			done
+			GATK -m 20g CombineVariants \
+				$chromosome_interval \
+				-R {config[ref_genome]} \
+				--genotypemergeoption UNSORTED \
+				-o {output} \
+				$inputs
+			"""
+
+	rule merge_chr_vcf_together:
+		input:
+			chr_VCF_to_single_VCF_hardFilter
+		output:
+			'{output_name}.GATK.vcf.gz'
+		threads: 2
+		shell:
+			"""
+			module load {config[picard_version]}
+			cat_inputs_i=""
+			for vcf in {input}; do
+				cat_inputs_i+="I=$vcf " 
+			done
+			java -Xmx15g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+				MergeVcfs \
+				$cat_inputs_i \
+				O={output}
+			"""	
+
+# Run VQSR on VCF
+# Should have 1 WGS or >30 Exomes 
+if str(config['VQSR']).upper() == 'YES':
+
+	rule merge_chr_vcf_together:
+		input:
+			chr_VCF_to_single_VCF_VQSR
+		output:
+			'temp/{output_name}.merged.vcf.gz'
+		threads: 2
+		shell:
+			"""
+			module load {config[picard_version]}
+			cat_inputs_i=""
+			for vcf in {input}; do
+				cat_inputs_i+="I=$vcf " 
+			done
+			java -Xmx15g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+				MergeVcfs \
+				$cat_inputs_i \
+				O={output}
+			"""	
+	
+	rule VariantRecalibrator_SNP:
+		input:
+			'temp/{output_name}.merged.vcf.gz'
+		output:
+			recal = temp('temp/{output_name}.VQSR_SNP_RECAL_SCORING'),
+			tranche = temp('temp/{output_name}.VQSR_SNP_TRANCHES'),
+			plot = 'VQSR_plot/{output_name}_VQSR.SNP_recal.R' 
+		threads: 4
+		shell:
+			"""
+			module load {config[gatk_version]}
+			GATK -m 20g VariantRecalibrator \
+				-R {config[ref_genome]} \
+				-input {input} \
+				-an DP \
+				-an QD \
+				-an FS \
+				-an SOR \
+				-an MQ \
+				-an MQRankSum \
+				-an ReadPosRankSum \
+				-mode SNP \
+				-tranche 100.0 -tranche 99.97 -tranche 99.9 -tranche 99.5 -tranche 99.0 -tranche 95.0 -tranche 90.0 \
+				-recalFile {output.recal} \
+				-tranchesFile {output.tranche} \
+				-rscriptFile {output.plot} \
+				{config[hapmap]} \
+				{config[omni]} \
+				{config[1000G]} \
+				{config[dbsnp]} \
+				-nt {threads}
+			"""
+
+	rule ApplyRecalibration_SNP:
+		input:
+			recal = 'temp/{output_name}.VQSR_SNP_RECAL_SCORING',
+			tranche = 'temp/{output_name}.VQSR_SNP_TRANCHES',
+			vcf = 'temp/{output_name}.merged.vcf.gz'
+		output:
+			temp('temp/{output_name}.VQSR_snpRECAL.vcf.gz')
+		threads: 4
+		shell:
+			"""
+			module load {config[gatk_version]}
+			GATK -m 20g ApplyRecalibration \
+				-R {config[ref_genome]} \
+				-mode SNP \
+				--ts_filter_level {config[SNP_tranche]} \
+				-recalFile {input.recal} \
+				-tranchesFile {input.tranche} \
+				-input {input.vcf} \
+				-o {output} \
+				-nt {threads}
+			"""
+
+	rule VariantRecalibrator_INDEL:
+		input:
+			'temp/{output_name}.VQSR_snpRECAL.vcf.gz'
+		output:
+			recal = temp('temp/{output_name}.VQSR_INDEL_RECAL_SCORING'),
+			tranche = temp('temp/{output_name}.VQSR_INDEL_TRANCHES'),
+			plot = 'VQSR_plot/{output_name}_VQSR.INDEL_recal.R' 
+		threads: 4
+		shell:
+			"""
+			module load {config[gatk_version]}
+			GATK -m 20g VariantRecalibrator \
+				-R {config[ref_genome]} \
+				-input {input} \
+				-an DP \
+				-an QD \
+				-an FS \
+				-an SOR \
+				-an MQRankSum \
+				-an ReadPosRankSum \
+				-mode INDEL \
+				-tranche 100.0 -tranche 99.97 -tranche 99.9 -tranche 99.5 -tranche 99.0  -tranche 98.0 -tranche 90.0 \
+				--maxGaussians 4 \
+				-recalFile {output.recal} \
+				-tranchesFile {output.tranche} \
+				-rscriptFile {output.plot} \
+				{config[mills]} \
+				{config[dbsnp]} \
+				-nt {threads}
+			"""
+
+	rule ApplyRecalibration_INDEL:
+		input:
+			recal = 'temp/{output_name}.VQSR_INDEL_RECAL_SCORING',
+			tranche = 'temp/{output_name}.VQSR_INDEL_TRANCHES',
+			vcf = 'temp/{output_name}.VQSR_snpRECAL.vcf.gz'
+		output:
+			'{output_name}.GATK.vcf.gz'
+		threads: 4
+		shell:
+			"""
+			module load {config[gatk_version]}
+			GATK -m 20g ApplyRecalibration \
+				-R {config[ref_genome]} \
+				-mode INDEL \
+				--ts_filter_level {config[INDEL_tranche]} \
+				-recalFile {input.recal} \
+				-tranchesFile {input.tranche} \
+				-input {input.vcf} \
+				-o {output} \
+				-nt {threads}
+			"""
+
+
+#rule add_metadata
+#	input:
+#	output:
+#	shell:
+# add git repo url and commit info to vcf 

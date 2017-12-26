@@ -37,14 +37,22 @@ def input_builder(wildcards):
 	gvcf_files = glob.glob(path + '/' + '*g.vcf.gz')
 	return(gvcf_files)
 
-
+def sample_vcf_output_builder():
+	import subprocess
+	sample_names = []
+	for i in input_builder('x'):
+		call = 'module load ' + config['samtools_version'] + '; bcftools query -l ' + i 
+		sample = subprocess.check_output(call, shell=True)
+		sample_names.append(sample.decode().strip())
+	return(sample_names)
+	
 wildcard_constraints:
-	chr='[0-9]+|MT_contigs|X|Y',
+	chr='[0-9]{1,2}|MT_contigs|X|Y',
 	variant_type='SNP|INDEL'
 
 rule all:
 	input:
-		expand('{output_name}.GATK.vcf.gz', output_name = config['output_name'])
+		expand('{sample}.individual.GATK.vcf.gz', sample=sample_vcf_output_builder())
 	#	expand('temp/{output_name}_{chr}.hardFilter.PBT.vcf.gz', output_name=config['output_name'], chr=CHRS)
 
 rule GenotypeGVCFs:
@@ -80,7 +88,8 @@ rule PhaseByTransmission:
 		chromosome = return_correct_chr_set
 	shell:
 		"""
-		if [ {config[phase_by_transmission]} = "Yes" ]; then
+		pbt=`echo {config[phase_by_transmission]}`
+		if [ "${{pbt^^}}" = "YES" ]; then
 			chromosome_interval=$(sed 's/^\|\s/ -L /g' <(echo {params.chromosome}))
 			module load {config[gatk_version]}
 			GATK -m 20g PhaseByTransmission \
@@ -91,6 +100,8 @@ rule PhaseByTransmission:
 				-V {input}
 		else
 			mv {input} {output}
+			module load {config[samtools_version]}
+			tabix -p vcf {output}
 		fi
 		"""
 
@@ -176,7 +187,7 @@ if str(config['VQSR']).upper() == 'NO':
 		input:
 			chr_VCF_to_single_VCF_hardFilter
 		output:
-			'{output_name}.GATK.vcf.gz'
+			'{output_name, \w+}.GATK.vcf.gz'
 		threads: 2
 		shell:
 			"""
@@ -306,7 +317,8 @@ if str(config['VQSR']).upper() == 'YES':
 			tranche = 'temp/{output_name}.VQSR_INDEL_TRANCHES',
 			vcf = 'temp/{output_name}.VQSR_snpRECAL.vcf.gz'
 		output:
-			'{output_name}.GATK.vcf.gz'
+			#https://groups.google.com/forum/#!topic/snakemake/yli8WsqX4yU
+			'{output_name, \w+}.GATK.vcf.gz'
 		threads: 4
 		shell:
 			"""
@@ -322,6 +334,23 @@ if str(config['VQSR']).upper() == 'YES':
 				-nt {threads}
 			"""
 
+rule create_single_sample_vcf:
+# make single sample vcfs from the single VCF holding all samples
+	input:
+		config['output_name'] + '.GATK.vcf.gz'
+	output:
+		'{sample}.individual.GATK.vcf.gz'
+	shell:
+		"""
+		module load {config[samtools_version]}
+		bcftools view -s {wildcards.sample} {input} | bgzip > {output}
+		"""
+
+
+#if str(config['sample_split']).upper() == 'YES':
+#	rule sample_split:
+#		input:
+#			'{output_name}.GATK.vcf.gz'
 
 #rule add_metadata
 #	input:

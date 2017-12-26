@@ -1,0 +1,18 @@
+{
+	"__default__" :
+	{
+		"partition" : "quick",
+		"time" : "4:00:00",
+		"mem" : "20g",
+		"output"  : "00log/{rule}_{wildcards}.out",
+		"error" : "00log/{rule}_{wildcards}.err",
+		"extra" : ""
+	},
+	"GenotypeGVCFs" :
+	{
+		"partition" : "norm",
+		"time" : "12:00:00",
+		"mem" : "64g"
+	}
+}
+	

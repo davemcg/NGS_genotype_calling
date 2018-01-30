@@ -247,7 +247,7 @@ if str(config['VQSR']).upper() == 'YES':
 				-an MQRankSum \
 				-an ReadPosRankSum \
 				-mode SNP \
-				-tranche 100.0 -tranche 99.97 -tranche 99.9 -tranche 99.5 -tranche 99.0 -tranche 95.0 -tranche 90.0 \
+				-tranche 100.0 -tranche 99.99 -tranche 99.97 -tranche 99.9 -tranche 99.5 -tranche 99.0 -tranche 95.0 -tranche 90.0 \
 				-recalFile {output.recal} \
 				-tranchesFile {output.tranche} \
 				-rscriptFile {output.plot} \
@@ -301,7 +301,7 @@ if str(config['VQSR']).upper() == 'YES':
 				-an MQRankSum \
 				-an ReadPosRankSum \
 				-mode INDEL \
-				-tranche 100.0 -tranche 99.97 -tranche 99.9 -tranche 99.5 -tranche 99.0  -tranche 98.0 -tranche 90.0 \
+				-tranche 100.0 -tranche 99.99 -tranche 99.97 -tranche 99.9 -tranche 99.5 -tranche 99.0  -tranche 98.0 -tranche 90.0 \
 				--maxGaussians 4 \
 				-recalFile {output.recal} \
 				-tranchesFile {output.tranche} \

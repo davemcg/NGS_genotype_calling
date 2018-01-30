@@ -1,4 +1,6 @@
 gvcf_path: 'GVCFs/'
+# do not put '.' in output_name
+# '_' are OK
 output_name: 'VCFs'
 picard_version:  'picard/2.9.2'
 pedigree: 'COHORT.ped'

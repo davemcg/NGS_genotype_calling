@@ -10,7 +10,7 @@ The current Snakefile is wrapped by [Snakemake.wrapper.sh](https://github.com/da
 
 Each file will be processed by chromosome (chr1 through X,Y) individually. chrMT and the contigs are merged together and processed as one. This makes this pipeline *fairly* performant. A exome can be processed in hours and a WGS in less than 48 hours. 
 
-A major speed increase could be realized by subdividing the chromosome in (smaller pieces)[https://gatkforums.broadinstitute.org/gatk/discussion/10215/intervals-and-interval-lists] - the Broad breaks WGS into something like 500 pieces. But this would dramatically increase the complexity of the Snakemake pipeline and may be a bit stressful on the scheduler. 
+A major speed increase could be realized by subdividing the chromosome in [smaller pieces](https://gatkforums.broadinstitute.org/gatk/discussion/10215/intervals-and-interval-lists) - the Broad breaks WGS into something like 500 pieces. But this would dramatically increase the complexity of the Snakemake pipeline and may be a bit stressful on the scheduler. 
 
 It would be reasonable to split the autosomal chromosomes into, say, 2-4 pieces each. Something to do in the future. 
 

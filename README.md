@@ -12,6 +12,7 @@
 - src/process_and_callGVCF.sh
 3. Filter GVCF to a master VCF
 - cp src/Snakefile_gvcf_to_vcf_example_config.yaml to your working directory
+- mkdir GVCFs
 - run `ln -s /path/to/your/gvcfs/*.raw.g.vcf GVCFs`
   - alternatively, just copy them, but that's not a great use of disk space
 - edit Snakefile_gvcf_to_vcf_example_config.yaml to give ped path and whether you want VQSR or hard filtering (yaml file has some explanatory comments)

@@ -32,5 +32,7 @@ snakemake -s /home/mcgaugheyd/git/NGS_genotype_calling/src/Snakefile_gvcf_to_vcf
 --cluster-config /home/mcgaugheyd/git/NGS_genotype_calling/src/cluster_gvcf_to_vcf.json \
 --configfile $config_yaml \
 --cluster "$sbcmd"  --latency-wait 120 --rerun-incomplete \
--k --restart-times 4 \
+-k \
 --resources parallel=2
+
+# --restart-times 4 \

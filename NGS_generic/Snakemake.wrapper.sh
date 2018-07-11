@@ -6,7 +6,7 @@
 # /data/mcgaugheyd/projects/nei/mcgaughey/EGA_EGAD00001002656
 # uses config.yaml in git directory
 
-
+mkdir -p 00log
 module load snakemake || exit 1
 
 sbcmd="sbatch --cpus-per-task={threads} \
@@ -18,9 +18,10 @@ sbcmd="sbatch --cpus-per-task={threads} \
 {cluster.extra}"
 
 
-snakemake -s /home/mcgaugheyd/git/human_seq_truth/snakemake/Snakefile \
+snakemake -s /home/mcgaugheyd/git/NGS_genotype_calling/NGS_generic/Snakefile \
 -pr --local-cores 2 --jobs 1999 \
---cluster-config /home/mcgaugheyd/git/human_seq_truth/snakemake/cluster.json \
+--cluster-config /home/mcgaugheyd/git/NGS_genotype_calling/NGS_generic/cluster.json \
 --cluster "$sbcmd"  --latency-wait 120 --rerun-incomplete \
 -k --restart-times 4 \
---resources parallel=4
+--resources parallel=4 \
+--configfile $1

@@ -10,9 +10,13 @@
 - NGS_generic_workflow/run_bwa-mem_hg37d5.sh (if starting from fastq)
 2. Call GVCF with GATK (v3.5-0 right now)
 - src/process_and_callGVCF.sh
-3. Filter GVCF to VCF
-- src/GVCF_to_hardFilteredVCF.sh (first choice)
-- src/GVCF_to_VQSRfilteredVCF.sh (if WGS or >30 exomes)
+3. Filter GVCF to a master VCF
+- cp src/Snakefile_gvcf_to_vcf_example_config.yaml to your working directory
+- mkdir GVCFs
+- run `ln -s /path/to/your/gvcfs/*.raw.g.vcf GVCFs`
+  - alternatively, just copy them, but that's not a great use of disk space
+- edit Snakefile_gvcf_to_vcf_example_config.yaml to give ped path and whether you want VQSR or hard filtering (yaml file has some explanatory comments)
+- run the Snakefile: `sbatch --time=24:00:00 ~/git/NGS_genotype_calling/GVCF_to_VCF_snakemake.wrapper.sh Snakefile_gvcf_to_vcf_example_config.yaml`
 4. Annotate variants
 - New repository: https://github.com/davemcg/variant_prioritization
 

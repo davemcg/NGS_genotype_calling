@@ -16,8 +16,14 @@
 	"align" :
 	{
 		"partition" : "norm",
-		"time" : "48:00:00",
-		"mem" : "32g"
+		"time" : "96:00:00",
+		"mem" : "48g",
+		"threads" : "32"
+	},
+	"picard_merge_bams" :
+	{
+		"partition" : "norm",
+		"time" : "24:00:00"
 	},
 	"merge_RG_bams_back_together" :
 	{

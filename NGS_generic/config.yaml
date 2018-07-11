@@ -1,6 +1,7 @@
-read_group: '@RG\\tID:HG001_WGS\\tSM:HG001_WGS\\tPL:ILLUMINA'
+samples: ['41001412010527_realigned_recal']
+read_groups: ['@RG\\tID:Lineagen_41001412010527\\tSM:Lineagen_41001412010527\\tPL:ILLUMINA']
 picard_version:  'picard/2.9.2'
-samtools_version: 'samtools/1.4'
+samtools_version: 'samtools/1.6'
 gatk_version: 'GATK/3.5-0'
 bwa_version: 'bwa/0.7.12'
 ref_genome: '/fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37_decoy.fasta'

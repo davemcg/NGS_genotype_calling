@@ -14,7 +14,7 @@ Each file will be processed by chromosome (chr1 through X,Y) individually. chrMT
 
 A speed increase could be realized by subdividing the chromosome in [smaller pieces](https://gatkforums.broadinstitute.org/gatk/discussion/10215/intervals-and-interval-lists) - the Broad breaks WGS into something like 500 pieces. Something to do in the future. 
 
-# How to Use
+# File naming
 
 Your fastq files (if that's the input) MUST have some kind of standard naming distinguishing forward / reverse at the end of the file.
 
@@ -25,7 +25,8 @@ Good:
 Bad:
   - `read1.sample1.fastq.gz`
   - `read2.sample1.fastq.gz`
-  
+
+# How to run
 1. Edit [metadata_file.csv](metadata_file.csv) with the sample lane, each lane bam, and the read groups you would like to add
 2. Tweak the [yaml](config.yaml) to:
   - match the forward / reverse notation used. For the Good example above, you would use `['R1','R2']`

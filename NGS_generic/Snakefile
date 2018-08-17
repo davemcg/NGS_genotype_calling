@@ -53,7 +53,7 @@ for line in metadata:
 def rg(wildcards):
 	# returns the read group given in the config['metadata_file']
 	lane_file = str(wildcards)
-	rg_out = LANEFILE_READGROUP[lane_file + config['lane_pair_delim'][0] + '.fastq.gz']
+	rg_out = str(LANEFILE_READGROUP[lane_file + config['lane_pair_delim'][0] + '.fastq.gz'][0])
 	return(rg_out)
 
 CHRS=["1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","X","Y","MT_contigs"]
@@ -100,10 +100,11 @@ rule align:
 	output:
 		temp('lane_bam/{lane}.realigned.bam')
 	params:
-		read_group = str(rg)
+		read_group = rg
 	threads: 16
 	shell:
-		"""	
+		"""
+		echo {params.read_group}	
 		module load {config[bwa_version]}; 
 		module load {config[samtools_version]}; 
 		bwa mem -M -t {threads} -B 4 -O 6 -E 1 -M -R {params.read_group} \

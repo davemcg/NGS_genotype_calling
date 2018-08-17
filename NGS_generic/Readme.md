@@ -23,8 +23,8 @@ Good:
  - `sample1.R2.fastq.gz`
  
 Bad:
-  - `read1.sample1.fastq.gz`
-  - `read2.sample1.fastq.gz`
+  - `run1026_lane12_read1_index8=sample1-1035582785.fastq.gz`
+  - `run1026_lane12_read2_index8=sample1-1035582785.fastq.gz`
 
 # How to run
 1. Edit [metadata_file.csv](metadata_file.csv) with the sample lane, each lane bam, and the read groups you would like to add

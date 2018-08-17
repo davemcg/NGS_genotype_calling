@@ -1,3 +1,5 @@
+metadata_file: 'metadata_file.csv'
+lane_pair_delim: ['_R1_001', '_R2_001']
 samples: ['41001412010527_realigned_recal']
 read_groups: ['@RG\\tID:Lineagen_41001412010527\\tSM:Lineagen_41001412010527\\tPL:ILLUMINA']
 picard_version:  'picard/2.9.2'

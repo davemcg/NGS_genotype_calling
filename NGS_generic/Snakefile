@@ -18,99 +18,143 @@ def chr_bam_to_single_bam(wildcards):
 	sample = str(wildcards)
 	sample_by_chr = []
 	for chrom in CHRS:
-		sample_by_chr.append('bam/chr_split/' + sample + '/' + sample + '__' + str(chrom) + '.realigned.CleanSam.sorted.markDup.gatk_realigner.recalibrated.bam')
+		sample_by_chr.append('sample_bam/chr_split/' + sample + '/' + sample + '__' + str(chrom) + '.CleanSam.sorted.markDup.gatk_realigner.recalibrated.bam')
 	return(sample_by_chr)
 
+# the 'metadata_file' is a csv with three columns
+# the first is the sample name (e.g. Patient001)
+# the second is the name of the fastq or bam associated with the sample
+# the third is the read group you want bwa to use
+# 	example: '@RG\\tID:Lineagen_41001412010527\\tSM:Lineagen_41001412010527\\tPL:ILLUMINA'
+# a header isn't required, but if it is included it MUST be:
+# 	Sample,File
+# you can have multiple lines per sample
+# most samples are paired end, so there will be at least two files per sample
+# often you have a sample sequenced across multiple lanes/machines, so you can have 
+# upwards of a dozen files for a single sample
+SAMPLE_LANEFILE = dict()
+LANEFILE_READGROUP = dict()
+metadata = open(config['metadata_file'])
+for line in metadata:
+	read_group = line.split(',')[2][:-1]
+	lane_file = line.split(',')[1]
+	sample = line.split(',')[0]
+	# skip header
+	if sample == 'Sample':
+		continue
+	if sample not in SAMPLE_LANEFILE:
+		SAMPLE_LANEFILE[sample] = [lane_file]
+	else:
+		old_lane_file = SAMPLE_LANEFILE[sample]
+		old_lane_file.append(lane_file)
+		SAMPLE_LANEFILE[sample] = old_lane_file
+	LANEFILE_READGROUP[lane_file] = [read_group]
+
 def rg(wildcards):
-	# returns the read group given in config.yaml's read_group for a sample
-	# by index. config['sample'] and config['read_groups'] should be given
-	# as matched lists
-	sample = str(wildcards)
-	all_path_samples = config['samples']
-	all_samples = [s.split('/')[-1] for s in all_path_samples]
-	rgs = config['read_groups']
-	rg_out = rgs[all_samples.index(sample)]
+	# returns the read group given in the config['metadata_file']
+	lane_file = str(wildcards)
+	rg_out = LANEFILE_READGROUP[lane_file + config['lane_pair_delim'][0] + '.fastq.gz']
 	return(rg_out)
 
-
-#(SAMPLES, FILE_ENDINGS) = glob_wildcards(join('{sample}_[1|2].{file_ending}'))
 CHRS=["1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","X","Y","MT_contigs"]
 MT_CONTIGS="MT GL000207.1 GL000226.1 GL000229.1 GL000231.1 GL000210.1 GL000239.1 GL000235.1 GL000201.1 GL000247.1 GL000245.1 GL000197.1 GL000203.1 GL000246.1 GL000249.1 GL000196.1 GL000248.1 GL000244.1 GL000238.1 GL000202.1 GL000234.1 GL000232.1 GL000206.1 GL000240.1 GL000236.1 GL000241.1 GL000243.1 GL000242.1 GL000230.1 GL000237.1 GL000233.1 GL000204.1 GL000198.1 GL000208.1 GL000191.1 GL000227.1 GL000228.1 GL000214.1 GL000221.1 GL000209.1 GL000218.1 GL000220.1 GL000213.1 GL000211.1 GL000199.1 GL000217.1 GL000216.1 GL000215.1 GL000205.1 GL000219.1 GL000224.1 GL000223.1 GL000195.1 GL000212.1 GL000222.1 GL000200.1 GL000193.1 GL000194.1 GL000225.1 GL000192.1 NC_007605"
 
-PATH_SAMPLES = config['samples']
-# strip out file paths
-SAMPLES = [s.split('/')[-1] for s in PATH_SAMPLES]
-# grab the file path ahead of sample name
-# assume all files have same path
-PATH = ['/'.join(s.split('/')[:-1]) for s in PATH_SAMPLES][0]
-# if path is blank, then make a period for the file will be ./file below
-if PATH != '':
-	PATH = PATH + '/'
-
 wildcard_constraints:
-	sample='|'.join(SAMPLES)
-
+	sample='|'.join(list(SAMPLE_LANEFILE.keys())),
+	chr = '|'.join(CHRS),
+	lane = '|'.join(list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in [y for sub in list(SAMPLE_LANEFILE.values()) for y in sub]])))
+	
 rule all:
 	input: 
-	#	expand('gvcfs/chr_split/{sample}/{sample}__{chr}.g.vcf.gz', sample=SAMPLES, chr=CHRS)
-		expand('gvcfs/{sample}.g.vcf.gz', sample=SAMPLES),
-		expand('bam/{sample}.realigned.recalibrated.bam', sample=SAMPLES),
+		expand('gvcfs/{sample}.g.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
+		expand('sample_bam/{sample}.recalibrated.bam', sample=list(SAMPLE_LANEFILE.keys())),
 		'GATK_metrics/multiqc_report',
 		'fastqc/multiqc_report'
 
-rule bam_to_fastq:
-	input:
-		PATH + '{sample}.bam'
-	output:
-		forward = temp(PATH  + '{sample}_' + config['fastq_ending_for']),
-		reverse = temp(PATH  + '{sample}_' + config['fastq_ending_rev'])
-	threads: 2
-	shell:
-		"""
-		module load {config[samtools_version]}
-		mkdir -p /scratch/mcgaugheyd/$SLURM_JOB_ID/
-		export REF_CACHE=/scratch/mcgaugheyd/$SLURM_JOB_ID/hts-refcache
-		samtools collate -uOn 128 {wildcards.sample}.bam /scratch/mcgaugheyd/$SLURM_JOB_ID/TMP_{wildcards.sample} | \
-			samtools fastq - -1 {output.forward} -2 {output.reverse}
-		"""
+#rule bam_to_fastq:
+#	input:
+#		PATH + '{lane}.bam'
+#	output:
+#		forward = temp(PATH  + '{lane}_' + config['fastq_ending_for']),
+#		reverse = temp(PATH  + '{lane}_' + config['fastq_ending_rev'])
+#	threads: 2
+#	shell:
+#		"""
+#		module load {config[samtools_version]}
+#		mkdir -p /scratch/mcgaugheyd/$SLURM_JOB_ID/
+#		export REF_CACHE=/scratch/mcgaugheyd/$SLURM_JOB_ID/hts-refcache
+#		samtools collate -uOn 128 {wildcards.sample}.bam /scratch/mcgaugheyd/$SLURM_JOB_ID/TMP_{wildcards.sample} | \
+#			samtools fastq - -1 {output.forward} -2 {output.reverse}
+#		"""
 
+# align with bwa mem
 rule align:
 	input:
-		forward = PATH  + '{sample}_' + config['fastq_ending_for'],
-		reverse = PATH  + '{sample}_' + config['fastq_ending_rev']
+		# config['lane_pair_delim'] is the string differentiating
+		# the forward from reverse
+		# e.g. ['_R1_001', '_R2_001'] if the file names are
+		# sample17_R1_001.fastq.gz and sample17_R2_001.fastq.gz
+		# for a set of paired end fastq
+		# if you don't have a paired fastq set, give as ['']
+		expand('fastq/{{lane}}{pair}.fastq.gz', pair = config['lane_pair_delim'])
 	output:
-		temp('bam/{sample}.realigned.bam')
+		temp('lane_bam/{lane}.realigned.bam')
 	params:
-		read_group = rg
-	threads: 32
+		read_group = str(rg)
+	threads: 16
 	shell:
 		"""	
 		module load {config[bwa_version]}; 
 		module load {config[samtools_version]}; 
 		bwa mem -M -t {threads} -B 4 -O 6 -E 1 -M -R {params.read_group} \
 			{config[bwa_genome]} \
-			<(zcat {input.forward}) <(zcat {input.reverse}) | samtools view -1 - \
-		> {output} 
+			{input} | \
+			samtools view -1 - > \
+			{output} 
 		"""
 
+# if multiple sets of fastq/bam provided for a sample, now merge together
+rule merge_lane_bam:
+	input:
+		lambda wildcards: expand('lane_bam/{lane}.realigned.bam', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]])))
+	output:
+		bam = temp('sample_bam/{sample}.bam'),
+		bai = temp('sample_bam/{sample}.bam.bai')
+	shell:
+		"""
+		module load {config[samtools_version]}
+		module load {config[picard_version]}
+		picard_i=""
+		for bam in {input}; do
+			picard_i+=" I=$bam"
+		done
+		java -Xmx8g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+			MergeSamFiles \
+			TMP_DIR=/scratch/$SLURM_JOB_ID \
+			$picard_i \
+			O={output.bam}
+		samtools index {output.bam}
+		"""
+	
 rule sort:
 	input:
-		'bam/{sample}.realigned.bam'
+		bam = 'sample_bam/{sample}.bam',
+		bai = 'sample_bam/{sample}.bam.bai'
 	output:
-		temp('bam/{sample}.realigned.s.bam')
+		temp('sample_bam/{sample}.sorted.bam')
 	threads: 8 
 	shell:
 		"""
 		export REF_CACHE=/scratch/$SLURM_JOB_ID/hts-refcache
 		module load {config[samtools_version]}
-		samtools sort {input} -@ {threads} -T /scratch/$SLURM_JOB_ID -o {output}
+		samtools sort {input.bam} -@ {threads} -T /scratch/$SLURM_JOB_ID -o {output}
 		"""
 
 rule build_index:
 	input:
-		'bam/{sample}.realigned.s.bam'
+		'sample_bam/{sample}.sorted.bam'
 	output:
-		temp('bam/{sample}.realigned.s.bam.bai')
+		temp('sample_bam/{sample}.sorted.bam.bai')
 	threads: 2
 	shell:
 		"""
@@ -121,7 +165,7 @@ rule build_index:
 
 rule fastqc:
 	input:
-		'bam/{sample}.realigned.bam'
+		'sample_bam/{sample}.bam'
 	output:
 		'fastqc/{sample}'
 	threads: 8
@@ -135,10 +179,10 @@ rule fastqc:
 
 rule split_bam_by_chr:
 	input:
-		bam = 'bam/{sample}.realigned.s.bam',
-		bai = 'bam/{sample}.realigned.s.bam.bai'
+		bam = 'sample_bam/{sample}.sorted.bam',
+		bai = 'sample_bam/{sample}.sorted.bam.bai'
 	output:
-		temp('bam/chr_split/{sample}/{sample}__{chr}.realigned.bam')
+		temp('sample_bam/chr_split/{sample}/{sample}__{chr}.bam')
 	threads: 2
 	shell:
 		"""
@@ -153,9 +197,9 @@ rule split_bam_by_chr:
 rule picard_clean_sam:
 # "Soft-clipping beyond-end-of-reference alignments and setting MAPQ to 0 for unmapped reads"
 	input:
-		'bam/chr_split/{sample}/{sample}__{chr}.realigned.bam'
+		'sample_bam/chr_split/{sample}/{sample}__{chr}.bam'
 	output:
-		temp('bam/chr_split/{sample}/{sample}__{chr}.realigned.CleanSam.bam')
+		temp('sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.bam')
 	threads: 2
 	shell:
 		"""
@@ -171,9 +215,9 @@ rule picard_fix_mate_information:
 # "Verify mate-pair information between mates and fix if needed."
 # also coord sorts
 	input:
-		'bam/chr_split/{sample}/{sample}__{chr}.realigned.CleanSam.bam'
+		'sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.bam'
 	output:
-		temp('bam/chr_split/{sample}/{sample}__{chr}.realigned.CleanSam.sorted.bam')
+		temp('sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.bam')
 	threads: 2
 	shell:
 		"""
@@ -188,9 +232,9 @@ rule picard_fix_mate_information:
 rule picard_mark_dups:
 # Mark duplicate reads
 	input:
-		'bam/chr_split/{sample}/{sample}__{chr}.realigned.CleanSam.sorted.bam'
+		'sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.bam'
 	output:
-		bam = ('bam/chr_split/{sample}/{sample}__{chr}.realigned.CleanSam.sorted.markDup.bam'),
+		bam = ('sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.markDup.bam'),
 		metrics = 'GATK_metrics/{sample}__{chr}.markDup.metrics'
 	threads: 2
 	shell:
@@ -206,9 +250,9 @@ rule picard_mark_dups:
 rule picard_bam_index:
 # Build bam index
 	input:
-		'bam/chr_split/{sample}/{sample}__{chr}.realigned.CleanSam.sorted.markDup.bam'
+		'sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.markDup.bam'
 	output:
-		temp('bam/chr_split/{sample}/{sample}__{chr}.realigned.CleanSam.sorted.markDup.bam.bai')
+		temp('sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.markDup.bam.bai')
 	threads: 2
 	shell:
 		"""
@@ -222,10 +266,10 @@ rule picard_bam_index:
 rule gatk_realigner_target:
 # identify regions which need realignment
 	input:
-		bam = 'bam/chr_split/{sample}/{sample}__{chr}.realigned.CleanSam.sorted.markDup.bam',
-		bai = 'bam/chr_split/{sample}/{sample}__{chr}.realigned.CleanSam.sorted.markDup.bam.bai'
+		bam = 'sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.markDup.bam',
+		bai = 'sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.markDup.bam.bai'
 	output:
-		temp('bam/chr_split/{sample}/{sample}__{chr}.forIndexRealigner.intervals')
+		temp('sample_bam/chr_split/{sample}/{sample}__{chr}.forIndexRealigner.intervals')
 	threads: 2
 	shell:
 		"""
@@ -241,11 +285,11 @@ rule gatk_realigner_target:
 rule gatk_indel_realigner:
 # realigns indels to improve quality
 	input:
-		bam = 'bam/chr_split/{sample}/{sample}__{chr}.realigned.CleanSam.sorted.markDup.bam',
-		bai = 'bam/chr_split/{sample}/{sample}__{chr}.realigned.CleanSam.sorted.markDup.bam.bai',
-		targets = 'bam/chr_split/{sample}/{sample}__{chr}.forIndexRealigner.intervals'
+		bam = 'sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.markDup.bam',
+		bai = 'sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.markDup.bam.bai',
+		targets = 'sample_bam/chr_split/{sample}/{sample}__{chr}.forIndexRealigner.intervals'
 	output:
-		temp('bam/chr_split/{sample}/{sample}__{chr}.realigned.CleanSam.sorted.markDup.gatk_realigner.bam')
+		temp('sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.markDup.gatk_realigner.bam')
 	threads: 2
 	shell:
 		"""
@@ -262,7 +306,7 @@ rule gatk_indel_realigner:
 rule gatk_base_recalibrator:
 # recalculate base quality scores
 	input:
-		'bam/chr_split/{sample}/{sample}__{chr}.realigned.CleanSam.sorted.markDup.gatk_realigner.bam'
+		'sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.markDup.gatk_realigner.bam'
 	output:
 		'GATK_metrics/{sample}__{chr}.recal_data.table1'
 	threads: 2
@@ -281,10 +325,10 @@ rule gatk_base_recalibrator:
 rule gatk_print_reads:
 # print out new bam with recalibrated scoring
 	input:
-		bam = 'bam/chr_split/{sample}/{sample}__{chr}.realigned.CleanSam.sorted.markDup.gatk_realigner.bam',
+		bam = 'sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.markDup.gatk_realigner.bam',
 		bqsr = 'GATK_metrics/{sample}__{chr}.recal_data.table1'
 	output:
-		temp('bam/chr_split/{sample}/{sample}__{chr}.realigned.CleanSam.sorted.markDup.gatk_realigner.recalibrated.bam')
+		temp('sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.markDup.gatk_realigner.recalibrated.bam')
 	threads: 2
 	shell:
 		"""
@@ -299,7 +343,7 @@ rule gatk_print_reads:
 rule gatk_base_recalibrator2:
 # recalibrate again
 	input:
-		bam = 'bam/chr_split/{sample}/{sample}__{chr}.realigned.CleanSam.sorted.markDup.gatk_realigner.bam',
+		bam = 'sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.markDup.gatk_realigner.bam',
 		bqsr = 'GATK_metrics/{sample}__{chr}.recal_data.table1'
 	output:
 		'GATK_metrics/{sample}__{chr}.recal_data.table2'
@@ -337,7 +381,7 @@ rule gatk_analyze_covariates:
 rule gatk_haplotype_caller:
 # call gvcf
 	input:
-		bam = 'bam/chr_split/{sample}/{sample}__{chr}.realigned.CleanSam.sorted.markDup.gatk_realigner.recalibrated.bam',
+		bam = 'sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.markDup.gatk_realigner.recalibrated.bam',
 		bqsr = 'GATK_metrics/{sample}__{chr}.recal_data.table1'
 	output:
 		temp('gvcfs/chr_split/{sample}/{sample}__{chr}.g.vcf.gz')
@@ -358,7 +402,7 @@ rule picard_merge_bams:
 	input:
 		chr_bam_to_single_bam
 	output:
-		'bam/{sample}.realigned.recalibrated.bam'
+		'sample_bam/{sample}.recalibrated.bam'
 	threads: 2
 	shell:
 		"""
@@ -394,8 +438,8 @@ rule picard_merge_gvcfs:
 rule multiqc_gatk:
 # run multiqc on recalibrator metrics
 	input:
-		expand('GATK_metrics/{sample}__{chr}.recal_data.table1',sample=SAMPLES, chr=CHRS),
-		expand('GATK_metrics/{sample}__{chr}.recal_data.table2', sample=SAMPLES, chr=CHRS)
+		expand('GATK_metrics/{sample}__{chr}.recal_data.table1',sample=list(SAMPLE_LANEFILE.keys()), chr=CHRS),
+		expand('GATK_metrics/{sample}__{chr}.recal_data.table2', sample=list(SAMPLE_LANEFILE.keys()), chr=CHRS)
 	output:
 		'GATK_metrics/multiqc_report'
 	shell:
@@ -406,7 +450,7 @@ rule multiqc_gatk:
 
 rule multiqc_fastqc:
 	input:
-		expand('fastqc/{sample}', sample=SAMPLES)
+		expand('fastqc/{sample}', sample=list(SAMPLE_LANEFILE.keys()))
 	output:
 		fastqc = 'fastqc/multiqc_report'
 	shell:

@@ -8,7 +8,8 @@
 		"error" : "00log/{rule}_{wildcards}.err",
 		"extra" : ""
 	},
-	"split_cram_by_rg" : {
+	"split_cram_by_rg" : 
+	{
 		"partition" : "norm",
 		"extra" : "--gres=lscratch:10",
 		"time" : "8:00:00"
@@ -17,13 +18,21 @@
 	{
 		"partition" : "norm",
 		"time" : "96:00:00",
-		"mem" : "48g",
+		"mem" : "64g",
 		"threads" : "32"
 	},
 	"picard_merge_bams" :
 	{
 		"partition" : "norm",
-		"time" : "24:00:00"
+		"time" : "24:00:00",
+		"mem" : "32G"
+	},
+	"merge_lane_bam" :
+	{
+		"partition" : "norm",
+		"time" : "24:00:00",
+		"mem" : "32G",
+		"extra" : "--gres=lscratch:300"
 	},
 	"merge_RG_bams_back_together" :
 	{
@@ -62,6 +71,7 @@
 	},
 	"gatk_haplotype_caller" : {
 		"partition" : "norm",
+		"mem" : "16g",
 		"time" : "36:00:00"
 	},
 	"globus_bam_transfer_from_Arges" : {

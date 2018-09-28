@@ -6,6 +6,7 @@ picard_version:  'picard/2.9.2'
 pedigree: 'COHORT.ped'
 # Only use for trios. Quartets will be skipped for phasing.
 phase_by_transmission: 'No'
+vt_version: 'vt/0.577'
 gatk_version: 'GATK/3.5-0'
 ref_genome: '/fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37_decoy.fasta'
 samtools_version: 'samtools/1.6'

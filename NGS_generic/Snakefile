@@ -1,8 +1,6 @@
 from os.path import join
 import sys
 
-#configfile: "/home/mcgaugheyd/git/NGS_genotype_calling/NGS_generic_workflow/config.yaml"
-
 def chr_GVCF_to_single_GVCF(wildcards):
 	# creates the filenames for the chr level GVCFs to use to concatenate to a single file
 	# ensures that input GVCF chrs are provided in order (same as CHRS) below
@@ -11,7 +9,6 @@ def chr_GVCF_to_single_GVCF(wildcards):
 	for chrom in CHRS:
 		sample_by_chr.append('gvcfs/chr_split/' + sample + '/' + sample + '__' + str(chrom) + '.g.vcf.gz')
 	return(sample_by_chr)
-
 
 def chr_bam_to_single_bam(wildcards):
 	# creates the filenames for the chr level bams to use to concatenate to a single file

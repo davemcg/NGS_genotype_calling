@@ -17,7 +17,7 @@
 	"align" :
 	{
 		"partition" : "norm",
-		"time" : "96:00:00",
+		"time" : "48:00:00",
 		"mem" : "64g",
 		"threads" : "32"
 	},
@@ -54,24 +54,27 @@
 	"picard_bam_index" : {
 		"mem" : "64g"
 	},
+	"picard_merge_gvcfs" : {
+		"mem" : "16g"
+	},
 	"gatk_base_recalibrator" : {
 		"partition" : "norm",
 		"mem" : "16g",
-		"time" : "6:00:00"
+		"time" : "10:00:00"
 	},
 	"gatk_base_recalibrator2" : {
 		"partition" : "norm",
 		"mem" : "16g",
-		"time" : "6:00:00"
+		"time" : "10:00:00"
 	},
 	"gatk_print_reads" : {
 		"partition" : "norm",
 		"mem" : "16g",
-		"time" : "72:00:00"
+		"time" : "36:00:00"
 	},
 	"gatk_haplotype_caller" : {
 		"partition" : "norm",
-		"mem" : "16g",
+		"mem" : "12g",
 		"time" : "36:00:00"
 	},
 	"globus_bam_transfer_from_Arges" : {
@@ -93,6 +96,13 @@
 	"sort" : {
 		"partition" : "norm",
 		"time" : "12:00:00"
+	},
+	"multiqc_gatk" : {
+		"mem" : "32g"
+	},
+	"bam_to_cram" : {
+		"extra" : "--gres=lscratch:300",
+		"partition" : "norm",
+		"time" : "24:00:00"
 	}
 }
-	

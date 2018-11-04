@@ -64,7 +64,7 @@ wildcard_constraints:
 rule all:
 	input: 
 		expand('gvcfs/{sample}.g.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
-		expand('sample_bam/{sample}.recalibrated.bam', sample=list(SAMPLE_LANEFILE.keys())),
+		expand('sample_cram/{sample}.cram', sample=list(SAMPLE_LANEFILE.keys())),
 		'GATK_metrics/multiqc_report',
 		'fastqc/multiqc_report'
 
@@ -171,7 +171,7 @@ rule fastqc:
 		"""
 		module load fastqc
 		mkdir -p fastqc 
-		mkdir fastqc/{wildcards.sample}
+		mkdir -p fastqc/{wildcards.sample}
 		fastqc -t {threads} -o {output} {input}
 		"""
 
@@ -232,7 +232,7 @@ rule picard_mark_dups:
 	input:
 		'sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.bam'
 	output:
-		bam = ('sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.markDup.bam'),
+		bam = temp('sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.markDup.bam'),
 		metrics = 'GATK_metrics/{sample}__{chr}.markDup.metrics'
 	threads: 2
 	shell:
@@ -400,7 +400,7 @@ rule picard_merge_bams:
 	input:
 		chr_bam_to_single_bam
 	output:
-		'sample_bam/{sample}.recalibrated.bam'
+		temp('sample_bam/{sample}.recalibrated.bam')
 	threads: 2
 	shell:
 		"""
@@ -412,6 +412,23 @@ rule picard_merge_bams:
 			MergeSamFiles \
 			$cat_inputs_i \
 			O={output}
+		"""
+
+# 30% smaller!
+rule bam_to_cram:
+	input:
+		'sample_bam/{sample}.recalibrated.bam'
+	output:
+		cram = 'sample_cram/{sample}.cram',
+		crai = 'sample_cram/{sample}.crai'
+	threads:
+		8
+	shell:
+		"""
+		module load {config[samtools_version]}
+		samtools sort -O bam -l 0 --threads {threads} -T /lscratch/$SLURM_JOB_ID {input} | \
+		samtools view -T {config[bwa_genome]} --threads {threads} -C -o {output.cram} -
+		samtools index {output.cram} {output.crai}
 		"""
 
 rule picard_merge_gvcfs:

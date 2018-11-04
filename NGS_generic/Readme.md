@@ -32,3 +32,11 @@ Bad:
   - match the forward / reverse notation used. For the Good example above, you would use `['R1','R2']`
   - Give path and name for the [metadata_file.csv](metadata_file.csv)
 3. Run with sbatch --time=SOMETHING ~/git/NGS_genotype_calling/NGS_generic/Snakemake.wrapper.sh config.yaml
+
+# How to get from the GVCF to a single, filtered VCF?
+
+![](gvcf_dag.svg)
+
+1. You need your GVCFs to all be in one folder. The next [Snakefile](../src/Snakefile_gvcf_to_vcf) requires that.
+2. Copy and edit the [yaml](../src/Snakefile_gvcf_to_vcf_example_config.yaml)
+3. Run with `sbatch --time=24:00:00 ~/git/NGS_genotype_calling/GVCF_to_VCF_snakemake.wrapper.sh Snakefile_gvcf_to_vcf_example_config.yaml`

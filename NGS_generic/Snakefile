@@ -417,7 +417,7 @@ rule picard_merge_bams:
 # 30% smaller!
 rule bam_to_cram:
 	input:
-		'sample_bam/{sample}.recalibrated.bam'
+		'sample_bam/{sample}.bam'
 	output:
 		cram = 'sample_cram/{sample}.cram',
 		crai = 'sample_cram/{sample}.crai'

@@ -63,10 +63,11 @@ wildcard_constraints:
 	
 rule all:
 	input: 
-		expand('gvcfs/{sample}.g.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
-		expand('sample_cram/{sample}.cram', sample=list(SAMPLE_LANEFILE.keys())),
-		'GATK_metrics/multiqc_report',
-		'fastqc/multiqc_report'
+		#expand('gvcfs/{sample}.g.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
+		#expand('sample_cram/{sample}.cram', sample=list(SAMPLE_LANEFILE.keys())),
+		#'GATK_metrics/multiqc_report',
+		#'fastqc/multiqc_report',
+		'cohort.smoove.square.anno.DHFFC0.7.vcf.gz'
 
 #rule bam_to_fastq:
 #	input:
@@ -116,8 +117,8 @@ rule merge_lane_bam:
 	input:
 		lambda wildcards: expand('lane_bam/{lane}.realigned.bam', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]])))
 	output:
-		bam = temp('sample_bam/{sample}.bam'),
-		bai = temp('sample_bam/{sample}.bam.bai')
+		bam = ('sample_bam/{sample}.bam'),
+		bai = ('sample_bam/{sample}.bam.bai')
 	shell:
 		"""
 		module load {config[samtools_version]}
@@ -473,4 +474,85 @@ rule multiqc_fastqc:
 		module load multiqc
 		multiqc -f -o {output} fastqc/
 		"""
+		
+rule smoove_call:
+	input:
+		bam = 'sample_bam/{sample}.bam',
+		bai = 'sample_bam/{sample}.bam.bai'
+	output:
+		vcf = 'smoove/{sample}-smoove.genotyped.vcf.gz'
+	threads: 16 
+	shell:
+		"""
+		TMP_DIR=/scratch/mcgaugheyd/$SLURM_JOB_ID
+		module load {config[smoove_version]}
+		smoove call --name {wildcards.sample} \
+			--fasta {config[ref_genome]} \
+			--excludechroms hs37d5,~:,~^GL,~decoy \
+			-p {threads} \
+			--outdir smoove/ \
+			--genotype \
+			{input.bam}
+		"""
 
+rule smoove_merge:
+	input:
+		expand('smoove/{sample}-smoove.genotyped.vcf.gz', sample = list(SAMPLE_LANEFILE.keys()))
+	output:
+		vcf = 'smoove/cohort.sites.vcf.gz'
+	threads: 4
+	shell:
+		"""
+		module load {config[smoove_version]}
+		smoove merge --name cohort \
+			--fasta {config[ref_genome]} \
+			--outdir smoove/ \
+			{input} 
+		"""
+
+rule smoove_reGenotype:
+	input:
+		vcf = 'smoove/cohort.sites.vcf.gz',
+		bam = 'sample_bam/{sample}.bam',
+		bai = 'sample_bam/{sample}.bam.bai'
+	output:
+		'smoove/reGenotype/{sample}-smoove.genotyped.vcf.gz'		
+	threads: 8
+	shell:
+		"""
+		TMP_DIR=/scratch/mcgaugheyd/$SLURM_JOB_ID
+		module load {config[smoove_version]}
+		smoove genotype -p {threads} \
+			--name {wildcards.sample} \
+			--outdir smoove/reGenotype/ \
+			--duphold \
+			--fasta {config[ref_genome]} \
+			--vcf {input.vcf} \
+			{input.bam}
+		"""
+
+rule smoove_paste:
+	input:
+		expand('smoove/reGenotype/{sample}-smoove.genotyped.vcf.gz', sample = list(SAMPLE_LANEFILE.keys()))
+	output:
+		'smoove/cohort.smoove.square.vcf.gz'
+	shell:
+		"""
+		TMP_DIR=/scratch/mcgaugheyd/$SLURM_JOB_ID
+		module load {config[smoove_version]}
+		smoove paste --name cohort {input} --outdir smoove
+		"""
+		
+rule smoove_annotate_and_DHFFC_filter:
+	input:
+		'smoove/cohort.smoove.square.vcf.gz'
+	output:
+		square = 'smoove/cohort.smoove.square.anno.vcf.gz',
+		dhffc = 'cohort.smoove.square.anno.DHFFC0.7.vcf.gz'
+	shell:
+		"""
+		module load {config[samtools_version]}
+		module load {config[smoove_version]}
+		smoove annotate --gff {config[gff]} {input} | bgzip -c > {output.square}
+		bcftools view -i '(FMT/DHFFC) < 0.7' {output.square} | bgzip -c > {output.dhffc}	
+		"""

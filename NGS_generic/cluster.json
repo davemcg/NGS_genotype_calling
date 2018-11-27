@@ -104,5 +104,10 @@
 		"extra" : "--gres=lscratch:300",
 		"partition" : "norm",
 		"time" : "24:00:00"
+	},
+	"smoove_call" : {
+		"partition" : "norm",
+		"time" : "6:00:00",
+		"mem" : "16g"
 	}
 }

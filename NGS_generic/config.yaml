@@ -5,6 +5,7 @@ read_groups: ['@RG\\tID:Lineagen_41001412010527\\tSM:Lineagen_41001412010527\\tP
 picard_version:  'picard/2.9.2'
 samtools_version: 'samtools/1.6'
 gatk_version: 'GATK/3.5-0'
+smoove_version: 'smoove/0.2.1'
 bwa_version: 'bwa/0.7.12'
 ref_genome: '/fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37_decoy.fasta'
 bwa_genome: '/data/mcgaugheyd/genomes/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta'

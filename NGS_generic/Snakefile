@@ -165,7 +165,7 @@ rule fastqc:
 	input:
 		'sample_bam/{sample}.bam'
 	output:
-		'fastqc/{sample}'
+		directory('fastqc/{sample}')
 	threads: 8
 	shell:
 		"""

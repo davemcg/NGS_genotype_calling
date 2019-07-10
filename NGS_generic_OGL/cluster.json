@@ -1,0 +1,108 @@
+{
+	"__default__" :
+	{
+		"partition" : "quick",
+		"time" : "4:00:00",
+		"mem" : "8g",
+		"output"  : "00log/{rule}_{wildcards}.out",
+		"error" : "00log/{rule}_{wildcards}.err",
+		"extra" : ""
+	},
+	"split_cram_by_rg" : 
+	{
+		"partition" : "norm",
+		"extra" : "--gres=lscratch:10",
+		"time" : "8:00:00"
+	},
+	"align" :
+	{
+		"partition" : "norm",
+		"time" : "48:00:00",
+		"mem" : "64g",
+		"threads" : "32"
+	},
+	"picard_merge_bams" :
+	{
+		"partition" : "norm",
+		"time" : "24:00:00",
+		"mem" : "32G"
+	},
+	"merge_lane_bam" :
+	{
+		"partition" : "norm",
+		"time" : "24:00:00",
+		"mem" : "32G",
+		"extra" : "--gres=lscratch:300"
+	},
+	"merge_RG_bams_back_together" :
+	{
+		"partition" : "norm",
+		"time" : "24:00:00",
+		"mem" : "64g",
+		"extra" : "--gres=lscratch:300"
+	},
+	"picard_clean_sam" : {
+		"mem" : "64g",
+		"extra" : "--gres=lscratch:100"
+	},
+	"picard_fix_mate_information" : {
+		"mem" : "64g"
+	},
+	"picard_mark_dups" : {
+		"mem" : "64g"
+	},
+	"picard_bam_index" : {
+		"mem" : "64g"
+	},
+	"picard_merge_gvcfs" : {
+		"mem" : "16g"
+	},
+	"gatk_base_recalibrator" : {
+		"partition" : "norm",
+		"mem" : "16g",
+		"time" : "10:00:00"
+	},
+	"gatk_base_recalibrator2" : {
+		"partition" : "norm",
+		"mem" : "16g",
+		"time" : "10:00:00"
+	},
+	"gatk_print_reads" : {
+		"partition" : "norm",
+		"mem" : "16g",
+		"time" : "36:00:00"
+	},
+	"gatk_haplotype_caller" : {
+		"partition" : "norm",
+		"mem" : "12g",
+		"time" : "36:00:00"
+	},
+	"globus_bam_transfer_from_Arges" : {
+		"partition" : "norm",
+		"time" : "24:00:00"
+	},
+	"globus_cram_transfer_from_Arges" : {
+		"partition" : "norm",
+		"time" : "48:00:00"
+	},
+	"split_original_cram_by_rg" : {
+		"partition" : "norm",
+		"time" : "12:00:00"
+	},
+	"fastqc" : {
+		"partition" : "norm",
+		"time" : "12:00:00"
+	},
+	"sort" : {
+		"partition" : "norm",
+		"time" : "12:00:00"
+	},
+	"multiqc_gatk" : {
+		"mem" : "32g"
+	},
+	"bam_to_cram" : {
+		"extra" : "--gres=lscratch:300",
+		"partition" : "norm",
+		"time" : "24:00:00"
+	}
+}

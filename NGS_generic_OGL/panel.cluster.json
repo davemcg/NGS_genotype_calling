@@ -10,28 +10,45 @@
 	},
 	"align" :
 	{
-		"partition" : "norm",
-		"time" : "6:00:00",
 		"mem" : "16g",
 		"threads" : "8"
 	},
-	"CoNVaDING_1" :
+	"align_hg19" :
+	{
+		"mem" : "16g",
+		"threads" : "8"
+	},
+	"CREST" :
 	{
 		"partition" : "norm",
-		"time" : "6:00:00"
+		"time" : "12:00:00",
+		"mem" : "16g"
+	},
+	"CoNVaDING_1" :
+	{
+		"time" : "2:00:00",
+		"mem" : "16g",
+		"extra" : "--gres=lscratch:50"
 	},
 	"picard_merge_bams" :
 	{
 		"partition" : "norm",
-		"time" : "24:00:00",
-		"mem" : "32G"
+		"time" : "6:00:00",
+		"mem" : "16G"
 	},
 	"merge_lane_bam" :
 	{
 		"partition" : "norm",
-		"time" : "24:00:00",
-		"mem" : "32G",
-		"extra" : "--gres=lscratch:300"
+		"time" : "6:00:00",
+		"mem" : "16G",
+		"extra" : "--gres=lscratch:100"
+	},
+	"merge_lane_bam_hg19" :
+	{
+		"partition" : "norm",
+		"time" : "6:00:00",
+		"mem" : "16G",
+		"extra" : "--gres=lscratch:100"
 	},
 	"merge_RG_bams_back_together" :
 	{

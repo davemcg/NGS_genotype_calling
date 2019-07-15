@@ -43,12 +43,18 @@ wildcard_constraints:
 
 rule all:
 	input:
-		expand('CREST/{sample}.predSV.txt', sample=list(SAMPLE_LANEFILE.keys())),
+		expand('CREST/hg19.{sample}.markDup.bam.predSV.txt', sample=list(SAMPLE_LANEFILE.keys())),
 		expand('gvcfs/{sample}.g.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
-		expand('sample_bam/{sample}.bam', sample=list(SAMPLE_LANEFILE.keys())),
 		'GATK_metrics/multiqc_report',
 		'fastqc/multiqc_report',
 		'CoNVaDING/SHORTlist.txt'
+#expand('sample_bam/{sample}.bam', sample=list(SAMPLE_LANEFILE.keys())),
+
+# conditinal input:
+#rule a:
+#    input:
+#        name="some/file.txt" if config["condition"] else "other/file.txt"
+#    ...
 
 #rule bam_to_fastq:
 #	input:
@@ -66,26 +72,106 @@ rule all:
 #			samtools fastq - -1 {output.forward} -2 {output.reverse}
 #		"""
 
+#decided to use sbatch directly
 # align with bwa mem
-rule align_hg19:
-	input:
-		expand('fastq/{{lane}}{pair}.fastq.gz', pair = config['lane_pair_delim'])
-	output:
-		temp('lane_bam/hg19bam/hg19.{lane}.realigned.bam')
-	params:
-		read_group = rg
-	threads: 8
-	shell:
-		"""
-		echo {params.read_group}
-		module load {config[bwa_version]};
-		module load {config[samtools_version]};
-		bwa mem -t {threads} -K 100000000 -Y -B 4 -O 6 -E 1 -R {params.read_group} \
-			/data/OGVFB/OGL_NGS/genomes/hg19/hg19.fa \
-			{input} | \
-			samtools view -1 - > \
-			{output}
-		"""
+if config['cutadapt'] == 'TRUE':
+	rule trim_adatpor:
+		input:
+			expand('fastq/{{lane}}{pair}.fastq.gz', pair = config['lane_pair_delim'])
+		output:
+			R1 = temp('trimmed/{lane}_R1_001.fastq.gz'),
+			R2 = temp('trimmed/{lane}_R2_001.fastq.gz')
+		shell:
+			"""
+			module load {config[cutadapt_version]}
+			cutadapt -a {config[R1_adaptor]} -A {config[R2_adaptor]} --minimum-length 2:2 -o {output.R1} -p {output.R2} {input}
+			"""
+	rule align_hg19:
+		input:
+			R1 = 'trimmed/{lane}_R1_001.fastq.gz',
+			R2 = 'trimmed/{lane}_R2_001.fastq.gz'
+		output:
+			temp('lane_bam/hg19bam/hg19.{lane}.realigned.bam')
+		params:
+			read_group = rg
+		threads: 8
+		shell:
+			"""
+			echo {params.read_group}
+			module load {config[bwa_version]};
+			module load {config[samtools_version]};
+			bwa mem -t {threads} -K 100000000 -Y -B 4 -O 6 -E 1 -R {params.read_group} \
+				/data/OGVFB/OGL_NGS/genomes/hg19/hg19.fa \
+				{input} | \
+				samtools view -1 - > \
+				{output}
+			"""
+	rule align:
+		input:
+			R1 = 'trimmed/{lane}_R1_001.fastq.gz',
+			R2 = 'trimmed/{lane}_R2_001.fastq.gz'
+		output:
+			temp('lane_bam/{lane}.realigned.bam')
+		params:
+			read_group = rg
+		threads: 8
+		shell:
+			"""
+			echo {params.read_group}
+			module load {config[bwa_version]};
+			module load {config[samtools_version]};
+			bwa mem -t {threads} -K 100000000 -M -B 4 -O 6 -E 1 -R {params.read_group} \
+				{config[bwa_genome]} \
+				{input} | \
+				samtools view -1 - > \
+				{output}
+			"""
+else:
+	rule align_hg19:
+		input:
+			expand('fastq/{{lane}}{pair}.fastq.gz', pair = config['lane_pair_delim'])
+		output:
+			temp('lane_bam/hg19bam/hg19.{lane}.realigned.bam')
+		params:
+			read_group = rg
+		threads: 8
+		shell:
+			"""
+			echo {params.read_group}
+			module load {config[bwa_version]};
+			module load {config[samtools_version]};
+			bwa mem -t {threads} -K 100000000 -Y -B 4 -O 6 -E 1 -R {params.read_group} \
+				/data/OGVFB/OGL_NGS/genomes/hg19/hg19.fa \
+				{input} | \
+				samtools view -1 - > \
+				{output}
+			"""
+	rule align:
+		input:
+			# config['lane_pair_delim'] is the string differentiating
+			# the forward from reverse
+			# e.g. ['_R1_001', '_R2_001'] if the file names are
+			# sample17_R1_001.fastq.gz and sample17_R2_001.fastq.gz
+			# for a set of paired end fastq
+			# if you don't have a paired fastq set, give as ['']
+			expand('fastq/{{lane}}{pair}.fastq.gz', pair = config['lane_pair_delim'])
+		output:
+			temp('lane_bam/{lane}.realigned.bam')
+		params:
+			read_group = rg
+		threads: 8
+		shell:
+			"""
+			echo {params.read_group}
+			module load {config[bwa_version]};
+			module load {config[samtools_version]};
+			bwa mem -t {threads} -K 100000000 -M -B 4 -O 6 -E 1 -R {params.read_group} \
+				{config[bwa_genome]} \
+				{input} | \
+				samtools view -1 - > \
+				{output}
+			"""
+
 
 rule merge_lane_bam_hg19:
 	input:
@@ -137,8 +223,9 @@ rule CREST:
 		bam = 'sample_bam/hg19bam/{sample}/hg19.{sample}.markDup.bam',
 		bai = 'sample_bam/hg19bam/{sample}/hg19.{sample}.markDup.bam.bai'
 	output:
-		cover = 'hg19.{sample}.markDup.bam.cover',
-		predSV = 'hg19.{sample}.markDup.bam.predSV.txt'
+		cover = temp('hg19.{sample}.markDup.bam.cover'),
+		predSV = 'hg19.{sample}.markDup.bam.predSV.txt',
+		sclip = temp('hg19.{sample}.markDup.bam.sclip.txt')
 	shell:
 		"""
 		BLAT_PORT=50000
@@ -178,46 +265,42 @@ rule CREST:
 localrules: mvCREST
 rule mvCREST:
 	input:
-	 	'hg19.{sample}.markDup.bam.predSV.txt'
+	 	expand('hg19.{sample}.markDup.bam.predSV.txt', sample=list(SAMPLE_LANEFILE.keys()))
 	output:
-		'CREST/{sample}.predSV.txt'
+		expand('CREST/hg19.{sample}.markDup.bam.predSV.txt', sample=list(SAMPLE_LANEFILE.keys()))
 	shell:
 		"""
-		mv {input} {output}
+		mv hg19.*.markDup.bam.predSV.txt CREST/.
+		rm blatServer*.log
 		"""
 #### Use R to remove the common calls found in too many samples, also annotate the region???
 
-# conditinal input:
-#rule a:
-#    input:
-#        name="some/file.txt" if config["condition"] else "other/file.txt"
-#    ...
-
-rule align:
-	input:
-		# config['lane_pair_delim'] is the string differentiating
-		# the forward from reverse
-		# e.g. ['_R1_001', '_R2_001'] if the file names are
-		# sample17_R1_001.fastq.gz and sample17_R2_001.fastq.gz
-		# for a set of paired end fastq
-		# if you don't have a paired fastq set, give as ['']
-		expand('fastq/{{lane}}{pair}.fastq.gz', pair = config['lane_pair_delim'])
-	output:
-		temp('lane_bam/{lane}.realigned.bam')
-	params:
-		read_group = rg
-	threads: 8
-	shell:
-		"""
-		echo {params.read_group}
-		module load {config[bwa_version]};
-		module load {config[samtools_version]};
-		bwa mem -t {threads} -K 100000000 -M -B 4 -O 6 -E 1 -R {params.read_group} \
-			{config[bwa_genome]} \
-			{input} | \
-			samtools view -1 - > \
-			{output}
-		"""
+#
+# rule align:
+# 	input:
+# 		# config['lane_pair_delim'] is the string differentiating
+# 		# the forward from reverse
+# 		# e.g. ['_R1_001', '_R2_001'] if the file names are
+# 		# sample17_R1_001.fastq.gz and sample17_R2_001.fastq.gz
+# 		# for a set of paired end fastq
+# 		# if you don't have a paired fastq set, give as ['']
+# 		expand('fastq/{{lane}}{pair}.fastq.gz', pair = config['lane_pair_delim'])
+# 	output:
+# 		temp('lane_bam/{lane}.realigned.bam')
+# 	params:
+# 		read_group = rg
+# 	threads: 8
+# 	shell:
+# 		"""
+# 		echo {params.read_group}
+# 		module load {config[bwa_version]};
+# 		module load {config[samtools_version]};
+# 		bwa mem -t {threads} -K 100000000 -M -B 4 -O 6 -E 1 -R {params.read_group} \
+# 			{config[bwa_genome]} \
+# 			{input} | \
+# 			samtools view -1 - > \
+# 			{output}
+# 		"""
 # bwa mem -K 100000000 : process input bases in each batch reardless of nThreads (for reproducibility));
 # -Y : use soft clipping for supplementary alignments. This is necessary for CREST.
 # -M : mark shorter split hits as secondary. David used -M
@@ -225,12 +308,13 @@ rule align:
 #-B 4 -O 6 -E 1 : these are bwa mem default.
 
 # if multiple sets of fastq/bam provided for a sample, now merge together
+
 rule merge_lane_bam:
 	input:
 		lambda wildcards: expand('lane_bam/{lane}.realigned.bam', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]])))
 	output:
-		bam = temp('sample_bam/{sample}.b37.bam'),
-		bai = temp('sample_bam/{sample}.b37.bai')
+		bam = temp('sample_bam/{sample}/{sample}.b37.bam'),
+		bai = temp('sample_bam/{sample}/{sample}.b37.bai')
 	shell:
 		"""
 		module load {config[picard_version]}
@@ -247,10 +331,10 @@ rule merge_lane_bam:
 			CREATE_INDEX=true
 		"""
 
-
 rule fastqc:
 	input:
-		'sample_bam/{sample}.b37.bam'
+		bam = 'sample_bam/{sample}/{sample}.b37.bam',
+		bai = 'sample_bam/{sample}/{sample}.b37.bai'
 	output:
 		directory('fastqc/{sample}')
 	threads: 8
@@ -259,16 +343,96 @@ rule fastqc:
 		module load fastqc
 		mkdir -p fastqc
 		mkdir -p fastqc/{wildcards.sample}
-		fastqc -t {threads} -o {output} {input}
+		fastqc -t {threads} -o {output} {input.bam}
 		"""
 
+rule CoNVaDING_1:
+	input:
+		bam = 'sample_bam/{sample}/{sample}.b37.bam',
+		bai = 'sample_bam/{sample}/{sample}.b37.bai'
+	output:
+		'CoNVaDING/normalized_coverage/{sample}.b37.aligned.only.normalized.coverage.txt'
+	shell:
+		"""
+		module load {config[samtools_version]}
+		perl ~/git/CoNVaDING/CoNVaDING.pl -mode StartWithBam \
+			-inputDir sample_bam/{wildcards.sample} \
+			-outputDir /lscratch/$SLURM_JOB_ID \
+			-bed {config[bed]} \
+			-useSampleAsControl \
+			-controlsDir {config[CoNVaDING_ctr_dir]} \
+			-rmDup
+		cp -a /lscratch/$SLURM_JOB_ID/*.b37.aligned.only.normalized.coverage.txt CoNVaDING/normalized_coverage/.
+		"""
+
+# rule CoNVaDING_1:
+# 	input:
+# 		bam = 'sample_bam/{sample}/{sample}.b37.bam',
+# 		bai = 'sample_bam/{sample}/{sample}.b37.bai'
+# 	output:
+# 		'CoNVaDING/normalized_coverage/{sample}.b37.aligned.only.normalized.coverage.txt'
+# 	shell:
+# 		"""
+# 		module load {config[samtools_version]}
+# 		perl ~/git/CoNVaDING/CoNVaDING.pl -mode StartWithBam \
+# 			-inputDir sample_bam/{sample} \
+# 			-outputDir /lscratch/$SLURM_JOB_ID \
+# 			-bed {config[bed]} \
+# 			-useSampleAsControl \
+# 			-controlsDir /lscratch/$SLURM_JOB_ID/controls \
+# 			-rmDup
+# 		cp -a /lscratch/$SLURM_JOB_ID/{sample}.b37.aligned.only.normalized.coverage.txt CoNVaDING/normalized_coverage/.
+# 		cp -a /lscratch/$SLURM_JOB_ID/{sample}.b37.aligned.only.normalized.coverage.txt {config[CoNVaDING_ctr_dir]}/.
+# 		module unload {config[samtools_version]}
+# 		"""
+#
+#			-controlsDir {config[CoNVaDING_ctr_dir]} \
+### <30 min per sample.
+### When sufficient number of male and females present, will have 2 control folders for M and F,
+### Will add -sexChr option at that time.
+
+localrules: CoNVaDING_2
+rule CoNVaDING_2:
+	input:
+		expand('CoNVaDING/normalized_coverage/{sample}.b37.aligned.only.normalized.coverage.txt', sample=list(SAMPLE_LANEFILE.keys())),
+	output:
+		MatchScore = directory('CoNVaDING/MatchScore'),
+		hiSens = directory('CoNVaDING/CNV_hiSens'),
+		shortlist = 'CoNVaDING/SHORTlist.txt'
+	shell:
+		"""
+		perl ~/git/CoNVaDING/CoNVaDING.pl -mode StartWithMatchScore \
+			-inputDir CoNVaDING/normalized_coverage \
+			-outputDir  {output.MatchScore} \
+			-controlsDir {config[CoNVaDING_ctr_dir]}
+		perl ~/git/CoNVaDING/CoNVaDING.pl \
+  			-mode StartWithBestScore \
+  			-inputDir {output.MatchScore} \
+  			-outputDir {output.hiSens} \
+  			-controlsDir {config[CoNVaDING_ctr_dir]} \
+  			-ratioCutOffLow 0.71 \
+  			-ratioCutOffHigh 1.35
+		for i in {output.hiSens}/*.shortlist.txt; do awk -F "\t" '{{print FILENAME"\t"$0}}' $i >> CoNVaDING/shortlist.temp; done
+		awk -F"\t" 'BEGIN{{OFS="\t"}} {{ sub(/.b37.aligned.only.best.score.shortlist.txt/,""); print }}' CoNVaDING/shortlist.temp \
+			| grep -v -P 'CHR\tSTART' - > CoNVaDING/SHORTlist.txt && \
+			echo -e "SAMPLE\tCHR\tSTART\tSTOP\tGENE\tNUMBER_OF_TARGETS\tNUMBER_OF_TARGETS_PASS_SHAPIRO-WILK_TEST\tABBERATION" \
+			| cat - CoNVaDING/SHORTlist.txt > CoNVaDING/tmpout && mv CoNVaDING/tmpout {output.shortlist}
+		"""
+#CoNVaDING detect 100% match samples and remove the 100% match samples from control.
+
+#need 30 samples for step 2 above.
+
+#############
+##IndelSeek
+############
 
 rule picard_clean_sam:
 # "Soft-clipping beyond-end-of-reference alignments and setting MAPQ to 0 for unmapped reads"
 	input:
-		'sample_bam/{sample}.b37.bam'
+		bam = 'sample_bam/{sample}/{sample}.b37.bam',
+		bai = 'sample_bam/{sample}/{sample}.b37.bai'
 	output:
-		temp('sample_bam/{sample}/{sample}.CleanSam.bam')
+		temp('sample_bam/{sample}.CleanSam.bam')
 	threads: 2
 	shell:
 		"""
@@ -276,7 +440,7 @@ rule picard_clean_sam:
 		java -Xmx60g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
 			CleanSam \
 			TMP_DIR=/lscratch/$SLURM_JOB_ID \
-			INPUT={input} \
+			INPUT={input.bam} \
 			OUTPUT={output}
 		"""
 
@@ -284,9 +448,9 @@ rule picard_fix_mate_information:
 # "Verify mate-pair information between mates and fix if needed."
 # also coord sorts
 	input:
-		'sample_bam/{sample}/{sample}.CleanSam.bam'
+		'sample_bam/{sample}.CleanSam.bam'
 	output:
-		temp('sample_bam/{sample}/{sample}.sorted.bam')
+		temp('sample_bam/{sample}.sorted.bam')
 	threads: 2
 	shell:
 		"""
@@ -301,11 +465,10 @@ rule picard_fix_mate_information:
 rule picard_mark_dups:
 # Mark duplicate reads
 	input:
-		'sample_bam/{sample}/{sample}.sorted.bam'
+		'sample_bam/{sample}.sorted.bam'
 	output:
-		bam = temp('sample_bam/{sample}/{sample}.markDup.bam'),
-		bai1 = temp('sample_bam/{sample}/{sample}.markDup.bai'),
-		bai2 = temp('sample_bam/{sample}/{sample}.markDup.bam.bai'),
+		bam = temp('sample_bam/{sample}.markDup.bam'),
+		bai = temp('sample_bam/{sample}.markDup.bai'),
 		metrics = 'GATK_metrics/{sample}.markDup.metrics'
 	threads: 2
 	shell:
@@ -317,8 +480,9 @@ rule picard_mark_dups:
 			OUTPUT={output.bam} \
 			METRICS_FILE={output.metrics} \
 			CREATE_INDEX=true
-		cp {output.bai1} {output.bai2}
 		"""
+#	bai2 = temp('sample_bam/{sample}.markDup.bam.bai'),
+#	cp {output.bai1} {output.bai2}
 
 # rule picard_bam_index:
 # # Build bam index
@@ -339,10 +503,10 @@ rule picard_mark_dups:
 rule gatk_realigner_target:
 # identify regions which need realignment
 	input:
-		bam = 'sample_bam/{sample}/{sample}.markDup.bam',
-		bai = 'sample_bam/{sample}/{sample}.markDup.bam.bai'
+		bam = 'sample_bam/{sample}.markDup.bam',
+		bai = 'sample_bam/{sample}.markDup.bai'
 	output:
-		temp('sample_bam/{sample}/{sample}.forIndexRealigner.intervals')
+		temp('sample_bam/{sample}.forIndexRealigner.intervals')
 	threads: 2
 	shell:
 		"""
@@ -360,11 +524,12 @@ rule gatk_realigner_target:
 rule gatk_indel_realigner:
 # realigns indels to improve quality
 	input:
-		bam = 'sample_bam/{sample}/{sample}.markDup.bam',
-		bai = 'sample_bam/{sample}/{sample}.markDup.bam.bai',
-		targets = 'sample_bam/{sample}/{sample}.forIndexRealigner.intervals'
+		bam = 'sample_bam/{sample}.markDup.bam',
+		bai = 'sample_bam/{sample}.markDup.bai',
+		targets = 'sample_bam/{sample}.forIndexRealigner.intervals'
 	output:
-		temp('sample_bam/{sample}/{sample}.gatk_realigner.bam')
+		bam = temp('sample_bam/{sample}.gatk_realigner.bam'),
+		bai = temp('sample_bam/{sample}.gatk_realigner.bai')
 	threads: 2
 	shell:
 		"""
@@ -375,7 +540,7 @@ rule gatk_indel_realigner:
 			--knownAlleles {config[1000g_indels]} \
 			--knownAlleles {config[mills_gold_indels]} \
 			-targetIntervals {input.targets} \
-			-o {output} \
+			-o {output.bam} \
 			--interval_padding 100 \
     		-L {config[bed]}
 		"""
@@ -383,7 +548,8 @@ rule gatk_indel_realigner:
 rule gatk_base_recalibrator:
 # recalculate base quality scores
 	input:
-		'sample_bam/{sample}/{sample}.gatk_realigner.bam'
+		bam = 'sample_bam/{sample}.gatk_realigner.bam',
+		bai = 'sample_bam/{sample}.gatk_realigner.bai'
 	output:
 		'GATK_metrics/{sample}.recal_data.table1'
 	threads: 2
@@ -392,7 +558,7 @@ rule gatk_base_recalibrator:
 		module load {config[gatk_version]}
 		GATK -p {threads} -m 15g BaseRecalibrator  \
 			-R {config[ref_genome]} \
-			-I {input} \
+			-I {input.bam} \
 			--knownSites {config[1000g_indels]} \
 			--knownSites {config[mills_gold_indels]} \
 			--knownSites {config[dbsnp_var]} \
@@ -404,12 +570,13 @@ rule gatk_base_recalibrator:
 rule gatk_print_reads:
 # print out new bam with recalibrated scoring
 	input:
-		bam = 'sample_bam/{sample}/{sample}.gatk_realigner.bam',
+		bam = 'sample_bam/{sample}.gatk_realigner.bam',
+		bai = 'sample_bam/{sample}.gatk_realigner.bai',
 		bqsr = 'GATK_metrics/{sample}.recal_data.table1'
 	output:
-		bam = 'sample_bam/{sample}/{sample}.recalibrated.bam',
-		bai1 = 'sample_bam/{sample}/{sample}.recalibrated.bai',
-		bai2 = 'sample_bam/{sample}/{sample}.recalibrated.bam.bai'
+		bam = 'sample_bam/{sample}.bam',
+		bai1 = 'sample_bam/{sample}.bai',
+		bai2 = 'sample_bam/{sample}.bam.bai'
 	threads: 2
 	shell:
 		"""
@@ -422,55 +589,11 @@ rule gatk_print_reads:
 		cp {output.bai1} {output.bai2}
 		"""
 
-rule CoNVaDING_1:
-	input:
-		bam = 'sample_bam/{sample}/{sample}.recalibrated.bam'
-	output:
-		normalized_coverage = 'CoNVaDING/normalized_coverage/{sample}.recalibrated.normalized.coverage.txt'
-	shell:
-		"""
-		module load {config[samtools_version]}
-		perl ~/git/CoNVaDING/CoNVaDING.pl -mode StartWithBam \
-			-inputDir sample_bam/{sample} \
-			-outputDir CoNVaDING/normalized_coverage \
-			-bed {config[bed]} \
-			-useSampleAsControl \
-			-controlsDir {config[CoNVaDING_ctr_dir]}
-		"""
-
-#IndelSeek
-localrules: CoNVaDING_2
-rule CoNVaDING_2:
-	input:
-		normalized_coverage = expand('CoNVaDING/normalized_coverage/{sample}.recalibrated.normalized.coverage.txt', sample=list(SAMPLE_LANEFILE.keys())),
-	output:
-		MatchScore = directory('CoNVaDING/MatchScore'),
-		hiSens = directory('CoNVaDING/CNV_hiSens'),
-		shortlist = 'CoNVaDING/SHORTlist.txt'
-	shell:
-		"""
-		perl ~/git/CoNVaDING/CoNVaDING.pl -mode StartWithMatchScore \
-			-inputDir CoNVaDING/normalized_coverage \
-			-outputDir  {output.MatchScore} \
-			-controlsDir {config[CoNVaDING_ctr_dir]}
-		perl ~/git/CoNVaDING/CoNVaDING.pl \
-  			-mode StartWithBestScore \
-  			-inputDir {output.MatchScore} \
-  			-outputDir {output.hiSens} \
-  			-controlsDir {config[CoNVaDING_ctr_dir]} \
-  			-ratioCutOffLow 0.71 \
-  			-ratioCutOffHigh 1.35
-		for i in {output.hiSens}/*.shortlist.txt; do awk -F "\t" '{print FILENAME"\t"$0}' $i >> CoNVaDING/shortlist.temp; done
-		awk -F '\t' '{{ sub(/.recalibrated.best.score.shortlist.txt/,""); print }}' CoNVaDING/shortlist.temp \
-			| grep -v -P 'CHR\tSTART' - > CoNVaDING/SHORTlist.txt && \
-			echo -e "SAMPLE\tCHR\tSTART\tSTOP\tGENE\tNUMBER_OF_TARGETS\tNUMBER_OF_TARGETS_PASS_SHAPIRO-WILK_TEST\tABBERATION" \
-			| cat - CoNVaDING/SHORTlist.txt > CoNVaDING/tmpout && mv CoNVaDING/tmpout {output.shortlist}
-		"""
-
 rule gatk_base_recalibrator2:
 # recalibrate again
 	input:
-		bam = 'sample_bam/{sample}/{sample}.gatk_realigner.bam',
+		bam = 'sample_bam/{sample}.gatk_realigner.bam',
+		bai = 'sample_bam/{sample}.gatk_realigner.bai',
 		bqsr = 'GATK_metrics/{sample}.recal_data.table1'
 	output:
 		'GATK_metrics/{sample}.recal_data.table2'
@@ -508,10 +631,10 @@ rule gatk_analyze_covariates:
 rule gatk_haplotype_caller:
 # call gvcf
 	input:
-		bam = 'sample_bam/{sample}/{sample}.recalibrated.bam',
+		bam = 'sample_bam/{sample}.bam',
 		bqsr = 'GATK_metrics/{sample}.recal_data.table1'
 	output:
-		temp('gvcfs/{sample}.g.vcf.gz')
+		'gvcfs/{sample}.g.vcf.gz'
 	threads: 2
 	shell:
 		"""
@@ -549,20 +672,4 @@ rule multiqc_fastqc:
 		"""
 		module load multiqc
 		multiqc -f -o {output} fastqc/
-		"""
-localrules: move_bam
-rule move_bam:
-	input:
-		bam = 'sample_bam/{sample}/{sample}.recalibrated.bam',
-		bai1 = 'sample_bam/{sample}/{sample}.recalibrated.bai',
-		bai2 = 'sample_bam/{sample}/{sample}.recalibrated.bam.bai'
-	output:
-		bam = 'sample_bam/{sample}.bam',
-		bai1 = 'sample_bam/{sample}.bai',
-		bai2 = 'sample_bam/{sample}.bam.bai'
-	shell:
-		"""
-		mv {input.bam} {output.bam}
-		mv {input.bai1} {output.bai1}
-		mv {input.bai2} {output.bai2}
 		"""

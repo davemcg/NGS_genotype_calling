@@ -16,3 +16,7 @@ CoNVaDING : 'TRUE' # TRUE or FALSE, No need to edit if using Snakefile
 cram: 'FALSE' # TRUE to convert bam to cram, values other than TRUE will not convert.
 bed: '/data/OGVFB/OGL_NGS/bed/OGL733v1.sorted.bed' # bed file is not used in the Snakefile for WGS or exome
 CoNVaDING_ctr_dir: '/data/OGVFB/OGL_NGS/CoNVaDING/OGL733v1'
+cutadapt: 'TRUE' #TRUE to trim adaptor using cutadapt, #FALSE not to trim.
+cutadapt_version: 'cutadapt/2.3'
+R1_adaptor: 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCA' #TrueSeq and NEB adaptors
+R2_adaptor: 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT' #TrueSeq and NEB adaptors

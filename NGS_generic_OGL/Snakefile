@@ -23,8 +23,8 @@ def chr_bam_to_single_bam(wildcards):
 # the second is the name of the fastq or bam associated with the sample
 # the third is the read group you want bwa to use
 # 	example: '@RG\\tID:Lineagen_41001412010527\\tSM:Lineagen_41001412010527\\tPL:ILLUMINA'
-# a header isn't required, but if it is included it MUST be:
-# 	Sample,File
+# a header isn't required, but if it is included it MUST start with #:
+# 	#Sample,File
 # you can have multiple lines per sample
 # most samples are paired end, so there will be at least two files per sample
 # often you have a sample sequenced across multiple lanes/machines, so you can have
@@ -37,7 +37,7 @@ for line in metadata:
 	lane_file = line.split(',')[1]
 	sample = line.split(',')[0]
 	# skip header
-	if sample == 'Sample':
+	if line.startswith("#"):
 		continue
 	if sample not in SAMPLE_LANEFILE:
 		SAMPLE_LANEFILE[sample] = [lane_file]

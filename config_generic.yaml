@@ -11,11 +11,14 @@ bwa_genome: '/data/OGVFB/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta
 1000g_indels: '/fdb/GATK_resource_bundle/b37-2.8/1000G_phase1.indels.b37.vcf'
 mills_gold_indels: '/fdb/GATK_resource_bundle/b37-2.8/Mills_and_1000G_gold_standard.indels.b37.vcf'
 dbsnp_var: '/fdb/GATK_resource_bundle/b37-2.8/dbsnp_138.b37.excluding_sites_after_129.vcf'
-CREST: 'TRUE' # TRUE or FALSE, This is for panel.Snakefile only. No need to edit if using Snakefile
-CoNVaDING : 'TRUE' # TRUE or FALSE, No need to edit if using Snakefile
 cram: 'FALSE' # TRUE to convert bam to cram, values other than TRUE will not convert.
 bed: '/data/OGVFB/OGL_NGS/bed/OGL733v1.sorted.bed' # bed file is not used in the Snakefile for WGS or exome
+CREST: 'TRUE' # TRUE or FALSE, This is for panel.Snakefile only. No need to edit if using Snakefile
+R_version: 'R/3.5'
+CoNVaDING: 'TRUE' # TRUE or FALSE, No need to edit if using Snakefile
 CoNVaDING_ctr_dir: '/data/OGVFB/OGL_NGS/CoNVaDING/OGL733v1'
+chrRD_highcutoff: '1.2' # cutoff for producing the abnormal chromasomal read-depth file
+chrRD_lowcutoff: '0.8' # cutoff for producing the abnormal chromasomal read-depth file
 cutadapt: 'TRUE' #TRUE to trim adaptor using cutadapt, #FALSE not to trim.
 cutadapt_version: 'cutadapt/2.3'
 R1_adaptor: 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCA' #TrueSeq and NEB adaptors

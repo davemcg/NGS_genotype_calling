@@ -6,8 +6,8 @@ import sys
 # the second is the name of the fastq or bam associated with the sample
 # the third is the read group you want bwa to use
 # 	example: '@RG\\tID:Lineagen_41001412010527\\tSM:Lineagen_41001412010527\\tPL:ILLUMINA'
-# a header isn't required, but if it is included it MUST be:
-# 	Sample,File
+# a header isn't required, but if it is included it MUST start with #:
+# 	#Sample,File
 # you can have multiple lines per sample
 # most samples are paired end, so there will be at least two files per sample
 # often you have a sample sequenced across multiple lanes/machines, so you can have
@@ -20,7 +20,7 @@ for line in metadata:
 	lane_file = line.split(',')[1]
 	sample = line.split(',')[0]
 	# skip header
-	if sample == 'Sample':
+	if line.startswith("#"):
 		continue
 	if sample not in SAMPLE_LANEFILE:
 		SAMPLE_LANEFILE[sample] = [lane_file]
@@ -362,7 +362,14 @@ rule CoNVaDING_1:
 			-useSampleAsControl \
 			-controlsDir {config[CoNVaDING_ctr_dir]} \
 			-rmDup
-		cp -a /lscratch/$SLURM_JOB_ID/*.b37.aligned.only.normalized.coverage.txt CoNVaDING/normalized_coverage/.
+		cp /lscratch/$SLURM_JOB_ID/*.b37.aligned.only.normalized.coverage.txt CoNVaDING/normalized_coverage/.
+		module load {config[R_version]}
+		Rscript ~/git/NGS_genotype_calling/NGS_generic_OGL/chrRD.R \
+			{output} \
+			CoNVaDING/normalized_coverage/{wildcards.sample}.chrRD.pdf \
+			{config[chrRD_highcutoff]} \
+			{config[chrRD_lowcutoff]} \
+			CoNVaDING/normalized_coverage/{wildcards.sample}.abnormalChr.tsv
 		"""
 
 # rule CoNVaDING_1:

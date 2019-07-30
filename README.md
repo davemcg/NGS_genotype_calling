@@ -20,3 +20,5 @@
 4. Annotate variants
 - New repository: https://github.com/davemcg/variant_prioritization
 
+# Visualization
+![](panel.genotype.calling.svg)

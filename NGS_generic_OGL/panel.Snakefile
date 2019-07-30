@@ -1,5 +1,8 @@
 from os.path import join
 import sys
+import datetime
+#import os.path # for checking whether a file exist. 7/21/19
+#from os import path # for checking whether a file exist. 7/21/19
 
 # the 'metadata_file' if provided, is a csv with three columns
 # the first is the sample name (e.g. Patient001)
@@ -14,6 +17,7 @@ import sys
 # upwards of a dozen files for a single sample
 SAMPLE_LANEFILE = dict()
 LANEFILE_READGROUP = dict()
+SAMPLE_SEX = dict()
 metadata = open(config['metadata_file'])
 for line in metadata:
 	read_group = line.split(',')[2][:-1]
@@ -24,11 +28,33 @@ for line in metadata:
 		continue
 	if sample not in SAMPLE_LANEFILE:
 		SAMPLE_LANEFILE[sample] = [lane_file]
+		SAMPLE_SEX[sample] = 0
 	else:
 		old_lane_file = SAMPLE_LANEFILE[sample]
 		old_lane_file.append(lane_file)
 		SAMPLE_LANEFILE[sample] = old_lane_file
 	LANEFILE_READGROUP[lane_file] = [read_group]
+metadata.close()
+
+#default sample sex is 0 as setting above
+#if config['ped'] != '':
+if config['ped']:
+	with open(config['ped']) as PED_file:
+		for line in PED_file:
+			if line.startswith("#"):
+				continue
+			else:
+				sample = line.split('\t')[1]
+				SAMPLE_SEX[sample] = line.split("\t")[4]
+#				SAMPLE_SEX[sample] = [line.split("\t")[4]]
+# try if confi['ped']: empty string returns false.
+#if line.strip(): empty line returns false.
+for i in SAMPLE_SEX:
+ 	print (i, SAMPLE_SEX[i])
+
+if config['analysis_batch_name'] == 'YYYYMMDD':
+	currentDT = datetime.datetime.now()
+	config['analysis_batch_name'] = currentDT.strftime("%Y%m%d")
 
 def rg(wildcards):
 	# returns the read group given in the config['metadata_file']
@@ -43,11 +69,28 @@ wildcard_constraints:
 
 rule all:
 	input:
-		expand('CREST/hg19.{sample}.markDup.bam.predSV.txt', sample=list(SAMPLE_LANEFILE.keys())),
-		expand('gvcfs/{sample}.g.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
-		'GATK_metrics/multiqc_report',
-		'fastqc/multiqc_report',
-		'CoNVaDING/SHORTlist.txt'
+		expand('CREST/hg19.{sample}.markDup.bam.predSV.txt', sample=list(SAMPLE_LANEFILE.keys())) if config['CREST'] == 'TRUE' else 'dummy.txt',
+		expand('gvcfs/{sample}.g.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())) if config['GATKgvcf'] == 'TRUE' else 'dummy.txt',
+		'GATK_metrics/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
+		'fastqc/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
+		expand('picardQC/{sample}.insert_size_metrics.txt', sample=list(SAMPLE_LANEFILE.keys())) if config['picardQC'] == 'TRUE' else 'dummy.txt',
+		'CoNVaDING/progress2.done' if config['CoNVaDING'] == 'TRUE' else 'dummy.txt',
+		'freebayes.vcf' if config['freebayes'] == 'TRUE' else 'dummy.txt',
+		expand('freebayes/{sample}.freebayes.filtered.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())) if config['freebayes_individual'] == 'TRUE' else 'dummy.txt',
+		expand('sample_cram/{sample}.cram', sample=list(SAMPLE_LANEFILE.keys())) if config['cram'] == 'TRUE' else expand('sample_bam/{sample}.bam', sample=list(SAMPLE_LANEFILE.keys())),
+
+localrules: dummy
+rule dummy:
+	input:
+		config['metadata_file']
+	output:
+		temp('dummy.txt')
+	shell:
+		"""
+		touch {output}
+		"""
+
+#		expand('INDELseek/{sample}.INDELseek.vcf', sample=list(SAMPLE_LANEFILE.keys())),
 #expand('sample_bam/{sample}.bam', sample=list(SAMPLE_LANEFILE.keys())),
 
 # conditinal input:
@@ -74,6 +117,7 @@ rule all:
 
 #decided to use sbatch directly
 # align with bwa mem
+
 if config['cutadapt'] == 'TRUE':
 	rule trim_adatpor:
 		input:
@@ -194,7 +238,7 @@ rule merge_lane_bam_hg19:
 			SORT_ORDER=coordinate \
 			CREATE_INDEX=true
 		"""
-
+#Try samtools rmdup instead in next version? CREST may not read the markDup reads.
 rule picard_mark_dups_hg19:
 # Mark duplicate reads
 	input:
@@ -213,11 +257,12 @@ rule picard_mark_dups_hg19:
 			INPUT={input} \
 			OUTPUT={output.bam} \
 			METRICS_FILE={output.metrics} \
+			REMOVE_DUPLICATES=true \
 			CREATE_INDEX=true
 		cp {output.bai1} {output.bai2}
 		"""
 
-
+#may be better run with lscratch.
 rule CREST:
 	input:
 		bam = 'sample_bam/hg19bam/{sample}/hg19.{sample}.markDup.bam',
@@ -261,6 +306,7 @@ rule CREST:
 			-t /data/OGVFB/OGL_NGS/genomes/hg19/hg19.2bit --blatserver localhost \
 			--blatport $BLAT_PORT
 		"""
+#### Create blat hyperlink (can be done in the previous step), use R to remove the common calls found in too many samples, also annotate the region???
 
 localrules: mvCREST
 rule mvCREST:
@@ -270,11 +316,12 @@ rule mvCREST:
 		expand('CREST/hg19.{sample}.markDup.bam.predSV.txt', sample=list(SAMPLE_LANEFILE.keys()))
 	shell:
 		"""
-		mv hg19.*.markDup.bam.predSV.txt CREST/.
+		cp -p -l hg19.*.markDup.bam.predSV.txt CREST/.
+		rm hg19.*.markDup.bam.predSV.txt
 		rm blatServer*.log
 		"""
-#### Use R to remove the common calls found in too many samples, also annotate the region???
-
+#cp -l: use hard-links instead of copying data of the regular files
+#cp -p: preserve attributes;
 #
 # rule align:
 # 	input:
@@ -330,6 +377,37 @@ rule merge_lane_bam:
 			SORT_ORDER=coordinate \
 			CREATE_INDEX=true
 		"""
+# 30% smaller!
+rule bam_to_cram:
+	input:
+		bam = 'sample_bam/{sample}/{sample}.b37.bam',
+		bai = 'sample_bam/{sample}/{sample}.b37.bai'
+	output:
+		cram = 'sample_cram/{sample}.cram',
+		crai = 'sample_cram/{sample}.crai'
+	threads:
+		8
+	shell:
+		"""
+		module load {config[samtools_version]}
+		samtools sort -O bam -l 0 --threads {threads} -T /lscratch/$SLURM_JOB_ID {input.bam} | \
+		samtools view -T {config[bwa_genome]} --threads {threads} -C -o {output.cram} -
+		samtools index {output.cram} {output.crai}
+		"""
+
+localrules: keep_bam
+rule keep_bam:
+	input:
+		bam = 'sample_bam/{sample}/{sample}.b37.bam',
+		bai = 'sample_bam/{sample}/{sample}.b37.bai'
+	output:
+		bam = 'sample_bam/{sample}.bam',
+		bai = 'sample_bam/{sample}.bai'
+	shell:
+		"""
+		cp -p -l {input.bam} {output.bam}
+		cp -p -l {input.bai} {output.bai}
+		"""
 
 rule fastqc:
 	input:
@@ -346,92 +424,175 @@ rule fastqc:
 		fastqc -t {threads} -o {output} {input.bam}
 		"""
 
-rule CoNVaDING_1:
-	input:
-		bam = 'sample_bam/{sample}/{sample}.b37.bam',
-		bai = 'sample_bam/{sample}/{sample}.b37.bai'
-	output:
-		'CoNVaDING/normalized_coverage/{sample}.b37.aligned.only.normalized.coverage.txt'
-	shell:
-		"""
-		module load {config[samtools_version]}
-		perl ~/git/CoNVaDING/CoNVaDING.pl -mode StartWithBam \
-			-inputDir sample_bam/{wildcards.sample} \
-			-outputDir /lscratch/$SLURM_JOB_ID \
-			-bed {config[bed]} \
-			-useSampleAsControl \
-			-controlsDir {config[CoNVaDING_ctr_dir]} \
-			-rmDup
-		cp /lscratch/$SLURM_JOB_ID/*.b37.aligned.only.normalized.coverage.txt CoNVaDING/normalized_coverage/.
-		module load {config[R_version]}
-		Rscript ~/git/NGS_genotype_calling/NGS_generic_OGL/chrRD.R \
-			{output} \
-			CoNVaDING/normalized_coverage/{wildcards.sample}.chrRD.pdf \
-			{config[chrRD_highcutoff]} \
-			{config[chrRD_lowcutoff]} \
-			CoNVaDING/normalized_coverage/{wildcards.sample}.abnormalChr.tsv
-		"""
-
 # rule CoNVaDING_1:
 # 	input:
 # 		bam = 'sample_bam/{sample}/{sample}.b37.bam',
 # 		bai = 'sample_bam/{sample}/{sample}.b37.bai'
 # 	output:
-# 		'CoNVaDING/normalized_coverage/{sample}.b37.aligned.only.normalized.coverage.txt'
-# 	shell:
-# 		"""
-# 		module load {config[samtools_version]}
-# 		perl ~/git/CoNVaDING/CoNVaDING.pl -mode StartWithBam \
-# 			-inputDir sample_bam/{sample} \
-# 			-outputDir /lscratch/$SLURM_JOB_ID \
-# 			-bed {config[bed]} \
-# 			-useSampleAsControl \
-# 			-controlsDir /lscratch/$SLURM_JOB_ID/controls \
-# 			-rmDup
-# 		cp -a /lscratch/$SLURM_JOB_ID/{sample}.b37.aligned.only.normalized.coverage.txt CoNVaDING/normalized_coverage/.
-# 		cp -a /lscratch/$SLURM_JOB_ID/{sample}.b37.aligned.only.normalized.coverage.txt {config[CoNVaDING_ctr_dir]}/.
-# 		module unload {config[samtools_version]}
-# 		"""
-#
-#			-controlsDir {config[CoNVaDING_ctr_dir]} \
-### <30 min per sample.
-### When sufficient number of male and females present, will have 2 control folders for M and F,
-### Will add -sexChr option at that time.
+# 		temp('CoNVaDING/progress1.{sample}')
+# 	params:
+# 		sex = lambda wildcards: SAMPLE_SEX[wildcards.sample]
+# 	run:
+# 		shell("bash ~/git/NGS_genotype_calling/NGS_generic_OGL/convading_1.sh {params.sex} {config[samtools_version]} {wildcards.sample} {config[bed]} {config[CoNVaDING_ctr_dir]} {config[chrRD_highcutoff]} {config[chrRD_lowcutoff]} {output}")
+
+
+rule CoNVaDING_1:
+	input:
+		bam = 'sample_bam/{sample}/{sample}.b37.bam',
+		bai = 'sample_bam/{sample}/{sample}.b37.bai'
+	output:
+		temp('CoNVaDING/progress1.{sample}')
+	params:
+		sex = lambda wildcards: SAMPLE_SEX[wildcards.sample]
+	shell:
+		"""
+		module load {config[samtools_version]}
+		module load {config[R_version]}
+		case {params.sex} in
+			1)
+				perl ~/git/CoNVaDING/CoNVaDING.pl -mode StartWithBam \
+					-inputDir sample_bam/{wildcards.sample} \
+					-outputDir /lscratch/$SLURM_JOB_ID \
+					-bed {config[bed]} \
+					-useSampleAsControl \
+					-controlsDir {config[CoNVaDING_ctr_dir]}_male \
+					-rmDup
+				mkdir -p CoNVaDING/normalized_coverage_male
+				cp /lscratch/$SLURM_JOB_ID/{wildcards.sample}.b37.aligned.only.normalized.coverage.txt \
+					CoNVaDING/normalized_coverage_male/{wildcards.sample}.b37.aligned.only.normalized.coverage.txt
+				cp /lscratch/$SLURM_JOB_ID/{wildcards.sample}.b37.aligned.only.normalized.coverage.txt \
+					{config[CoNVaDING_ctr_dir]}
+				Rscript ~/git/NGS_genotype_calling/NGS_generic_OGL/chrRD.R \
+					CoNVaDING/normalized_coverage_male/{wildcards.sample}.b37.aligned.only.normalized.coverage.txt \
+					CoNVaDING/normalized_coverage_male/{wildcards.sample}.chrRD.pdf \
+					{config[chrRD_highcutoff]} \
+					{config[chrRD_lowcutoff]} \
+					CoNVaDING/normalized_coverage_male/{wildcards.sample}.abnormalChr.tsv \
+					1
+				touch {output}
+				;;
+			2)
+				perl ~/git/CoNVaDING/CoNVaDING.pl -mode StartWithBam \
+					-inputDir sample_bam/{wildcards.sample} \
+					-outputDir /lscratch/$SLURM_JOB_ID \
+					-bed {config[bed]} \
+					-useSampleAsControl \
+					-controlsDir {config[CoNVaDING_ctr_dir]}_female \
+					-rmDup
+				mkdir -p CoNVaDING/normalized_coverage_female
+				cp /lscratch/$SLURM_JOB_ID/{wildcards.sample}.b37.aligned.only.normalized.coverage.txt \
+					CoNVaDING/normalized_coverage_female/{wildcards.sample}.b37.aligned.only.normalized.coverage.txt
+				cp /lscratch/$SLURM_JOB_ID/{wildcards.sample}.b37.aligned.only.normalized.coverage.txt \
+					{config[CoNVaDING_ctr_dir]}
+				Rscript ~/git/NGS_genotype_calling/NGS_generic_OGL/chrRD.R \
+					CoNVaDING/normalized_coverage_female/{wildcards.sample}.b37.aligned.only.normalized.coverage.txt \
+					CoNVaDING/normalized_coverage_female/{wildcards.sample}.chrRD.pdf \
+					{config[chrRD_highcutoff]} \
+					{config[chrRD_lowcutoff]} \
+					CoNVaDING/normalized_coverage_female/{wildcards.sample}.abnormalChr.tsv \
+					2
+				touch {output}
+				;;
+			*)
+				perl ~/git/CoNVaDING/CoNVaDING.pl -mode StartWithBam \
+					-inputDir sample_bam/{wildcards.sample} \
+					-outputDir /lscratch/$SLURM_JOB_ID \
+					-bed {config[bed]} \
+					-useSampleAsControl \
+					-controlsDir {config[CoNVaDING_ctr_dir]} \
+					-rmDup
+				mkdir -p CoNVaDING/normalized_coverage
+				cp /lscratch/$SLURM_JOB_ID/{wildcards.sample}.b37.aligned.only.normalized.coverage.txt \
+					CoNVaDING/normalized_coverage/{wildcards.sample}.b37.aligned.only.normalized.coverage.txt
+				Rscript ~/git/NGS_genotype_calling/NGS_generic_OGL/chrRD.R \
+					CoNVaDING/normalized_coverage/{wildcards.sample}.b37.aligned.only.normalized.coverage.txt \
+					CoNVaDING/normalized_coverage/{wildcards.sample}.chrRD.pdf \
+					{config[chrRD_highcutoff]} \
+					{config[chrRD_lowcutoff]} \
+					CoNVaDING/normalized_coverage/{wildcards.sample}.abnormalChr.tsv \
+					0
+				touch {output}
+				;;
+		esac
+		"""
 
 localrules: CoNVaDING_2
 rule CoNVaDING_2:
 	input:
-		expand('CoNVaDING/normalized_coverage/{sample}.b37.aligned.only.normalized.coverage.txt', sample=list(SAMPLE_LANEFILE.keys())),
+		expand('CoNVaDING/progress1.{sample}', sample=list(SAMPLE_LANEFILE.keys())),
 	output:
-		MatchScore = directory('CoNVaDING/MatchScore'),
-		hiSens = directory('CoNVaDING/CNV_hiSens'),
-		shortlist = 'CoNVaDING/SHORTlist.txt'
+		temp('CoNVaDING/progress2.done')
 	shell:
 		"""
-		perl ~/git/CoNVaDING/CoNVaDING.pl -mode StartWithMatchScore \
-			-inputDir CoNVaDING/normalized_coverage \
-			-outputDir  {output.MatchScore} \
-			-controlsDir {config[CoNVaDING_ctr_dir]}
-		perl ~/git/CoNVaDING/CoNVaDING.pl \
-  			-mode StartWithBestScore \
-  			-inputDir {output.MatchScore} \
-  			-outputDir {output.hiSens} \
-  			-controlsDir {config[CoNVaDING_ctr_dir]} \
-  			-ratioCutOffLow 0.71 \
-  			-ratioCutOffHigh 1.35
-		for i in {output.hiSens}/*.shortlist.txt; do awk -F "\t" '{{print FILENAME"\t"$0}}' $i >> CoNVaDING/shortlist.temp; done
-		awk -F"\t" 'BEGIN{{OFS="\t"}} {{ sub(/.b37.aligned.only.best.score.shortlist.txt/,""); print }}' CoNVaDING/shortlist.temp \
-			| grep -v -P 'CHR\tSTART' - > CoNVaDING/SHORTlist.txt && \
-			echo -e "SAMPLE\tCHR\tSTART\tSTOP\tGENE\tNUMBER_OF_TARGETS\tNUMBER_OF_TARGETS_PASS_SHAPIRO-WILK_TEST\tABBERATION" \
-			| cat - CoNVaDING/SHORTlist.txt > CoNVaDING/tmpout && mv CoNVaDING/tmpout {output.shortlist}
+ 		filetest=$((ls CoNVaDING/normalized_coverage/*.b37.aligned.only.normalized.coverage.txt >> /dev/null 2>&1 && echo TRUE) || echo FALSE)
+		if [ $filetest == "TRUE" ];
+		then
+			perl ~/git/CoNVaDING/CoNVaDING.pl -mode StartWithMatchScore \
+				-inputDir CoNVaDING/normalized_coverage \
+				-outputDir  CoNVaDING/MatchScore \
+				-controlsDir {config[CoNVaDING_ctr_dir]}
+			perl ~/git/CoNVaDING/CoNVaDING.pl \
+  				-mode StartWithBestScore \
+  				-inputDir CoNVaDING/MatchScore \
+  				-outputDir CoNVaDING/CNV_hiSens \
+  				-controlsDir {config[CoNVaDING_ctr_dir]} \
+  				-ratioCutOffLow 0.71 \
+  				-ratioCutOffHigh 1.35
+			for i in CoNVaDING/CNV_hiSens/*.shortlist.txt; do awk -F "\t" '{{print FILENAME"\t"$0}}' $i >> CoNVaDING/shortlist.temp; done
+			awk -F"\t" 'BEGIN{{OFS="\t"}} {{sub(/CoNVaDING\/CNV_hiSens\//,""); sub(/.b37.aligned.only.best.score.shortlist.txt/,""); print }}' CoNVaDING/shortlist.temp \
+				| grep -v -P 'CHR\tSTART' - > CoNVaDING/SHORTlist.txt && \
+				echo -e "SAMPLE\tCHR\tSTART\tSTOP\tGENE\tNUMBER_OF_TARGETS\tNUMBER_OF_TARGETS_PASS_SHAPIRO-WILK_TEST\tABBERATION" \
+				| cat - CoNVaDING/SHORTlist.txt > CoNVaDING/tmpout && mv CoNVaDING/tmpout CoNVaDING/SHORTlist.txt
+		fi
+		filetest=$((ls CoNVaDING/normalized_coverage_male/*.b37.aligned.only.normalized.coverage.txt >> /dev/null 2>&1 && echo TRUE) || echo FALSE)
+		if [ $filetest == "TRUE" ];
+		then
+			perl ~/git/CoNVaDING/CoNVaDING.pl -mode StartWithMatchScore \
+				-inputDir CoNVaDING/normalized_coverage_male \
+				-outputDir  CoNVaDING/MatchScore_male \
+				-controlsDir {config[CoNVaDING_ctr_dir]}_male \
+				-sexChr \
+			perl ~/git/CoNVaDING/CoNVaDING.pl \
+  				-mode StartWithBestScore \
+  				-inputDir CoNVaDING/MatchScore_male \
+  				-outputDir CoNVaDING/CNV_hiSens_male \
+  				-controlsDir {config[CoNVaDING_ctr_dir]}_male \
+  				-ratioCutOffLow 0.71 \
+  				-ratioCutOffHigh 1.35 \
+				-sexChr
+			for i in CoNVaDING/CNV_hiSens_male/*.shortlist.txt; do awk -F "\t" '{{print FILENAME"\t"$0}}' $i >> CoNVaDING/shortlist_male.temp; done
+			awk -F"\t" 'BEGIN{{OFS="\t"}} {{sub(/CoNVaDING\/CNV_hiSens_male\//,""); sub(/.b37.aligned.only.best.score.shortlist.txt/,""); print }}' CoNVaDING/shortlist_male.temp \
+				| grep -v -P 'CHR\tSTART' - > CoNVaDING/SHORTlist_male.txt && \
+				echo -e "SAMPLE\tCHR\tSTART\tSTOP\tGENE\tNUMBER_OF_TARGETS\tNUMBER_OF_TARGETS_PASS_SHAPIRO-WILK_TEST\tABBERATION" \
+				| cat - CoNVaDING/SHORTlist_male.txt > CoNVaDING/tmpout_male && mv CoNVaDING/tmpout_male CoNVaDING/SHORTlist_male.txt
+		fi
+		filetest=$((ls CoNVaDING/normalized_coverage_female/*.b37.aligned.only.normalized.coverage.txt >> /dev/null 2>&1 && echo TRUE) || echo FALSE)
+		if [ $filetest == "TRUE" ];
+		then
+			perl ~/git/CoNVaDING/CoNVaDING.pl -mode StartWithMatchScore \
+				-inputDir CoNVaDING/normalized_coverage_female \
+				-outputDir  CoNVaDING/MatchScore_female \
+				-controlsDir {config[CoNVaDING_ctr_dir]}_female \
+				-sexChr
+			perl ~/git/CoNVaDING/CoNVaDING.pl \
+  				-mode StartWithBestScore \
+  				-inputDir CoNVaDING/MatchScore_female \
+  				-outputDir CoNVaDING/CNV_hiSens_female \
+  				-controlsDir {config[CoNVaDING_ctr_dir]}_female \
+  				-ratioCutOffLow 0.71 \
+  				-ratioCutOffHigh 1.35 \
+				-sexChr
+			for i in CoNVaDING/CNV_hiSens_female/*.shortlist.txt; do awk -F "\t" '{{print FILENAME"\t"$0}}' $i >> CoNVaDING/shortlist_female.temp; done
+			awk -F"\t" 'BEGIN{{OFS="\t"}} {{sub(/CoNVaDING\/CNV_hiSens_female\//,""); sub(/.b37.aligned.only.best.score.shortlist.txt/,""); print }}' CoNVaDING/shortlist_female.temp \
+				| grep -v -P 'CHR\tSTART' - > CoNVaDING/SHORTlist_female.txt && \
+				echo -e "SAMPLE\tCHR\tSTART\tSTOP\tGENE\tNUMBER_OF_TARGETS\tNUMBER_OF_TARGETS_PASS_SHAPIRO-WILK_TEST\tABBERATION" \
+				| cat - CoNVaDING/SHORTlist_female.txt > CoNVaDING/tmpout_female && mv CoNVaDING/tmpout_female CoNVaDING/SHORTlist_female.txt
+		fi
+		touch {output}
 		"""
-#CoNVaDING detect 100% match samples and remove the 100% match samples from control.
-
+### Consider performing CoNVaDING QC and creating final list.
+### 				-controlSamples 20 for "StartWithMatchScore" for the male samples because low sample no.
 #need 30 samples for step 2 above.
-
-#############
-##IndelSeek
-############
 
 rule picard_clean_sam:
 # "Soft-clipping beyond-end-of-reference alignments and setting MAPQ to 0 for unmapped reads"
@@ -506,6 +667,33 @@ rule picard_mark_dups:
 # 			INPUT={input} \
 # 			OUTPUT={output}
 # 		"""
+rule picard_alignmentQC:
+#insert size and alignment metrics
+	input:
+		bam = 'sample_bam/{sample}.markDup.bam',
+		bai = 'sample_bam/{sample}.markDup.bai'
+	output:
+		insert_size_metrics = 'picardQC/{sample}.insert_size_metrics.txt',
+		insert_size_histogram = 'picardQC/{sample}.insert_size_histogram.pdf',
+		alignment_metrics = 'picardQC/{sample}.alignment_metrics.txt'
+	threads: 2
+	shell:
+		"""
+		module load {config[picard_version]}
+		java -Xmx8g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+			CollectInsertSizeMetrics \
+			INPUT={input.bam} \
+			O={output.insert_size_metrics} \
+		    H={output.insert_size_histogram} \
+		    M=0.5
+		java -Xmx8g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+			CollectAlignmentSummaryMetrics \
+			INPUT={input.bam} \
+			R={config[bwa_genome]} \
+			METRIC_ACCUMULATION_LEVEL=SAMPLE \
+			METRIC_ACCUMULATION_LEVEL=READ_GROUP \
+			O={output.alignment_metrics}
+		"""
 
 rule gatk_realigner_target:
 # identify regions which need realignment
@@ -581,9 +769,8 @@ rule gatk_print_reads:
 		bai = 'sample_bam/{sample}.gatk_realigner.bai',
 		bqsr = 'GATK_metrics/{sample}.recal_data.table1'
 	output:
-		bam = 'sample_bam/{sample}.bam',
-		bai1 = 'sample_bam/{sample}.bai',
-		bai2 = 'sample_bam/{sample}.bam.bai'
+		bam = temp('sample_bam/{sample}.recal.bam'),
+		bai = temp('sample_bam/{sample}.recal.bai')
 	threads: 2
 	shell:
 		"""
@@ -593,7 +780,6 @@ rule gatk_print_reads:
 			-I {input.bam} \
 			-BQSR {input.bqsr} \
 			-o {output.bam}
-		cp {output.bai1} {output.bai2}
 		"""
 
 rule gatk_base_recalibrator2:
@@ -638,7 +824,8 @@ rule gatk_analyze_covariates:
 rule gatk_haplotype_caller:
 # call gvcf
 	input:
-		bam = 'sample_bam/{sample}.bam',
+		bam = 'sample_bam/{sample}.recal.bam',
+		bai	= 'sample_bam/{sample}.recal.bai',
 		bqsr = 'GATK_metrics/{sample}.recal_data.table1'
 	output:
 		'gvcfs/{sample}.g.vcf.gz'
@@ -660,7 +847,7 @@ rule gatk_haplotype_caller:
 rule multiqc_gatk:
 # run multiqc on recalibrator metrics
 	input:
-		expand('GATK_metrics/{sample}.recal_data.table1',sample=list(SAMPLE_LANEFILE.keys())),
+		expand('GATK_metrics/{sample}.recal_data.table1', sample=list(SAMPLE_LANEFILE.keys())),
 		expand('GATK_metrics/{sample}.recal_data.table2', sample=list(SAMPLE_LANEFILE.keys()))
 	output:
 		directory('GATK_metrics/multiqc_report')
@@ -680,3 +867,58 @@ rule multiqc_fastqc:
 		module load multiqc
 		multiqc -f -o {output} fastqc/
 		"""
+
+#freebayes avoids indel_realign, base-quality_recalibration, better to run on all of the bam files
+#freebayes can identify MNP and complex indels.
+#need to have unique RG ID fields for each sample. Use the RG made by the wrapper.
+
+rule freebayes_individual:
+	input:
+		bam = 'sample_bam/{sample}.markDup.bam',
+		bai = 'sample_bam/{sample}.markDup.bai'
+	output:
+		vcf = 'freebayes/{sample}.freebayes.vcf.gz',
+		filteredvcf = 'freebayes/{sample}.freebayes.filtered.vcf.gz'
+#	threads: 2
+	shell:
+		"""
+		module load {config[freebayes_version]}
+		module load {config[vcflib_version]}
+		module load {config[samtools_version]}
+		freebayes -f {config[bwa_genome]} \
+			--limit-coverage 1000 {input.bam} | vcffilter -f "QUAL > 1" | bgzip > {output.vcf}
+		sleep 2
+		tabix -f -p vcf {output.vcf}
+		vcffilter -f "QUAL > 20 & QUAL / AO > 5 & SAF > 0 & SAR > 0 & RPR > 1 & RPL > 1" {output.vcf} | bgzip > {output.filteredvcf}
+		sleep 2
+		tabix -f -p vcf {output.filteredvcf}
+		"""
+
+rule freebayes:
+	input:
+		bam = expand('sample_bam/{sample}.markDup.bam', sample=list(SAMPLE_LANEFILE.keys())),
+		bai = expand('sample_bam/{sample}.markDup.bai', sample=list(SAMPLE_LANEFILE.keys()))
+	output:
+		temp('freebayes.vcf')
+	threads: 36
+	shell:
+		"""
+		module load {config[freebayes_version]}
+		module load {config[vcflib_version]}
+		module load {config[samtools_version]}
+		freebayes-parallel {config[freebayes_region]} {threads} -f {config[bwa_genome]} \
+			--limit-coverage 1000 {input.bam} | vcffilter -f "QUAL > 1" | bgzip > {config[analysis_batch_name]}.freebayes.vcf.gz
+		sleep 2
+		tabix -f -p vcf {config[analysis_batch_name]}.freebayes.vcf.gz
+		vcffilter -f "QUAL > 20 & QUAL / AO > 5 & SAF > 0 & SAR > 0 & RPR > 1 & RPL > 1"  {config[analysis_batch_name]}.freebayes.vcf.gz | bgzip > {config[analysis_batch_name]}.freebayes.filtered.vcf.gz
+		sleep 2
+		tabix -f -p vcf {config[analysis_batch_name]}.freebayes.filtered.vcf.gz
+		touch freebayes.vcf
+		"""
+#For filtering: tried QUAL > 20 suggested in GitHub freebayes
+#consider change the filter option to according to Eric Garrison's Univ Iowa hardfilter suggestion: vcffilter -f "QUAL > 1 & QUAL / AO > 10 & SAF > 0 & SAR > 0 & RPR > 1 & RPL > 1"
+#For a single file: freebayes -f {config[ref_genome]} {input.bam} | vcffilter -f "QUAL > 20" > {output}
+#24 OGLv1 panel on MiSeq 7/17/19, finished in 70 min, when running on 32 threads and 128 gb mem: 500 regions: freebayes-parallel /data/OGVFB/OGL_NGS/bed/freebayes.OGLv1.500.region 32 -f /data/OGVFB/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta 24bam | vcffilter -f "QUAL > 20" > freebayes.vcf
+#48 OGLv1 panel on MiSeq 7/17/19, failed after one batch of writing when running on 36 threads and 720gb mem, when on 500 regions, when not setting "--use-best-n-alleles 4"
+#48 samples above worked when using --use-best-n-alleles 4 7/21/19 took ~ 3 hours.
+#removed --use-best-n-alleles 4 on 7/23/2019 When working with 12 samples, and use "QUAL > 20 & QUAL / AO > 5 & SAF > 0 & SAR > 0 & RPR > 1 & RPL > 1" retained both orf15 variants.

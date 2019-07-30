@@ -8,6 +8,13 @@
 		"error" : "00log/{rule}_{wildcards}.err",
 		"extra" : ""
 	},
+	"freebayes" :
+	{
+		"partition" : "largemem",
+		"time" : "6:00:00",
+		"mem" : "720g",
+		"threads" : "36"
+	},
 	"align" :
 	{
 		"mem" : "16g",
@@ -21,7 +28,7 @@
 	"CREST" :
 	{
 		"partition" : "norm",
-		"time" : "12:00:00",
+		"time" : "16:00:00",
 		"mem" : "16g"
 	},
 	"CoNVaDING_1" :
@@ -79,22 +86,22 @@
 	"gatk_base_recalibrator" : {
 		"partition" : "norm",
 		"mem" : "16g",
-		"time" : "10:00:00"
+		"time" : "6:00:00"
 	},
 	"gatk_base_recalibrator2" : {
 		"partition" : "norm",
 		"mem" : "16g",
-		"time" : "10:00:00"
+		"time" : "6:00:00"
 	},
 	"gatk_print_reads" : {
 		"partition" : "norm",
 		"mem" : "16g",
-		"time" : "36:00:00"
+		"time" : "6:00:00"
 	},
 	"gatk_haplotype_caller" : {
 		"partition" : "norm",
 		"mem" : "12g",
-		"time" : "36:00:00"
+		"time" : "6:00:00"
 	},
 	"globus_bam_transfer_from_Arges" : {
 		"partition" : "norm",
@@ -110,7 +117,7 @@
 	},
 	"fastqc" : {
 		"partition" : "norm",
-		"time" : "12:00:00"
+		"time" : "6:00:00"
 	},
 	"sort" : {
 		"partition" : "norm",
@@ -122,6 +129,6 @@
 	"bam_to_cram" : {
 		"extra" : "--gres=lscratch:300",
 		"partition" : "norm",
-		"time" : "24:00:00"
+		"time" : "6:00:00"
 	}
 }

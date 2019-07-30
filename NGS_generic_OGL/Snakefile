@@ -1,5 +1,6 @@
 from os.path import join
 import sys
+import datetime
 
 def chr_GVCF_to_single_GVCF(wildcards):
 	# creates the filenames for the chr level GVCFs to use to concatenate to a single file
@@ -47,6 +48,10 @@ for line in metadata:
 		SAMPLE_LANEFILE[sample] = old_lane_file
 	LANEFILE_READGROUP[lane_file] = [read_group]
 
+if config['analysis_batch_name'] == 'YYYYMMDD':
+	currentDT = datetime.datetime.now()
+	config['analysis_batch_name'] = currentDT.strftime("%Y%m%d")
+
 def rg(wildcards):
 	# returns the read group given in the config['metadata_file']
 	lane_file = str(wildcards)
@@ -62,20 +67,27 @@ wildcard_constraints:
 	lane = '|'.join(list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in [y for sub in list(SAMPLE_LANEFILE.values()) for y in sub]])))
 
 
-if config['cram'] == 'TRUE':
-	rule all:
-		input:
-			expand('gvcfs/{sample}.g.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
-			expand('sample_cram/{sample}.cram', sample=list(SAMPLE_LANEFILE.keys())),
-			'GATK_metrics/multiqc_report',
-			'fastqc/multiqc_report'
-else:
-	rule all:
-		input:
-			expand('gvcfs/{sample}.g.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
-			expand('sample_bam/{sample}.recalibrated.bam', sample=list(SAMPLE_LANEFILE.keys())),
-			'GATK_metrics/multiqc_report',
-			'fastqc/multiqc_report'
+rule all:
+	input:
+		expand('gvcfs/{sample}.g.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())) if config['GATKgvcf'] == 'TRUE' else 'dummy.txt',
+		expand('sample_cram/{sample}.cram', sample=list(SAMPLE_LANEFILE.keys())) if config['cram'] == 'TRUE' else expand('sample_bam/{sample}.bam', sample=list(SAMPLE_LANEFILE.keys())),
+		'GATK_metrics/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
+		'fastqc/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
+		expand('picardQC/{sample}.insert_size_metrics.txt', sample=list(SAMPLE_LANEFILE.keys())) if config['picardQC'] == 'TRUE' else 'dummy.txt',
+#		expand('freebayes/{sample}.freebayes.filtered.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())) if config['freebayes_individual'] == 'TRUE' else 'dummy.txt',
+#		'freebayes.vcf' if config['freebayes'] == 'TRUE' else 'dummy.txt'
+#freebayes_individual can consider gvcf files.
+
+localrules: dummy
+rule dummy:
+	input:
+		config['metadata_file']
+	output:
+		temp('dummy.txt')
+	shell:
+		"""
+		touch {output}
+		"""
 
 #rule bam_to_fastq:
 #	input:
@@ -135,8 +147,8 @@ rule merge_lane_bam:
 	input:
 		lambda wildcards: expand('lane_bam/{lane}.realigned.bam', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]])))
 	output:
-		bam = temp('sample_bam/{sample}.bam'),
-		bai = temp('sample_bam/{sample}.bai')
+		bam = temp('sample_bam/{sample}.b37.bam'),
+		bai = temp('sample_bam/{sample}.b37.bai')
 	shell:
 		"""
 		module load {config[samtools_version]}
@@ -184,7 +196,7 @@ rule merge_lane_bam:
 
 rule fastqc:
 	input:
-		'sample_bam/{sample}.bam'
+		'sample_bam/{sample}.b37.bam'
 	output:
 		directory('fastqc/{sample}')
 	threads: 8
@@ -196,10 +208,70 @@ rule fastqc:
 		fastqc -t {threads} -o {output} {input}
 		"""
 
-rule split_bam_by_chr:
+rule picard_alignmentQC:
+#insert size and alignment metrics
 	input:
+		bam = 'sample_bam/{sample}.b37.bam',
+		bai = 'sample_bam/{sample}.b37.bai'
+	output:
+		insert_size_metrics = 'picardQC/{sample}.insert_size_metrics.txt',
+		insert_size_histogram = 'picardQC/{sample}.insert_size_histogram.pdf',
+		alignment_metrics = 'picardQC/{sample}.alignment_metrics.txt'
+	threads: 2
+	shell:
+		"""
+		module load {config[picard_version]}
+		java -Xmx8g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+			CollectInsertSizeMetrics \
+			INPUT={input.bam} \
+			O={output.insert_size_metrics} \
+		    H={output.insert_size_histogram} \
+		    M=0.5
+		java -Xmx8g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+			CollectAlignmentSummaryMetrics \
+			INPUT={input.bam} \
+			R={config[bwa_genome]} \
+			METRIC_ACCUMULATION_LEVEL=SAMPLE \
+			METRIC_ACCUMULATION_LEVEL=READ_GROUP \
+			O={output.alignment_metrics}
+		"""
+
+# 30% smaller!
+rule bam_to_cram:
+	input:
+		bam = 'sample_bam/{sample}.b37.bam',
+		bai = 'sample_bam/{sample}.b37.bai'
+	output:
+		cram = 'sample_cram/{sample}.cram',
+		crai = 'sample_cram/{sample}.crai'
+	threads:
+		8
+	shell:
+		"""
+		module load {config[samtools_version]}
+		samtools sort -O bam -l 0 --threads {threads} -T /lscratch/$SLURM_JOB_ID {input.bam} | \
+		samtools view -T {config[bwa_genome]} --threads {threads} -C -o {output.cram} -
+		samtools index {output.cram} {output.crai}
+		"""
+
+localrules: keep_bam
+rule keep_bam:
+	input:
+		bam = 'sample_bam/{sample}.b37.bam',
+		bai = 'sample_bam/{sample}.b37.bai'
+	output:
 		bam = 'sample_bam/{sample}.bam',
 		bai = 'sample_bam/{sample}.bai'
+	shell:
+		"""
+		cp -p -l {input.bam} {output.bam}
+		cp -p -l {input.bai} {output.bai}
+		"""
+
+rule split_bam_by_chr:
+	input:
+		bam = 'sample_bam/{sample}.b37.bam',
+		bai = 'sample_bam/{sample}.b37.bai'
 	output:
 		temp('sample_bam/chr_split/{sample}/{sample}__{chr}.bam')
 	threads: 2
@@ -283,6 +355,7 @@ rule picard_mark_dups:
 # 			INPUT={input} \
 # 			OUTPUT={output}
 # 		"""
+
 
 rule gatk_realigner_target:
 # identify regions which need realignment
@@ -418,70 +491,54 @@ rule gatk_haplotype_caller:
 			-o {output}
 		"""
 
-if config['cram']  == 'TRUE':
-	rule picard_merge_bams:
-# merge chr split bams into one bam per sample
-		input:
-			chr_bam_to_single_bam
-		output:
-			temp('sample_bam/{sample}.recalibrated.bam')
-		threads: 2
-		shell:
-			"""
-			module load {config[picard_version]}
-			cat_inputs_i=""
-			for bam in {input}; do
-				cat_inputs_i+="I=$bam "; done
-			java -Xmx15g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
-				MergeSamFiles \
-				$cat_inputs_i \
-				O={output}
-			"""
-else:
-	rule picard_merge_bams_index:
-# merge chr split bams into one bam per sample
-		input:
-			chr_bam_to_single_bam
-		output:
-			bam = 'sample_bam/{sample}.recalibrated.bam',
-			bai1 = 'sample_bam/{sample}.recalibrated.bai',
-			bai2 = 'sample_bam/{sample}.recalibrated.bam.bai'
-		threads: 2
-		shell:
-			"""
-			module load {config[picard_version]}
-			cat_inputs_i=""
-			for bam in {input}; do
-				cat_inputs_i+="I=$bam "; done
-			java -Xmx15g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
-				MergeSamFiles \
-				SORT_ORDER=coordinate \
-				CREATE_INDEX=true \
-				$cat_inputs_i \
-				O={output.bam}
-			cp {output.bai1} {output.bai2}
-			"""
+# if config['cram']  == 'TRUE':
+# 	rule picard_merge_bams:
+# # merge chr split bams into one bam per sample
+# 		input:
+# 			chr_bam_to_single_bam
+# 		output:
+# 			temp('sample_bam/{sample}.recalibrated.bam')
+# 		threads: 2
+# 		shell:
+# 			"""
+# 			module load {config[picard_version]}
+# 			cat_inputs_i=""
+# 			for bam in {input}; do
+# 				cat_inputs_i+="I=$bam "; done
+# 			java -Xmx15g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+# 				MergeSamFiles \
+# 				$cat_inputs_i \
+# 				O={output}
+# 			"""
+# else:
+# 	rule picard_merge_bams_index:
+# # merge chr split bams into one bam per sample
+# 		input:
+# 			chr_bam_to_single_bam
+# 		output:
+# 			bam = 'sample_bam/{sample}.recalibrated.bam',
+# 			bai1 = 'sample_bam/{sample}.recalibrated.bai',
+# 			bai2 = 'sample_bam/{sample}.recalibrated.bam.bai'
+# 		threads: 2
+# 		shell:
+# 			"""
+# 			module load {config[picard_version]}
+# 			cat_inputs_i=""
+# 			for bam in {input}; do
+# 				cat_inputs_i+="I=$bam "; done
+# 			java -Xmx15g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+# 				MergeSamFiles \
+# 				SORT_ORDER=coordinate \
+# 				CREATE_INDEX=true \
+# 				$cat_inputs_i \
+# 				O={output.bam}
+# 			cp {output.bai1} {output.bai2}
+# 			"""
 #java -Xmx15g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
 #	BuildBamIndex \
 #	INPUT={output.bam} \
 #	OUTPUT={output.bai}
 
-# 30% smaller!
-rule bam_to_cram:
-	input:
-		'sample_bam/{sample}.recalibrated.bam'
-	output:
-		cram = 'sample_cram/{sample}.cram',
-		crai = 'sample_cram/{sample}.crai'
-	threads:
-		8
-	shell:
-		"""
-		module load {config[samtools_version]}
-		samtools sort -O bam -l 0 --threads {threads} -T /lscratch/$SLURM_JOB_ID {input} | \
-		samtools view -T {config[bwa_genome]} --threads {threads} -C -o {output.cram} -
-		samtools index {output.cram} {output.crai}
-		"""
 
 rule picard_merge_gvcfs:
 # merge chr split gvcf back into one gvcf per sample

@@ -27,9 +27,9 @@ if [ -z "$1" ]; then
 fi
 
 
-snakemake -s /home/mcgaugheyd/git/NGS_genotype_calling/src/Snakefile_gvcf_to_vcf \
+snakemake -s ~/git/NGS_genotype_calling/src/Snakefile_gvcf_to_vcf \
 -pr --local-cores 2 --jobs 1999 \
---cluster-config /home/mcgaugheyd/git/NGS_genotype_calling/src/cluster_gvcf_to_vcf.json \
+--cluster-config ~/git/NGS_genotype_calling/src/cluster_gvcf_to_vcf.json \
 --configfile $config_yaml \
 --cluster "$sbcmd"  --latency-wait 120 --rerun-incomplete \
 -k \

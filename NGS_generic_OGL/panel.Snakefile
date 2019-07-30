@@ -49,8 +49,8 @@ if config['ped']:
 #				SAMPLE_SEX[sample] = [line.split("\t")[4]]
 # try if confi['ped']: empty string returns false.
 #if line.strip(): empty line returns false.
-for i in SAMPLE_SEX:
- 	print (i, SAMPLE_SEX[i])
+# for i in SAMPLE_SEX:
+#  	print (i, SAMPLE_SEX[i])
 
 if config['analysis_batch_name'] == 'YYYYMMDD':
 	currentDT = datetime.datetime.now()

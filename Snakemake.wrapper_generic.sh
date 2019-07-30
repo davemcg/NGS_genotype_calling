@@ -71,6 +71,7 @@ esac
 # --notemp Ignore temp() declaration;
 # --dryrun 
 # --unlock
+# --dag
 
 
 # if [[ "${ngstype^^}" =~ ^(PANEL|EXOME)$ ]];

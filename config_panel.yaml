@@ -1,12 +1,12 @@
 metadata_file: 'metadata_file.csv' # if making metadata file before running this snakemake, make sure the file name is *metadata*.csv. Otherwise, keep the file name as is.
 analysis_batch_name: 'YYYYMMDD' # name for freebayes vcf file. If leaving as YYYYMMDD, current date will be used as name
-ped: 'miseq0626_0719.ped' #Can leave as blank ''. Mainly for ChrX CNV, has to have ped extenstion, header if present has to starts with # miseq0626_0719.ped
+ped: '' #Can leave as blank ''. Mainly for ChrX CNV, has to have ped extenstion, header if present has to starts with # miseq0626_0719.ped
 cram: 'TRUE' # TRUE to convert bam to cram, values other than TRUE will not convert.
 multiqc: 'TRUE' # will run only if TrueSeq
 picardQC: 'TRUE'
 GATKgvcf: 'TRUE' # will run only if TRUE
 cutadapt: 'TRUE' #TRUE to trim adaptor using cutadapt, #FALSE not to trim.
-CREST: 'FALSE' # TRUE or FALSE, This is for panel.Snakefile only.
+CREST: 'TRUE' # TRUE or FALSE, This is for panel.Snakefile only.
 CoNVaDING: 'TRUE' # Will run only if TRUE.
 freebayes: 'TRUE' # freebayes will run only if TRUE
 freebayes_individual: 'TRUE'

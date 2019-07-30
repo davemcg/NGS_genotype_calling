@@ -1,0 +1,4 @@
+module load freebayes
+module load samtools
+
+samtools depth 0720/sample_bam/G05140.markDup.bam | coverage_to_regions.py /data/OGVFB/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta.fai 1000 > /data/OGVFB/OGL_NGS/bed/freebayes.OGLv1.1000.region

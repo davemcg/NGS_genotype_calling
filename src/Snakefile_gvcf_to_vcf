@@ -114,7 +114,7 @@ rule vt_decompose:
 		"""
 		module load samtools
 		module load {config[vt_version]}
-		vt decompose {input} -o {output.vcf}
+		vt decompose -s {input} | vt normalize -r {config[ref_genome]} - | bgzip -cf > {output.vcf}
 		tabix -p vcf {output.vcf}
 		"""
 

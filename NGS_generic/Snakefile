@@ -456,7 +456,7 @@ rule multiqc_gatk:
 		expand('GATK_metrics/{sample}__{chr}.recal_data.table1',sample=list(SAMPLE_LANEFILE.keys()), chr=CHRS),
 		expand('GATK_metrics/{sample}__{chr}.recal_data.table2', sample=list(SAMPLE_LANEFILE.keys()), chr=CHRS)
 	output:
-		'GATK_metrics/multiqc_report'
+		directory('GATK_metrics/multiqc_report')
 	shell:
 		"""
 		module load multiqc
@@ -467,7 +467,7 @@ rule multiqc_fastqc:
 	input:
 		expand('fastqc/{sample}', sample=list(SAMPLE_LANEFILE.keys()))
 	output:
-		fastqc = 'fastqc/multiqc_report'
+		directory('fastqc/multiqc_report')
 	shell:
 		"""
 		module load multiqc

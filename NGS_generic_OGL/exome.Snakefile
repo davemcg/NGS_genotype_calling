@@ -70,6 +70,7 @@ wildcard_constraints:
 rule all:
 	input:
 		expand('gvcfs/{sample}.g.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())) if config['GATKgvcf'] == 'TRUE' else 'dummy.txt',
+		expand('recal_bam/{sample}.recal.bam', sample=list(SAMPLE_LANEFILE.keys())) if config['recal_bam'] == 'TRUE' else 'dummy.txt',
 		expand('sample_cram/{sample}.cram', sample=list(SAMPLE_LANEFILE.keys())) if config['cram'] == 'TRUE' else expand('sample_bam/{sample}.bam', sample=list(SAMPLE_LANEFILE.keys())),
 		'GATK_metrics/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
 		'fastqc/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
@@ -577,53 +578,30 @@ rule gatk_haplotype_caller:
 			-o {output}
 		"""
 
-# if config['cram']  == 'TRUE':
-# 	rule picard_merge_bams:
-# # merge chr split bams into one bam per sample
-# 		input:
-# 			chr_bam_to_single_bam
-# 		output:
-# 			temp('sample_bam/{sample}.recalibrated.bam')
-# 		threads: 2
-# 		shell:
-# 			"""
-# 			module load {config[picard_version]}
-# 			cat_inputs_i=""
-# 			for bam in {input}; do
-# 				cat_inputs_i+="I=$bam "; done
-# 			java -Xmx15g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
-# 				MergeSamFiles \
-# 				$cat_inputs_i \
-# 				O={output}
-# 			"""
-# else:
-# 	rule picard_merge_bams_index:
-# # merge chr split bams into one bam per sample
-# 		input:
-# 			chr_bam_to_single_bam
-# 		output:
-# 			bam = 'sample_bam/{sample}.recalibrated.bam',
-# 			bai1 = 'sample_bam/{sample}.recalibrated.bai',
-# 			bai2 = 'sample_bam/{sample}.recalibrated.bam.bai'
-# 		threads: 2
-# 		shell:
-# 			"""
-# 			module load {config[picard_version]}
-# 			cat_inputs_i=""
-# 			for bam in {input}; do
-# 				cat_inputs_i+="I=$bam "; done
-# 			java -Xmx15g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
-# 				MergeSamFiles \
-# 				SORT_ORDER=coordinate \
-# 				CREATE_INDEX=true \
-# 				$cat_inputs_i \
-# 				O={output.bam}
-# 			cp {output.bai1} {output.bai2}
-# 			"""
-#java -Xmx15g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
-#	BuildBamIndex \
-#	INPUT={output.bam} \
-#	OUTPUT={output.bai}
+rule picard_merge_bams:
+# merge chr split bams into one bam per sample
+	input:
+		chr_bam_to_single_bam
+	output:
+		bam = 'recal_bam/{sample}.recal.bam'
+	threads: 2
+	shell:
+		"""
+		module load {config[picard_version]}
+		cat_inputs_i=""
+		for bam in {input}; do
+			cat_inputs_i+="I=$bam "; done
+		java -Xmx15g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+			MergeSamFiles \
+			SORT_ORDER=coordinate \
+			CREATE_INDEX=true \
+			$cat_inputs_i \
+			O={output.bam}
+		"""
+# java -Xmx15g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+# 	BuildBamIndex \
+# 	INPUT={output.bam} \
+# 	OUTPUT={output.bai}
 
 
 rule picard_merge_gvcfs:

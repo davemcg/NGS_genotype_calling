@@ -582,3 +582,5 @@ rule multiqc_fastqc:
 		module load multiqc
 		multiqc -f -o {output} fastqc/
 		"""
+##freebayes
+#freebayes-parallel <(fasta_generate_regions.py ref.fa.fai 100000) 36 -f ref.fa aln.bam >out.vcf"

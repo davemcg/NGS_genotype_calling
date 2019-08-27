@@ -5,6 +5,7 @@
 # sbatch --time=12:0:0 ~/git/NGS_genotype_calling/Snakemake.wrapper_generic.sh ~/git/NGS_genotype_calling/config_generic.yaml OGL733v1 panel
 # $2: Libary Information, such as OGLv1
 # $3: If typing in "panel", the panel.Snakefile and panel.cluster.json will be run. If "exome", then exome snakefile/exome.json will be used. Anything else including empty will run the WGS pipeline. The config file is the $1.
+#When there is two or more *metadata_file*.csv present in the folder, then -e *metadata_file.csv will produce "binary operator expected". Thus changed to only single file.
 
 mkdir -p 00log
 module load snakemake/5.5.2 || exit 1
@@ -20,18 +21,21 @@ sbcmd="sbatch --cpus-per-task={threads} \
 lib=$2
 ngstype=$3
 
-if [ -e *metadata_file*.csv ];
+if [ -e metadata_file.csv ];
 then
 	echo "metadata_file provided"
 else
 	for fastq1 in fastq/*.fastq.gz; do
 	filename=$(basename $fastq1)
 	header=$(zcat $fastq1 | head -1)
-	id=$(echo $header | cut -d: -f 3,4,10 | sed 's/\:/\./g')
+	id=$(echo $header | cut -d: -f 3,4 | sed 's/\:/\./g')
 	sm=$(echo $filename | cut -d_ -f 1 | sed 's/\-/\_/g')
-	echo "$sm,$filename,@RG\\\tID:$id\\\tSM:$sm\\\tLB:$lib"_"$sm\\\tPL:ILLUMINA" >> metadata_file.csv
+	echo "$sm,$filename,@RG\\\tID:$id"_"$sm\\\tSM:$sm\\\tLB:$lib"_"$sm\\\tPL:ILLUMINA" >> metadata_file.csv
 	done
 fi
+
+#id=$(echo $header | cut -d: -f 3,4,10 | sed 's/\:/\./g') edited 8/27/19
+#echo "$sm,$filename,@RG\\\tID:$id\\\tSM:$sm\\\tLB:$lib"_"$sm\\\tPL:ILLUMINA" edited 8/27/19 
 #removed R1_001 from for fastq1 in fastq/*R1_001.fastq.gz; 7/9/19
 #RG information: https://software.broadinstitute.org/gatk/documentation/article?id=6472
 #id added sample no field which is in position 10 in the fastq file; When working with another Instrument, check and see whether the id field will be unique.

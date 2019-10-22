@@ -34,6 +34,8 @@ else
 	done
 fi
 
+#https://software.broadinstitute.org/gatk/documentation/article.php?id=6472
+
 #id=$(echo $header | cut -d: -f 3,4,10 | sed 's/\:/\./g') edited 8/27/19
 #echo "$sm,$filename,@RG\\\tID:$id\\\tSM:$sm\\\tLB:$lib"_"$sm\\\tPL:ILLUMINA" edited 8/27/19 
 #removed R1_001 from for fastq1 in fastq/*R1_001.fastq.gz; 7/9/19
@@ -44,13 +46,13 @@ fi
 
 case "${ngstype^^}" in
 	"PANEL")
-		snakemake -s /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/panel.Snakefile \
+		snakemake -s /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/test.panel.Snakefile \
 		-pr --local-cores 2 --jobs 1999 \
 		--cluster-config /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/panel.cluster.json \
 		--cluster "$sbcmd"  --latency-wait 120 --rerun-incomplete \
 		-k --restart-times 0 \
 		--resources parallel=4 \
-		--configfile $1
+		--configfile $1 
 		;;
 	"EXOME")
 		snakemake -s /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/exome.Snakefile \

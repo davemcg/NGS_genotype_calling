@@ -11,7 +11,7 @@
 	"freebayes" :
 	{
 		"partition" : "largemem",
-		"time" : "6:00:00",
+		"time" : "24:00:00",
 		"mem" : "720g",
 		"threads" : "36"
 	},

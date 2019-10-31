@@ -17,7 +17,7 @@
 	},
 	"merge_freebayes" :
 	{
-		"mem" : "64g",
+		"mem" : "64g"
 	},
 	"align" :
 	{

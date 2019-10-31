@@ -15,6 +15,10 @@
 		"mem" : "720g",
 		"threads" : "36"
 	},
+	"merge_freebayes" :
+	{
+		"mem" : "64g",
+	},
 	"align" :
 	{
 		"mem" : "16g",

@@ -21,6 +21,10 @@
 		"time" : "12:00:00",
 		"mem" : "32g"
 	},
+	"merge_freebayes" :
+	{
+		"mem" : "64g",
+	},
 	"split_cram_by_rg" :
 	{
 		"partition" : "norm",

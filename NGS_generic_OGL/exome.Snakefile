@@ -75,9 +75,9 @@ rule all:
 		'GATK_metrics/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
 		'fastqc/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
 		expand('picardQC/{sample}.insert_size_metrics.txt', sample=list(SAMPLE_LANEFILE.keys())) if config['picardQC'] == 'TRUE' else 'dummy.txt',
-		expand('freebayes/{sample}.freebayes.filtered.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())) if config['freebayes_individual'] == 'TRUE' else 'dummy.txt',
+		'freebayes_prioritization/freebayes.merged.vcf' if config['freebayes_individual'] == 'TRUE' else 'dummy.txt',
 		'freebayes.vcf' if config['freebayes'] == 'TRUE' else 'dummy.txt'
-#freebayes_individual can consider gvcf files.
+#freebayes_individual: consider gvcf files.
 
 localrules: dummy
 rule dummy:
@@ -279,6 +279,21 @@ rule freebayes_individual:
 		sleep 2
 		tabix -f -p vcf {output.filteredvcf}
 		"""
+
+rule merge_freebayes:
+	input:
+		expand('freebayes/{sample}.freebayes.filtered.vcf.gz', sample=list(SAMPLE_LANEFILE.keys()))
+	output:
+		temp('freebayes_prioritization/freebayes.merged.vcf')
+	shell:
+		"""
+		module load {config[vcftools_version]}
+		vcf-merge freebayes/*.freebayes.filtered.vcf.gz | bgzip -c > {config[analysis_batch_name]}.freebayes.filtered.merged.vcf.gz
+		sleep 2
+		tabix -f -p vcf {config[analysis_batch_name]}.freebayes.filtered.merged.vcf.gz
+		touch {output}
+		"""
+#	module load {config[samtools_version]} - samtools automaticcally loaded when loading vcftools.	
 
 rule create_freebayes_region:
 	input:

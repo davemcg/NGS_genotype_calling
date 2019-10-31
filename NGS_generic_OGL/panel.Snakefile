@@ -76,7 +76,7 @@ rule all:
 		expand('picardQC/{sample}.insert_size_metrics.txt', sample=list(SAMPLE_LANEFILE.keys())) if config['picardQC'] == 'TRUE' else 'dummy.txt',
 		'CoNVaDING/progress2.done' if config['CoNVaDING'] == 'TRUE' else 'dummy.txt',
 		'freebayes.vcf' if config['freebayes'] == 'TRUE' else 'dummy.txt',
-		expand('freebayes/{sample}.freebayes.filtered.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())) if config['freebayes_individual'] == 'TRUE' else 'dummy.txt',
+		'freebayes_prioritization/freebayes.merged.vcf' if config['freebayes_individual'] == 'TRUE' else 'dummy.txt',
 		expand('sample_cram/{sample}.cram', sample=list(SAMPLE_LANEFILE.keys())) if config['cram'] == 'TRUE' else expand('sample_bam/{sample}.bam', sample=list(SAMPLE_LANEFILE.keys())),
 
 localrules: dummy
@@ -893,6 +893,21 @@ rule freebayes_individual:
 		sleep 2
 		tabix -f -p vcf {output.filteredvcf}
 		"""
+
+rule merge_freebayes:
+	input:
+		expand('freebayes/{sample}.freebayes.filtered.vcf.gz', sample=list(SAMPLE_LANEFILE.keys()))
+	output:
+		temp('freebayes_prioritization/freebayes.merged.vcf')
+	shell:
+		"""
+		module load {config[vcftools_version]}
+		vcf-merge freebayes/*.freebayes.filtered.vcf.gz | bgzip -c > {config[analysis_batch_name]}.freebayes.filtered.merged.vcf.gz
+		sleep 2
+		tabix -f -p vcf {config[analysis_batch_name]}.freebayes.filtered.merged.vcf.gz
+		touch {output}
+		"""
+#	module load {config[samtools_version]} - samtools automaticcally loaded when loading vcftools.	
 
 rule freebayes:
 	input:

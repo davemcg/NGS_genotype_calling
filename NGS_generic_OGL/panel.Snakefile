@@ -62,22 +62,29 @@ def rg(wildcards):
 	rg_out = str(LANEFILE_READGROUP[lane_file + config['lane_pair_delim'][0] + '.fastq.gz'][0])
 	return(rg_out)
 
+# import CREST hg19 regions
+REGIONS_file = config['regions']
+if '/home/$USER' in REGIONS_file:
+	REGIONS_file = os.environ['HOME'] + REGIONS_file.split('$USER')[-1]
+REGIONS = open(REGIONS_file).readlines()
+REGIONS = [r.strip() for r in REGIONS]
 
 wildcard_constraints:
 	sample='|'.join(list(SAMPLE_LANEFILE.keys())),
-	lane = '|'.join(list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in [y for sub in list(SAMPLE_LANEFILE.values()) for y in sub]])))
+	lane = '|'.join(list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in [y for sub in list(SAMPLE_LANEFILE.values()) for y in sub]]))),
+	region = '|'.join(REGIONS)
 
 rule all:
 	input:
-		expand('CREST/hg19.{sample}.markDup.bam.predSV.txt', sample=list(SAMPLE_LANEFILE.keys())) if config['CREST'] == 'TRUE' else 'dummy.txt',
+		expand('CREST/{sample}.predSV.txt', sample=list(SAMPLE_LANEFILE.keys())) if config['CREST'] == 'TRUE' else 'dummy.txt',
 		expand('gvcfs/{sample}.g.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())) if config['GATKgvcf'] == 'TRUE' else 'dummy.txt',
 		'GATK_metrics/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
 		'fastqc/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
 		expand('picardQC/{sample}.insert_size_metrics.txt', sample=list(SAMPLE_LANEFILE.keys())) if config['picardQC'] == 'TRUE' else 'dummy.txt',
 		'CoNVaDING/progress2.done' if config['CoNVaDING'] == 'TRUE' else 'dummy.txt',
 		'freebayes.vcf' if config['freebayes'] == 'TRUE' else 'dummy.txt',
-		'freebayes_prioritization/freebayes.merged.vcf' if config['freebayes_individual'] == 'TRUE' else 'dummy.txt',
-		expand('sample_cram/{sample}.cram', sample=list(SAMPLE_LANEFILE.keys())) if config['cram'] == 'TRUE' else expand('sample_bam/{sample}.bam', sample=list(SAMPLE_LANEFILE.keys())),
+		'freebayesPrioritization/freebayes.merge.done.txt' if config['freebayes_individual'] == 'TRUE' else 'dummy.txt',
+		expand('sample_cram/{sample}.cram', sample=list(SAMPLE_LANEFILE.keys())) if config['cram'] == 'TRUE' else expand('sample_bam/{sample}.bam', sample=list(SAMPLE_LANEFILE.keys()))
 
 localrules: dummy
 rule dummy:
@@ -263,20 +270,73 @@ rule picard_mark_dups_hg19:
 		"""
 
 #may be better run with lscratch.
-rule CREST:
+#to be done: need to run by chromosome then combine
+#to be done: need to remove common variants seen all the time
+# rule CREST:
+# 	input:
+# 		bam = 'sample_bam/hg19bam/{sample}/hg19.{sample}.markDup.bam',
+# 		bai = 'sample_bam/hg19bam/{sample}/hg19.{sample}.markDup.bam.bai'
+# 	output:
+# 		cover = temp('hg19.{sample}.markDup.bam.cover'),
+# 		predSV = 'hg19.{sample}.markDup.bam.predSV.txt',
+# 		sclip = temp('hg19.{sample}.markDup.bam.sclip.txt')
+# 	shell:
+# 		"""
+# 		BLAT_PORT=50000
+# 		function safe_start_blat {{
+#     		local genome_2bit=$1
+#     		# sleep random amount up to 30s to avoid risk of race condition
+#     		sleep $((RANDOM % 30))
+# 			# count how many gfServers there are already running
+# 			local other_gfservers=$(ps -eo comm | grep -c gfServer)
+# 			echo "there are $other_gfservers other gfServers running"
+# 			BLAT_PORT=$((BLAT_PORT + other_gfservers))
+# 			# start gfServer
+# 			echo "startig gfServer on port $BLAT_PORT"
+# 			gfServer start localhost $BLAT_PORT $genome_2bit -canStop \
+# 					-log=blatServer_${{BLAT_PORT}}.log &> /dev/null &
+# 			# wait until gfServer is running
+# 			while [[ $(gfServer files localhost $BLAT_PORT 2>&1) =~ "Error in TCP" ]]; do
+# 			 	echo "Waiting for BLAT server to start..."
+# 				sleep 10
+# 			done
+# 			echo "BLAT server is running!"
+# 		}}
+# 		module load CREST
+# 		tmp=$(mktemp -d ./XXXX)
+# 		export TMPDIR=${{tmp}}
+# 		# Start up BLAT server:
+# 		safe_start_blat /data/OGVFB/OGL_NGS/genomes/hg19/hg19.2bit
+# 		trap "gfServer stop localhost $BLAT_PORT; rm -rf ${{tmp}}" EXIT
+# 		extractSClip.pl -i {input.bam} --ref_genome /data/OGVFB/OGL_NGS/genomes/hg19/hg19.fa
+# 		CREST.pl -f {output.cover} \
+# 			-d {input.bam} \
+# 			--ref_genome /data/OGVFB/OGL_NGS/genomes/hg19/hg19.fa \
+# 			-t /data/OGVFB/OGL_NGS/genomes/hg19/hg19.2bit --blatserver localhost \
+# 			--blatport $BLAT_PORT \
+# 			--read_len 150
+# 		"""
+
+# when a node has too many blat going on, some blats will not start leading to problems. Thus tried the followings:
+# in panel.cluster.json, I used 64 g only because "exclusive" and each node has at least 121g - worked well without error
+# Also tried 8 cpus-per-task and 64g memory - queued faster than exclusive. probably all jobs were run in a seperate gnomad_exome
+# 8 cpus-per-task and 16g - up to 3 blats on the node. 3/48 jobs failed.
+rule CRESTbyChr:
 	input:
 		bam = 'sample_bam/hg19bam/{sample}/hg19.{sample}.markDup.bam',
 		bai = 'sample_bam/hg19bam/{sample}/hg19.{sample}.markDup.bam.bai'
 	output:
-		cover = temp('hg19.{sample}.markDup.bam.cover'),
-		predSV = 'hg19.{sample}.markDup.bam.predSV.txt',
-		sclip = temp('hg19.{sample}.markDup.bam.sclip.txt')
+		cover = temp('temp/{sample}/{region}/hg19.{sample}.markDup.bam.{region}.cover'),
+		predSV = temp('temp/{sample}/{region}/{sample}_{region}.predSV.txt'),
+		sclip = temp('temp/{sample}/{region}/hg19.{sample}.markDup.bam.{region}.sclip.txt')
 	shell:
 		"""
+		#cp /data/OGVFB/OGL_NGS/genomes/hg19/hg19.2bit /lscratch/$SLURM_JOB_ID/.
+		cd temp/{wildcards.sample}/{wildcards.region}
 		BLAT_PORT=50000
 		function safe_start_blat {{
     		local genome_2bit=$1
-    		# sleep random amount up to 30s to avoid risk of race condition
+    		# sleep random amount up to 30s to avoid risk of race condition, # change to 60s did not help 1/17/20
     		sleep $((RANDOM % 30))
 			# count how many gfServers there are already running
 			local other_gfservers=$(ps -eo comm | grep -c gfServer)
@@ -286,7 +346,7 @@ rule CREST:
 			echo "startig gfServer on port $BLAT_PORT"
 			gfServer start localhost $BLAT_PORT $genome_2bit -canStop \
 					-log=blatServer_${{BLAT_PORT}}.log &> /dev/null &
-			# wait until gfServer is running
+			# wait until gfServer is running, change to 20s did not help
 			while [[ $(gfServer files localhost $BLAT_PORT 2>&1) =~ "Error in TCP" ]]; do
 			 	echo "Waiting for BLAT server to start..."
 				sleep 10
@@ -299,27 +359,45 @@ rule CREST:
 		# Start up BLAT server:
 		safe_start_blat /data/OGVFB/OGL_NGS/genomes/hg19/hg19.2bit
 		trap "gfServer stop localhost $BLAT_PORT; rm -rf ${{tmp}}" EXIT
-		extractSClip.pl -i {input.bam} --ref_genome /data/OGVFB/OGL_NGS/genomes/hg19/hg19.fa
-		CREST.pl -f {output.cover} \
-			-d {input.bam} \
+		extractSClip.pl -i ../../../{input.bam} --ref_genome /data/OGVFB/OGL_NGS/genomes/hg19/hg19.fa -r {wildcards.region}
+		CREST.pl -f ../../../{output.cover} \
+			-d ../../../{input.bam} \
 			--ref_genome /data/OGVFB/OGL_NGS/genomes/hg19/hg19.fa \
 			-t /data/OGVFB/OGL_NGS/genomes/hg19/hg19.2bit --blatserver localhost \
-			--blatport $BLAT_PORT
+			--blatport $BLAT_PORT \
+			--read_len 150 -r {wildcards.region} \
+			-p {wildcards.sample}_{wildcards.region}
+		rm blatServer_$BLAT_PORT.log
 		"""
+
 #### Create blat hyperlink (can be done in the previous step), use R to remove the common calls found in too many samples, also annotate the region???
 
 localrules: mvCREST
 rule mvCREST:
 	input:
-	 	expand('hg19.{sample}.markDup.bam.predSV.txt', sample=list(SAMPLE_LANEFILE.keys()))
+	 	expand('temp/{{sample}}/{region}/{{sample}}_{region}.predSV.txt', region=REGIONS)
 	output:
-		expand('CREST/hg19.{sample}.markDup.bam.predSV.txt', sample=list(SAMPLE_LANEFILE.keys()))
+		'CREST/{sample}.predSV.txt'
 	shell:
 		"""
-		cp -p -l hg19.*.markDup.bam.predSV.txt CREST/.
-		rm hg19.*.markDup.bam.predSV.txt
-		rm blatServer*.log
+		#cat {input} > {output}
+		cat {input} | awk -F "\t" 'BEGIN{{OFS="\t"}} {{print "{wildcards.sample}",$4+$8,$0}}' - | \
+		sort -nrk 2,2 - > {output}
+		sed -i '1 i\Sample\tsum_reads\tleft_chr\tleft_pos\tleft_strand\t# of left soft-clipped reads\t right_chr\t right_pos\tright_strand\t# right soft-clipped reads\t SV type\t coverage at left_pos\t coverage at right_pos\tassembled length at left_pos\t assembled length at right_pos\taverage percent identity at left_pos\t percent of non-unique mapping reads at left_pos\t average percent identity at right_pos\t percent of non-unique mapping reads at right_pos\t start position of consensus mapping to genome\tstarting chromosome of consensus mapping\t position of the genomic mapping of consensus starting position\t end position of consensus mapping to genome\tending chromsome of consnesus mapping\t position of genomic mapping of consensus ending posiiton\t consensus sequences' {output}
 		"""
+
+rule CRESTannotation:
+	input:
+		'CREST/{sample}.predSV.txt'
+	output:
+		'CRESTanno/{sample}.anno.predSV.xlsx'
+	shell:
+		"""
+		module load {config[R_version]}
+		Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/CRESTanno.R \
+			{input} {config[CRESTdb]} {output}
+		"""
+
 #cp -l: use hard-links instead of copying data of the regular files
 #cp -p: preserve attributes;
 #
@@ -877,37 +955,145 @@ rule freebayes_individual:
 		bam = 'sample_bam/{sample}.markDup.bam',
 		bai = 'sample_bam/{sample}.markDup.bai'
 	output:
-		vcf = 'freebayes/{sample}.freebayes.vcf.gz',
-		filteredvcf = 'freebayes/{sample}.freebayes.filtered.vcf.gz'
-#	threads: 2
+		vcf = 'freebayes/{sample}.vcf.gz',
+		filteredvcf = 'freebayes/{sample}.filtered.vcf.gz',
+		tbi = 'freebayes/{sample}.filtered.vcf.gz.tbi'
+	threads: 16
 	shell:
 		"""
 		module load {config[freebayes_version]}
 		module load {config[vcflib_version]}
 		module load {config[samtools_version]}
-		freebayes -f {config[bwa_genome]} \
-			--limit-coverage 1000 {input.bam} | vcffilter -f "QUAL > 1" | bgzip > {output.vcf}
+		module load {config[vt_version]}
+		freebayes-parallel {config[freebayes_region]} {threads} -f {config[bwa_genome]} \
+			--limit-coverage 1000 {input.bam} --min-coverage 4 \
+			| vcffilter -f "QUAL > 1" \
+			| vt decompose -s - \
+			| vt normalize -m -r {config[bwa_genome]} - \
+			| sed -e "s|1/.|0/1|" -e "s|./1|0/1|" \
+			| bgzip > {output.vcf}
 		sleep 2
 		tabix -f -p vcf {output.vcf}
-		vcffilter -f "QUAL > 20 & QUAL / AO > 5 & SAF > 0 & SAR > 0 & RPR > 1 & RPL > 1" {output.vcf} | bgzip > {output.filteredvcf}
+		vcffilter -f "( QUAL > 15 & QA / AO > 15 & SAF > 0 & SAR > 0 & RPR > 0 & RPL > 0 ) & AO > 2 & DP > 3 | ( QUAL > 30 & QA / AO > 25 & ( SAF = 0 | SAR = 0 | RPR = 0 | RPL = 0 ) & AO > 2 & DP > 3 )" {output.vcf} | bgzip > {output.filteredvcf}
 		sleep 2
 		tabix -f -p vcf {output.filteredvcf}
 		"""
+# sed -e "s|1/.|0/1|" -e "s|./1|0/1|" bi-alleleic locus edit the GT field.
+# rule freebayes_individual:
+# 	input:
+# 		bam = 'sample_bam/{sample}.markDup.bam',
+# 		bai = 'sample_bam/{sample}.markDup.bai'
+# 	output:
+# 		vcf = 'freebayes/{sample}.freebayes.vcf.gz',
+# 		filteredvcf = 'freebayes/{sample}.freebayes.filtered.vcf.gz',
+# 		tbi = 'freebayes/{sample}.freebayes.filtered.vcf.gz.tbi'
+# 	threads: 16
+# 	shell:
+# 		"""
+# 		module load {config[freebayes_version]}
+# 		module load {config[vcflib_version]}
+# 		module load {config[samtools_version]}
+# 		freebayes-parallel {config[freebayes_region]} {threads} -f {config[bwa_genome]} \
+# 			--limit-coverage 1000 {input.bam} --min-coverage 4 | \
+# 			vcffilter -f "QUAL > 1" | bgzip > {output.vcf}
+# 		sleep 60
+# 		tabix -f -p vcf {output.vcf}
+# 		vcffilter -f "( QUAL > 15 & QA / AO > 15 & SAF > 0 & SAR > 0 & RPR > 0 & RPL > 0 ) & AO > 2 & DP > 3 | ( QUAL > 30 & QA / AO > 25 & ( SAF = 0 | SAR = 0 | RPR = 0 | RPL = 0 ) & AO > 2 & DP > 3 )" {output.vcf} | bgzip > {output.filteredvcf}
+# 		sleep 2
+# 		tabix -f -p vcf {output.filteredvcf}
+# 		"""
+# 1/20/2020: changed QUAL > 20 & QA / AO > 10 to QUAL > 15 & QA / AO > 15 because of 2226 female orf sample
+#When using non-parallel version below using default json parameters, MiSeq OGLv1 took ~90min.
+# rule freebayes_individual:
+# 	input:
+# 		bam = 'sample_bam/{sample}.markDup.bam',
+# 		bai = 'sample_bam/{sample}.markDup.bai'
+# 	output:
+# 		vcf = 'freebayes/{sample}.freebayes.vcf.gz',
+# 		filteredvcf = 'freebayes/{sample}.freebayes.filtered.vcf.gz',
+# 		tbi = 'freebayes/{sample}.freebayes.filtered.vcf.gz.tbi'
+# #	threads: 2
+# 	shell:
+# 		"""
+# 		module load {config[freebayes_version]}
+# 		module load {config[vcflib_version]}
+# 		module load {config[samtools_version]}
+# 		freebayes -f {config[bwa_genome]} --min-coverage 4 \
+# 			--limit-coverage 1000 {input.bam} | vcffilter -f "QUAL > 1" | bgzip > {output.vcf}
+# 		sleep 60
+# 		tabix -f -p vcf {output.vcf}
+# 		vcffilter -f "( QUAL > 20 & QA / AO > 10 & SAF > 0 & SAR > 0 & RPR > 0 & RPL > 0 ) & AO > 2 & DP > 3 | ( QUAL > 30 & QA / AO > 25 & ( SAF = 0 | SAR = 0 | RPR = 0 | RPL = 0 ) & AO > 2 & DP > 3 )" {output.vcf} | bgzip > {output.filteredvcf}
+# 		sleep 2
+# 		tabix -f -p vcf {output.filteredvcf}
+# 		"""
+# --gvcf: after gvcf,I tried to pipe it to vcffilter, which removed the reference regions | vcffilter -f "QUAL > 1"
+#freebayes -f /data/OGVFB/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta --gvcf --limit-coverage 1000 --min-coverage 4 sample_bam/14_NA12878.markDup.bam > 14_NA12878.test.gvcf
+#Tag with "PASS" worked as shown below. It's possible to use --gvcf then tag with PASS?
+#vcffilter -t "PASS" -f "( QUAL > 20 & QA / AO > 10 & SAF > 0 & SAR > 0 & RPR > 0 & RPL > 0 )  & AO > 2 & DP > 3 | ( QUAL > 30 & QA / AO > 25 & ( SAF = 0 | SAR = 0 | RPR = 0 | RPL = 0 ) & AO > 2 & DP > 3 )" 14_NA12878.freebayes.vcf.gz | bgzip > 14_NA12878.freebayes.filter7.vcf.gz
+#vcffilter -F "filter2" -f ... did not work
+##WGS vcffilter
+#vcffilter -f "QUAL > 20 & QA / AO > 10 & SAF > 0 & SAR > 0 & RPR > 1 & RPL > 1" {output.vcf} | bgzip > {output.filteredvcf}
+# QUAL > 1 removes horrible sites, testing 11/2/19
+# QUAL / AO > 10 additional contribution of each obs should be 10 log units (~ Q10 per read), Used QUAL/AO > 5 before 10/30/19;
+# QA / AO > 10 (QA: Sum of quality of the alternate observations), starting 11/1/19 - 99% specificity and 98% sensitivity
+# SAF > 0 & SAR > 0 reads on both strands, Number of alternate observations on the forward/reverse strand, remove this one for panel/exome data, use AO > 2 instead.
+# RPR > 1 & RPL > 1 at least two reads “balanced” to each side of the site
+##INFO=<ID=QA,Number=A,Type=Integer,Description="Alternate allele quality sum in phred">
+##INFO=<ID=RPL,Number=A,Type=Float,Description="Reads Placed Left: number of reads supporting the alternate balanced to the left (5') of the alternate allele">
+##INFO=<ID=RPR,Number=A,Type=Float,Description="Reads Placed Right: number of reads supporting the alternate balanced to the right (3') of the alternate allele">
+##INFO=<ID=MQM,Number=A,Type=Float,Description="Mean mapping quality of observed alternate alleles">
+##INFO=<ID=MQMR,Number=1,Type=Float,Description="Mean mapping quality of observed reference alleles">
+##INFO=<ID=AC,Number=A,Type=Integer,Description="Total number of alternate alleles in called genotypes">
+##INFO=<ID=AN,Number=1,Type=Integer,Description="Total number of alleles in called genotypes">
 
 rule merge_freebayes:
 	input:
-		expand('freebayes/{sample}.freebayes.filtered.vcf.gz', sample=list(SAMPLE_LANEFILE.keys()))
+		vcf = expand('freebayes/{sample}.filtered.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
+		tbi = expand('freebayes/{sample}.filtered.vcf.gz.tbi', sample=list(SAMPLE_LANEFILE.keys()))
 	output:
-		temp('freebayes_prioritization/freebayes.merged.vcf')
+		'freebayesPrioritization/freebayes.merge.done.txt'
+	threads: 8
 	shell:
 		"""
-		module load {config[vcftools_version]}
-		vcf-merge freebayes/*.freebayes.filtered.vcf.gz | bgzip -c > {config[analysis_batch_name]}.freebayes.filtered.merged.vcf.gz
+		module load {config[samtools_version]}
+		bcftools merge --merge none --output-type z --threads {threads} {input.vcf} \
+		 	> freebayesPrioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
 		sleep 2
-		tabix -f -p vcf {config[analysis_batch_name]}.freebayes.filtered.merged.vcf.gz
+		tabix -f -p vcf freebayesPrioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
 		touch {output}
 		"""
-#	module load {config[samtools_version]} - samtools automaticcally loaded when loading vcftools.	
+
+# rule merge_freebayes:
+# 	input:
+# 		vcf = expand('freebayes/{sample}.freebayes.filtered.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
+# 		tbi = expand('freebayes/{sample}.freebayes.filtered.vcf.gz.tbi', sample=list(SAMPLE_LANEFILE.keys()))
+# 	output:
+# 		'freebayesPrioritization/freebayes.merge.done.txt'
+# 	threads: 8
+# 	shell:
+# 		"""
+# 		module load {config[gatk_version]}
+# 		module load {config[samtools_version]}
+# 		ls freebayes/*.filtered.vcf.gz > freebayes/vcfs.list
+# 		GATK -p {threads} -m 60g CombineVariants \
+# 			-R {config[ref_genome]} \
+# 			-V freebayes/vcfs.list \
+# 			-o freebayesPrioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
+# 		sleep 2
+# 		tabix -f -p vcf freebayesPrioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
+# 		rm freebayes/vcfs.list
+#		touch {output}
+# 		"""
+
+		# """
+		# module load {config[vcftools_version]}
+		# vcf-merge {input.vcf} | bgzip -c > freebayesPrioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
+		# sleep 60
+		# tabix -f -p vcf freebayesPrioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
+		# touch {output}
+		# """
+#	module load {config[samtools_version]} - samtools automaticcally loaded when loading vcftools.
+
 
 rule freebayes:
 	input:

@@ -7,6 +7,7 @@ picardQC: 'TRUE'
 GATKgvcf: 'TRUE' # will run only if TRUE
 cutadapt: 'TRUE' #TRUE to trim adaptor using cutadapt, #FALSE not to trim.
 CREST: 'TRUE' # TRUE or FALSE, This is for panel.Snakefile only.
+regions: '/home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/chr_split_24_coords.txt' #chr1 to chr22, chrX, chrY
 CoNVaDING: 'TRUE' # Will run only if TRUE.
 freebayes: 'FALSE' # freebayes will run only if TRUE
 freebayes_individual: 'TRUE'
@@ -33,5 +34,7 @@ R2_adaptor: 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT' #TrueSeq and NEB adaptors
 #INDELseek_bed: '/data/OGVFB/OGL_NGS/bed/OGL733v1.sorted.indelseek.bed' #Made by make_indelseek_bed.sh
 freebayes_version: 'freebayes/1.3.1'
 vcflib_version: 'vcflib/v1.0.0-rc0-331-g7e3d806'
+vt_version: 'vt/0.577'
 vcftools_version: 'vcftools/0.1.16'
-freebayes_region: '/data/OGVFB/OGL_NGS/bed/freebayes.OGLv1.1000.region' # panel 500 regions worked for MiSeq OGLv1; made by make_freebayes_region.sh
+freebayes_region: '/data/OGVFB/OGL_NGS/bed/freebayes.OGLv1.500.region' # choice of 20, 500, 1000 regions made for OGLv1. Panel 500 regions worked for MiSeq OGLv1; made by make_freebayes_region.sh
+CRESTdb: '/data/OGL/resources/CRESTdb.tsv'

@@ -18,12 +18,14 @@
 	"freebayes_individual" :
 	{
 		"partition" : "norm",
-		"time" : "12:00:00",
-		"mem" : "32g"
+		"time" : "8:00:00",
+		"mem" : "64g",
+		"threads" : "16"
 	},
 	"merge_freebayes" :
 	{
-		"mem" : "64g"
+		"mem" : "64g",
+		"threads" : "8"
 	},
 	"split_cram_by_rg" :
 	{
@@ -38,6 +40,18 @@
 		"mem" : "64g",
 		"threads" : "32"
 	},
+	"align_hg19" :
+	{
+		"mem" : "16g",
+		"threads" : "8"
+	},
+	"CRESTbyChr" :
+	{
+		"partition" : "quick",
+		"time" : "3:00:00",
+		"mem" : "64g",
+		"extra" : "--cpus-per-task=8"
+	},
 	"picard_merge_bams" :
 	{
 		"partition" : "norm",
@@ -50,6 +64,13 @@
 		"time" : "24:00:00",
 		"mem" : "32G",
 		"extra" : "--gres=lscratch:300"
+	},
+	"merge_lane_bam_hg19" :
+	{
+		"partition" : "norm",
+		"time" : "6:00:00",
+		"mem" : "16G",
+		"extra" : "--gres=lscratch:100"
 	},
 	"merge_RG_bams_back_together" :
 	{
@@ -67,6 +88,9 @@
 	},
 	"picard_mark_dups" : {
 		"mem" : "64g"
+	},
+	"picard_mark_dups_hg19" : {
+		"mem" : "20g"
 	},
 	"picard_mark_dups_allchr" : {
 		"mem" : "64g"
@@ -123,6 +147,6 @@
 	"bam_to_cram" : {
 		"extra" : "--gres=lscratch:300",
 		"partition" : "norm",
-		"time" : "24:00:00"
+		"time" : "8:00:00"
 	}
 }

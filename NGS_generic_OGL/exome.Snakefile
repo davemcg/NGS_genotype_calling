@@ -77,7 +77,7 @@ wildcard_constraints:
 
 rule all:
 	input:
-		expand('CREST/{sample}.predSV.txt', sample=list(SAMPLE_LANEFILE.keys())) if config['CREST'] == 'TRUE' else 'dummy.txt',
+		expand('CRESTanno/{sample}.predSV.xlsx', sample=list(SAMPLE_LANEFILE.keys())) if config['CREST'] == 'TRUE' else 'dummy.txt',
 		expand('gvcfs/{sample}.g.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())) if config['GATKgvcf'] == 'TRUE' else 'dummy.txt',
 		# expand('recal_bam/{sample}.recal.bam', sample=list(SAMPLE_LANEFILE.keys())) if config['recal_bam'] == 'TRUE' else 'dummy.txt',
 		expand('sample_cram/{sample}.cram', sample=list(SAMPLE_LANEFILE.keys())) if config['cram'] == 'TRUE' else expand('sample_bam/{sample}.bam', sample=list(SAMPLE_LANEFILE.keys())),
@@ -366,12 +366,46 @@ rule CRESTannotation:
 	input:
 		'CREST/{sample}.predSV.txt'
 	output:
-		'CRESTanno/{sample}.anno.predSV.xlsx'
+		leftAVinput = temp('CRESTanno/{sample}.left.avinput'),
+		rightAVinput = temp('CRESTanno/{sample}.right.avinput'),
+		leftAnnovar = temp('CRESTanno/{sample}.left.hg19_multianno.txt'),
+		rightAnnovar = temp('CRESTanno/{sample}.right.hg19_multianno.txt'),
+		leftAnnovarR = temp('CRESTanno/{sample}.left.forR.txt'),
+		rightAnnovarR = temp('CRESTanno/{sample}.right.forR.txt'),
+		crestR = temp('CRESTanno/{sample}.forR.txt'),
+		anno = 'CRESTanno/{sample}.predSV.xlsx'
+
 	shell:
 		"""
 		module load {config[R_version]}
+		module load {config[annovar_version]}
+		awk -F"\t" 'BEGIN{{OFS="\t"}} NR>1 {{print $4,$5,$5,"0","-"}}' {input} > {output.leftAVinput}
+		awk -F"\t" 'BEGIN{{OFS="\t"}} NR>1 {{print $8,$9,$9,"0","-"}}' {input} > {output.rightAVinput}
+		table_annovar.pl {output.leftAVinput} \
+			$ANNOVAR_DATA/hg19 \
+			-buildver hg19 \
+			-remove \
+			-out {wildcards.sample}.left \
+			--protocol refGene \
+			-operation  g \
+			--argument '-splicing 100 -hgvs' \
+			--polish -nastring . \
+			--thread 1
+		table_annovar.pl {output.rightAVinput} \
+			$ANNOVAR_DATA/hg19 \
+			-buildver hg19 \
+			-remove \
+			-out {wildcards.sample}.right \
+			--protocol refGene \
+			-operation  g \
+			--argument '-splicing 100 -hgvs' \
+			--polish -nastring . \
+			--thread 1
+		awk -F"\t" 'BEGIN{{OFS="\t"}} NR==1 {{print "leftGene","leftSplicing","leftAA"}} NR>1 {{print $7,$8,$10}}' {output.leftAnnovar} > {output.leftAnnovarR}
+		awk -F"\t" 'BEGIN{{OFS="\t"}} NR==1 {{print "rightGene","rightSplicing","rightAA"}} NR>1 {{print $7,$8,$10}}' {output.rightAnnovar} > {output.rightAnnovarR}
+		paste {input} {output.leftAnnovarR} {output.rightAnnovarR} > {output.crestR}
 		Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/CRESTanno.R \
-			{input} {config[CRESTdb]} {output}
+			{output.crestR} {config[CRESTdb]} {output.anno}
 		"""
 
 # if multiple sets of fastq/bam provided for a sample, now merge together

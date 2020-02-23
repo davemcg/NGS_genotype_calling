@@ -53,7 +53,7 @@ case "${ngstype^^}" in
 		--cluster "$sbcmd"  --latency-wait 120 --rerun-incomplete \
 		-k --restart-times 1 \
 		--resources parallel=4 \
-		--configfile $1 --notemp
+		--configfile $1
 		;;
 	"EXOME")
 		snakemake -s /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/exome.Snakefile \

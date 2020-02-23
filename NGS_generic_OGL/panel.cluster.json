@@ -27,6 +27,11 @@
 		"mem" : "64g",
 		"threads" : "8"
 	},
+	"coverage" :
+	{
+		"mem" : "32g",
+		"threads" : "16"
+	},
 	"align" :
 	{
 		"mem" : "16g",

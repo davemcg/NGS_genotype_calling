@@ -3,7 +3,7 @@
 set -e
 
 module load GATK/3.8-0
-module load vt/0.577
+module load vt/0.57721
 
 #sbatch --cpus-per-task=8 --mem=16g --time=6:00:00 /data/OGVFB/OGL_NGS/NGS_genotype_calling/gvcf_to_vcf_070419.sh OGLv1_062619.vcf /data/OGVFB/OGL_NGS/bed/OGL731_v1.sorted.bed /data/guanb/MiSeq/190626_0061_CGWJ7/OGLv1_062619.ped
 #submit at the project folder.
@@ -13,7 +13,7 @@ output_vcf_name=$1
 bed=$2
 ped=$3
 
-mkdir -p prioritization
+mkdir -p GATKprioritization
 
 cd gvcfs
 
@@ -86,4 +86,4 @@ module load samtools/1.9
 bgzip -f ${1%.vcf}.filterSNP-INDEL.vcf
 tabix -p vcf ${1%.vcf}.filterSNP-INDEL.vcf.gz
 
-mv vcf ${1%.vcf}.filterSNP-INDEL.vcf.gz* ../prioritization/.
+mv vcf ${1%.vcf}.filterSNP-INDEL.vcf.gz* ../GATKprioritization/.

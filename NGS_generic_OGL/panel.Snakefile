@@ -84,6 +84,7 @@ rule all:
 		'CoNVaDING/progress2.done' if config['CoNVaDING'] == 'TRUE' else 'dummy.txt',
 		'freebayes.vcf' if config['freebayes'] == 'TRUE' else 'dummy.txt',
 		'freebayesPrioritization/freebayes.merge.done.txt' if config['freebayes_individual'] == 'TRUE' else 'dummy.txt',
+		expand('coverage/{sample}.coverage.xlsx', sample=list(SAMPLE_LANEFILE.keys())) if config['coverage'] == 'TRUE' else 'dummy.txt',
 		expand('sample_cram/{sample}.cram', sample=list(SAMPLE_LANEFILE.keys())) if config['cram'] == 'TRUE' else expand('sample_bam/{sample}.bam', sample=list(SAMPLE_LANEFILE.keys()))
 
 localrules: dummy
@@ -380,10 +381,9 @@ rule mvCREST:
 		'CREST/{sample}.predSV.txt'
 	shell:
 		"""
-		#cat {input} > {output}
-		cat {input} | awk -F "\t" 'BEGIN{{OFS="\t"}} {{print "{wildcards.sample}",$4+$8,$0}}' - | \
+		cat {input} | awk -F "\t" 'BEGIN{{OFS="\t"}} {{if ($1 == $5) {{print "{wildcards.sample}",$4+$8,$6-$2,$0}} else {{print "{wildcards.sample}",$4+$8,".",$0}}}}' - | \
 		sort -nrk 2,2 - > {output}
-		sed -i '1 i\Sample\tsum_reads\tleft_chr\tleft_pos\tleft_strand\t# of left soft-clipped reads\t right_chr\t right_pos\tright_strand\t# right soft-clipped reads\t SV type\t coverage at left_pos\t coverage at right_pos\tassembled length at left_pos\t assembled length at right_pos\taverage percent identity at left_pos\t percent of non-unique mapping reads at left_pos\t average percent identity at right_pos\t percent of non-unique mapping reads at right_pos\t start position of consensus mapping to genome\tstarting chromosome of consensus mapping\t position of the genomic mapping of consensus starting position\t end position of consensus mapping to genome\tending chromsome of consnesus mapping\t position of genomic mapping of consensus ending posiiton\t consensus sequences' {output}
+		sed -i '1 i\sample\tsumReads\tindelSize\tleftChr\tleftPos\tleftStrand\tNumofLeftSoftClippedReads\trightChr\trightPos\trightStrand\tNumofRightSoftClippedReads\tSVtype\tcoverageAtLeftPos\tcoverageAtRightPos\tassembledLengthAtLeftPos\tassembledLengthAtRightPos\taveragePercentIdentityAtLeftPos\tPercentOfNon-uniqueMappingReadsAtLeftPos\taveragePercentIdentityAtRightPos\tpercentOfNon-uniqueMappingReadsAtRightPos\tstartPositionOfConsensusMappingToGenome\tstartingChromosomeOfConsensusMapping\tpositionOfTheGenomicMappingOfConsensusStartingPosition\tendPositionOfConsensusMappingToGenome\tendingChromsomeOfConsnesusMapping\tpositionOfGenomicMappingOfConsensusEndingPosiiton\tconsensusSequences' {output}
 		"""
 
 rule CRESTannotation:
@@ -409,7 +409,7 @@ rule CRESTannotation:
 			$ANNOVAR_DATA/hg19 \
 			-buildver hg19 \
 			-remove \
-			-out {wildcards.sample}.left \
+			-out CRESTanno/{wildcards.sample}.left \
 			--protocol refGene \
 			-operation  g \
 			--argument '-splicing 100 -hgvs' \
@@ -419,7 +419,7 @@ rule CRESTannotation:
 			$ANNOVAR_DATA/hg19 \
 			-buildver hg19 \
 			-remove \
-			-out {wildcards.sample}.right \
+			-out CRESTanno/{wildcards.sample}.right \
 			--protocol refGene \
 			-operation  g \
 			--argument '-splicing 100 -hgvs' \
@@ -560,8 +560,8 @@ rule CoNVaDING_1:
 		"""
 		module load {config[samtools_version]}
 		module load {config[R_version]}
-		case {params.sex} in
-			1)
+		case "{params.sex}" in
+			"1")
 				perl ~/git/CoNVaDING/CoNVaDING.pl -mode StartWithBam \
 					-inputDir sample_bam/{wildcards.sample} \
 					-outputDir /lscratch/$SLURM_JOB_ID \
@@ -572,8 +572,6 @@ rule CoNVaDING_1:
 				mkdir -p CoNVaDING/normalized_coverage_male
 				cp /lscratch/$SLURM_JOB_ID/{wildcards.sample}.b37.aligned.only.normalized.coverage.txt \
 					CoNVaDING/normalized_coverage_male/{wildcards.sample}.b37.aligned.only.normalized.coverage.txt
-				cp /lscratch/$SLURM_JOB_ID/{wildcards.sample}.b37.aligned.only.normalized.coverage.txt \
-					{config[CoNVaDING_ctr_dir]}
 				Rscript ~/git/NGS_genotype_calling/NGS_generic_OGL/chrRD.R \
 					CoNVaDING/normalized_coverage_male/{wildcards.sample}.b37.aligned.only.normalized.coverage.txt \
 					CoNVaDING/normalized_coverage_male/{wildcards.sample}.chrRD.pdf \
@@ -583,7 +581,7 @@ rule CoNVaDING_1:
 					1
 				touch {output}
 				;;
-			2)
+			"2")
 				perl ~/git/CoNVaDING/CoNVaDING.pl -mode StartWithBam \
 					-inputDir sample_bam/{wildcards.sample} \
 					-outputDir /lscratch/$SLURM_JOB_ID \
@@ -594,8 +592,6 @@ rule CoNVaDING_1:
 				mkdir -p CoNVaDING/normalized_coverage_female
 				cp /lscratch/$SLURM_JOB_ID/{wildcards.sample}.b37.aligned.only.normalized.coverage.txt \
 					CoNVaDING/normalized_coverage_female/{wildcards.sample}.b37.aligned.only.normalized.coverage.txt
-				cp /lscratch/$SLURM_JOB_ID/{wildcards.sample}.b37.aligned.only.normalized.coverage.txt \
-					{config[CoNVaDING_ctr_dir]}
 				Rscript ~/git/NGS_genotype_calling/NGS_generic_OGL/chrRD.R \
 					CoNVaDING/normalized_coverage_female/{wildcards.sample}.b37.aligned.only.normalized.coverage.txt \
 					CoNVaDING/normalized_coverage_female/{wildcards.sample}.chrRD.pdf \
@@ -628,7 +624,16 @@ rule CoNVaDING_1:
 		esac
 		"""
 
-localrules: CoNVaDING_2
+				# cp /lscratch/$SLURM_JOB_ID/{wildcards.sample}.b37.aligned.only.normalized.coverage.txt \
+				# 	{config[CoNVaDING_ctr_dir]}_male/.
+
+				# cp /lscratch/$SLURM_JOB_ID/{wildcards.sample}.b37.aligned.only.normalized.coverage.txt \
+				# 	{config[CoNVaDING_ctr_dir]}_female/.
+
+				# cp /lscratch/$SLURM_JOB_ID/{wildcards.sample}.b37.aligned.only.normalized.coverage.txt \
+				# 	{config[CoNVaDING_ctr_dir]}/.
+
+#localrules: CoNVaDING_2
 rule CoNVaDING_2:
 	input:
 		expand('CoNVaDING/progress1.{sample}', sample=list(SAMPLE_LANEFILE.keys())),
@@ -636,8 +641,8 @@ rule CoNVaDING_2:
 		temp('CoNVaDING/progress2.done')
 	shell:
 		"""
- 		filetest=$((ls CoNVaDING/normalized_coverage/*.b37.aligned.only.normalized.coverage.txt >> /dev/null 2>&1 && echo TRUE) || echo FALSE)
-		if [ $filetest == "TRUE" ];
+ 		filetest0=$((ls CoNVaDING/normalized_coverage/*.b37.aligned.only.normalized.coverage.txt >> /dev/null 2>&1 && echo TRUE) || echo FALSE)
+		if [ $filetest0 == "TRUE" ];
 		then
 			perl ~/git/CoNVaDING/CoNVaDING.pl -mode StartWithMatchScore \
 				-inputDir CoNVaDING/normalized_coverage \
@@ -656,14 +661,14 @@ rule CoNVaDING_2:
 				echo -e "SAMPLE\tCHR\tSTART\tSTOP\tGENE\tNUMBER_OF_TARGETS\tNUMBER_OF_TARGETS_PASS_SHAPIRO-WILK_TEST\tABBERATION" \
 				| cat - CoNVaDING/SHORTlist.txt > CoNVaDING/tmpout && mv CoNVaDING/tmpout CoNVaDING/SHORTlist.txt
 		fi
-		filetest=$((ls CoNVaDING/normalized_coverage_male/*.b37.aligned.only.normalized.coverage.txt >> /dev/null 2>&1 && echo TRUE) || echo FALSE)
-		if [ $filetest == "TRUE" ];
+		filetest1=$((ls CoNVaDING/normalized_coverage_male/*.b37.aligned.only.normalized.coverage.txt >> /dev/null 2>&1 && echo TRUE) || echo FALSE)
+		if [ $filetest1 == "TRUE" ];
 		then
 			perl ~/git/CoNVaDING/CoNVaDING.pl -mode StartWithMatchScore \
 				-inputDir CoNVaDING/normalized_coverage_male \
 				-outputDir  CoNVaDING/MatchScore_male \
 				-controlsDir {config[CoNVaDING_ctr_dir]}_male \
-				-sexChr \
+				-sexChr
 			perl ~/git/CoNVaDING/CoNVaDING.pl \
   				-mode StartWithBestScore \
   				-inputDir CoNVaDING/MatchScore_male \
@@ -678,8 +683,8 @@ rule CoNVaDING_2:
 				echo -e "SAMPLE\tCHR\tSTART\tSTOP\tGENE\tNUMBER_OF_TARGETS\tNUMBER_OF_TARGETS_PASS_SHAPIRO-WILK_TEST\tABBERATION" \
 				| cat - CoNVaDING/SHORTlist_male.txt > CoNVaDING/tmpout_male && mv CoNVaDING/tmpout_male CoNVaDING/SHORTlist_male.txt
 		fi
-		filetest=$((ls CoNVaDING/normalized_coverage_female/*.b37.aligned.only.normalized.coverage.txt >> /dev/null 2>&1 && echo TRUE) || echo FALSE)
-		if [ $filetest == "TRUE" ];
+		filetest2=$((ls CoNVaDING/normalized_coverage_female/*.b37.aligned.only.normalized.coverage.txt >> /dev/null 2>&1 && echo TRUE) || echo FALSE)
+		if [ $filetest2 == "TRUE" ];
 		then
 			perl ~/git/CoNVaDING/CoNVaDING.pl -mode StartWithMatchScore \
 				-inputDir CoNVaDING/normalized_coverage_female \
@@ -702,6 +707,7 @@ rule CoNVaDING_2:
 		fi
 		touch {output}
 		"""
+
 ### Consider performing CoNVaDING QC and creating final list.
 ### 				-controlSamples 20 for "StartWithMatchScore" for the male samples because low sample no.
 #need 30 samples for step 2 above.
@@ -761,24 +767,31 @@ rule picard_mark_dups:
 			METRICS_FILE={output.metrics} \
 			CREATE_INDEX=true
 		"""
-#	bai2 = temp('sample_bam/{sample}.markDup.bam.bai'),
-#	cp {output.bai1} {output.bai2}
 
-# rule picard_bam_index:
-# # Build bam index
-# 	input:
-# 		'sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.markDup.bam'
-# 	output:
-# 		temp('sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.markDup.bam.bai')
-# 	threads: 2
-# 	shell:
-# 		"""
-# 		module load {config[picard_version]}
-# 		java -Xmx60g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
-# 		BuildBamIndex \
-# 			INPUT={input} \
-# 			OUTPUT={output}
-# 		"""
+rule coverage:
+	input:
+		bam = 'sample_bam/{sample}.markDup.bam',
+		bai = 'sample_bam/{sample}.markDup.bai'
+	output:
+		thresholds = 'coverage/mosdepth/{sample}.thresholds.bed.gz',
+		xlsx = 'coverage/{sample}.coverage.xlsx'
+	threads: 16
+	shell:
+		"""
+		module load {config[mosedepth_version]}
+		mosdepth -t {threads} --by {config[bed]} --mapq 0 --thresholds 10,20,30 \
+			{wildcards.sample} {input.bam}
+		mv {wildcards.sample}.thresholds.bed.gz* coverage/mosdepth/.
+		mv {wildcards.sample}.mosdepth* coverage/mosdepth/.
+		mv {wildcards.sample}.per-base.bed.gz* coverage/mosdepth/.
+		mv {wildcards.sample}.regions.bed.gz* coverage/mosdepth/.
+		zcat {output.thresholds} \
+			 | sed '1 s/^.*$/chr\tstart\tend\tgene\tcoverageTen\tcoverageTwenty\tcoverageThirty/' \
+			 > {output.thresholds}.tsv
+		Rscript ~/git/NGS_genotype_calling/NGS_generic_OGL/mosdepth_bed_coverage.R \
+			{output.thresholds}.tsv {config[OGL_Dx_research_genes]} {output.xlsx}
+		"""
+
 rule picard_alignmentQC:
 #insert size and alignment metrics
 	input:
@@ -983,6 +996,7 @@ rule multiqc_fastqc:
 #freebayes avoids indel_realign, base-quality_recalibration, better to run on all of the bam files
 #freebayes can identify MNP and complex indels.
 #need to have unique RG ID fields for each sample. Use the RG made by the wrapper.
+#Using CleanSam and FixMateInformation, freebayes was able to call one additional ins variant using the panel NA12878 data.
 
 rule freebayes_individual:
 	input:
@@ -1000,66 +1014,22 @@ rule freebayes_individual:
 		module load {config[samtools_version]}
 		module load {config[vt_version]}
 		freebayes-parallel {config[freebayes_region]} {threads} -f {config[bwa_genome]} \
-			--limit-coverage 1000 {input.bam} --min-coverage 4 \
-			| vcffilter -f "QUAL > 1" \
-			| vt decompose -s - \
-			| vt normalize -m -r {config[bwa_genome]} - \
-			| sed -e "s|1/.|0/1|" -e "s|./1|0/1|" \
-			| bgzip > {output.vcf}
+			--limit-coverage 1000 {input.bam} --min-alternate-fraction 0.05 \
+			--min-mapping-quality 1 --genotype-qualities --strict-vcf --use-mapping-quality \
+			| bgzip -f > {output.vcf}
 		sleep 2
 		tabix -f -p vcf {output.vcf}
-		vcffilter -f "( QUAL > 15 & QA / AO > 15 & SAF > 0 & SAR > 0 & RPR > 0 & RPL > 0 ) & AO > 2 & DP > 3 | ( QUAL > 30 & QA / AO > 25 & ( SAF = 0 | SAR = 0 | RPR = 0 | RPL = 0 ) & AO > 2 & DP > 3 )" {output.vcf} | bgzip > {output.filteredvcf}
+		bcftools norm --multiallelics -any --output-type v {output.vcf} \
+			| vt decompose_blocksub -p -m -d 2 - \
+			| bcftools norm --check-ref s --fasta-ref {config[bwa_genome]} --output-type v - \
+			| bcftools norm -d none --output-type v - \
+			| vcffilter -f "( QUAL > 15 & QA / AO > 15 & SAF > 0 & SAR > 0 & RPR > 0 & RPL > 0 & AO > 2 & DP > 3 ) | ( QUAL > 30 & QA / AO > 25 & ( SAF = 0 | SAR = 0 | RPR = 0 | RPL = 0 ) & AO > 2 & DP > 3 )" \
+			| bgzip -f > {output.filteredvcf}
 		sleep 2
 		tabix -f -p vcf {output.filteredvcf}
 		"""
-# sed -e "s|1/.|0/1|" -e "s|./1|0/1|" bi-alleleic locus edit the GT field.
-# rule freebayes_individual:
-# 	input:
-# 		bam = 'sample_bam/{sample}.markDup.bam',
-# 		bai = 'sample_bam/{sample}.markDup.bai'
-# 	output:
-# 		vcf = 'freebayes/{sample}.freebayes.vcf.gz',
-# 		filteredvcf = 'freebayes/{sample}.freebayes.filtered.vcf.gz',
-# 		tbi = 'freebayes/{sample}.freebayes.filtered.vcf.gz.tbi'
-# 	threads: 16
-# 	shell:
-# 		"""
-# 		module load {config[freebayes_version]}
-# 		module load {config[vcflib_version]}
-# 		module load {config[samtools_version]}
-# 		freebayes-parallel {config[freebayes_region]} {threads} -f {config[bwa_genome]} \
-# 			--limit-coverage 1000 {input.bam} --min-coverage 4 | \
-# 			vcffilter -f "QUAL > 1" | bgzip > {output.vcf}
-# 		sleep 60
-# 		tabix -f -p vcf {output.vcf}
-# 		vcffilter -f "( QUAL > 15 & QA / AO > 15 & SAF > 0 & SAR > 0 & RPR > 0 & RPL > 0 ) & AO > 2 & DP > 3 | ( QUAL > 30 & QA / AO > 25 & ( SAF = 0 | SAR = 0 | RPR = 0 | RPL = 0 ) & AO > 2 & DP > 3 )" {output.vcf} | bgzip > {output.filteredvcf}
-# 		sleep 2
-# 		tabix -f -p vcf {output.filteredvcf}
-# 		"""
-# 1/20/2020: changed QUAL > 20 & QA / AO > 10 to QUAL > 15 & QA / AO > 15 because of 2226 female orf sample
-#When using non-parallel version below using default json parameters, MiSeq OGLv1 took ~90min.
-# rule freebayes_individual:
-# 	input:
-# 		bam = 'sample_bam/{sample}.markDup.bam',
-# 		bai = 'sample_bam/{sample}.markDup.bai'
-# 	output:
-# 		vcf = 'freebayes/{sample}.freebayes.vcf.gz',
-# 		filteredvcf = 'freebayes/{sample}.freebayes.filtered.vcf.gz',
-# 		tbi = 'freebayes/{sample}.freebayes.filtered.vcf.gz.tbi'
-# #	threads: 2
-# 	shell:
-# 		"""
-# 		module load {config[freebayes_version]}
-# 		module load {config[vcflib_version]}
-# 		module load {config[samtools_version]}
-# 		freebayes -f {config[bwa_genome]} --min-coverage 4 \
-# 			--limit-coverage 1000 {input.bam} | vcffilter -f "QUAL > 1" | bgzip > {output.vcf}
-# 		sleep 60
-# 		tabix -f -p vcf {output.vcf}
-# 		vcffilter -f "( QUAL > 20 & QA / AO > 10 & SAF > 0 & SAR > 0 & RPR > 0 & RPL > 0 ) & AO > 2 & DP > 3 | ( QUAL > 30 & QA / AO > 25 & ( SAF = 0 | SAR = 0 | RPR = 0 | RPL = 0 ) & AO > 2 & DP > 3 )" {output.vcf} | bgzip > {output.filteredvcf}
-# 		sleep 2
-# 		tabix -f -p vcf {output.filteredvcf}
-# 		"""
+#vt decompose_blocksub -a separated inframe insertion to fs. thus do not use.
+
 # --gvcf: after gvcf,I tried to pipe it to vcffilter, which removed the reference regions | vcffilter -f "QUAL > 1"
 #freebayes -f /data/OGVFB/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta --gvcf --limit-coverage 1000 --min-coverage 4 sample_bam/14_NA12878.markDup.bam > 14_NA12878.test.gvcf
 #Tag with "PASS" worked as shown below. It's possible to use --gvcf then tag with PASS?
@@ -1072,13 +1042,7 @@ rule freebayes_individual:
 # QA / AO > 10 (QA: Sum of quality of the alternate observations), starting 11/1/19 - 99% specificity and 98% sensitivity
 # SAF > 0 & SAR > 0 reads on both strands, Number of alternate observations on the forward/reverse strand, remove this one for panel/exome data, use AO > 2 instead.
 # RPR > 1 & RPL > 1 at least two reads “balanced” to each side of the site
-##INFO=<ID=QA,Number=A,Type=Integer,Description="Alternate allele quality sum in phred">
-##INFO=<ID=RPL,Number=A,Type=Float,Description="Reads Placed Left: number of reads supporting the alternate balanced to the left (5') of the alternate allele">
-##INFO=<ID=RPR,Number=A,Type=Float,Description="Reads Placed Right: number of reads supporting the alternate balanced to the right (3') of the alternate allele">
-##INFO=<ID=MQM,Number=A,Type=Float,Description="Mean mapping quality of observed alternate alleles">
-##INFO=<ID=MQMR,Number=1,Type=Float,Description="Mean mapping quality of observed reference alleles">
-##INFO=<ID=AC,Number=A,Type=Integer,Description="Total number of alternate alleles in called genotypes">
-##INFO=<ID=AN,Number=1,Type=Integer,Description="Total number of alleles in called genotypes">
+
 
 rule merge_freebayes:
 	input:
@@ -1090,8 +1054,15 @@ rule merge_freebayes:
 	shell:
 		"""
 		module load {config[samtools_version]}
-		bcftools merge --merge none --output-type z --threads {threads} {input.vcf} \
-		 	> freebayesPrioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
+		case "{input.vcf}" in
+			*\ *)
+				bcftools merge --merge none --missing-to-ref --output-type z --threads {threads} {input.vcf} \
+				> freebayesPrioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
+				;;
+			*)
+				cp {input.vcf} freebayesPrioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
+				;;
+		esac
 		sleep 2
 		tabix -f -p vcf freebayesPrioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
 		touch {output}
@@ -1099,8 +1070,8 @@ rule merge_freebayes:
 
 # rule merge_freebayes:
 # 	input:
-# 		vcf = expand('freebayes/{sample}.freebayes.filtered.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
-# 		tbi = expand('freebayes/{sample}.freebayes.filtered.vcf.gz.tbi', sample=list(SAMPLE_LANEFILE.keys()))
+# 		vcf = expand('freebayes/{sample}.filtered.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
+# 		tbi = expand('freebayes/{sample}.filtered.vcf.gz.tbi', sample=list(SAMPLE_LANEFILE.keys()))
 # 	output:
 # 		'freebayesPrioritization/freebayes.merge.done.txt'
 # 	threads: 8
@@ -1116,17 +1087,8 @@ rule merge_freebayes:
 # 		sleep 2
 # 		tabix -f -p vcf freebayesPrioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
 # 		rm freebayes/vcfs.list
-#		touch {output}
+# 		touch {output}
 # 		"""
-
-		# """
-		# module load {config[vcftools_version]}
-		# vcf-merge {input.vcf} | bgzip -c > freebayesPrioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
-		# sleep 60
-		# tabix -f -p vcf freebayesPrioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
-		# touch {output}
-		# """
-#	module load {config[samtools_version]} - samtools automaticcally loaded when loading vcftools.
 
 
 rule freebayes:

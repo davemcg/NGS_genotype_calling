@@ -8,8 +8,9 @@
 #Should be very quick to finish.
 #sbatch --partition=quick --mem=64g ~/git/NGS_genotype_calling/NGS_generic_OGL/rtg_eval_vcf_GIAB.sh vcf.gz output_folder
 #$3 could be /data/OGL/GIAB/NA12878/HG001_GRCh37_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf.bed
+#GIAB true set did not contain any block_substitution. 
 
-module load  vt/0.577
+module load  vt/0.57721
 module load samtools/1.9
 
 vcfinput=$1
@@ -25,15 +26,25 @@ else
 fi
 
 
-zcat $1 | vt decompose -s - | vt normalize -r /data/OGVFB/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta - | bgzip -c > ${filename%.vcf.gz}.vt.vcf.gz
+zcat $1 | vt decompose -s - | vt decompose_blocksub -a - | vt normalize -n -r /data/OGVFB/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta - | bgzip -c > ${filename%.vcf.gz}.vt.vcf.gz
 
 tabix -f -p vcf ${filename%.vcf.gz}.vt.vcf.gz
 
 module load rtg/3.8.4
 
-rtg vcfeval -b /data/OGL/GIAB/NA12878/HG001_GRCh37_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf.vt.vcf.gz -c ${filename%.vcf.gz}.vt.vcf.gz -t /data/OGL/resources/genomes/hg19/human_g1k_v37decoy_sdf -e $bed --vcf-score-field QUAL -o $2
+rtg vcfeval -b /data/OGL/GIAB/NA12878/HG001_GRCh37_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf.vt.vcf.gz -c ${filename%.vcf.gz}.vt.vcf.gz -t /data/OGL/resources/genomes/hg19/human_g1k_v37decoy_sdf --ref-overlap --evaluation-regions $bed -o $2
+
+#
+#--vcf-score-field QUAL 
+#Default vcf-score-field is GQ.
 
 rm ${filename%.vcf.gz}.vt.vcf.gz*
+
+rtg rocplot $2/snp_roc.tsv.gz --png=$2/$2.snp.png
+rtg rocplot $2/non_snp_roc.tsv.gz --png=$2/$2.indel.png
+rtg rocplot $2/weighted_roc.tsv.gz --png=$2/$2.roc.png
+rtg rocplot -P $2/weighted_roc.tsv.gz --png=$2/$2.precission_recall.png
+
 
 #If multisample vcf files, --sample daughter; Use <baseline_sample>,<calls_sample> to select different sample names for baseline and calls.
 #Interpretation of the results: Note that vcfeval reports true positives both counted using the baseline variant representation as well as counted using the call variant representation. When these numbers differ greatly, it indicates a general difference in representational conventions used between the two call sets. Since false negatives can only be measured in terms of the baseline representation, sensitivity is defined as: Sensitivity = TPbaseline/(TPbaseline + FN). Conversely since false positives can only be measured in terms of the call representation, precision is defined as: Precision = TPcall/(TPcall + FP).

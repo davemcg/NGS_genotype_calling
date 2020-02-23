@@ -571,16 +571,18 @@ rule freebayes_individual:
 		module load {config[vcflib_version]}
 		module load {config[samtools_version]}
 		module load {config[vt_version]}
-		freebayes-parallel {config[freebayes_region]} {threads} -f {config[bwa_genome]} \
-			--limit-coverage 1000 {input.bam} --min-coverage 4 \
-			| vcffilter -f "QUAL > 1" \
-			| vt decompose -s - \
-			| vt normalize -m -r {config[bwa_genome]} - \
-			| sed -e "s|1/.|0/1|" -e "s|./1|0/1|" \
-			| bgzip > {output.vcf}
+		freebayes-parallel {config[freebayes_exome_region]} {threads} -f {config[bwa_genome]} \
+			--limit-coverage 1000 {input.bam} --min-alternate-fraction 0.05 \
+			--min-mapping-quality 1 --genotype-qualities --strict-vcf --use-mapping-quality \
+			| bgzip -f > {output.vcf}
 		sleep 2
 		tabix -f -p vcf {output.vcf}
-		vcffilter -f "( QUAL > 15 & QA / AO > 15 & SAF > 0 & SAR > 0 & RPR > 0 & RPL > 0 ) & AO > 2 & DP > 3 | ( QUAL > 30 & QA / AO > 25 & ( SAF = 0 | SAR = 0 | RPR = 0 | RPL = 0 ) & AO > 2 & DP > 3 )" {output.vcf} | bgzip > {output.filteredvcf}
+		bcftools norm --multiallelics -any --output-type v {output.vcf} \
+			| vt decompose_blocksub -p -m -d 2 - \
+			| bcftools norm --check-ref s --fasta-ref {config[bwa_genome]} --output-type v - \
+			| bcftools norm -d none --output-type v - \
+			| vcffilter -f "( QUAL > 15 & QA / AO > 15 & SAF > 0 & SAR > 0 & RPR > 0 & RPL > 0 & AO > 2 & DP > 3 ) | ( QUAL > 30 & QA / AO > 25 & ( SAF = 0 | SAR = 0 | RPR = 0 | RPL = 0 ) & AO > 2 & DP > 3 )" \
+			| bgzip -f > {output.filteredvcf}
 		sleep 2
 		tabix -f -p vcf {output.filteredvcf}
 		"""
@@ -595,8 +597,15 @@ rule merge_freebayes:
 	shell:
 		"""
 		module load {config[samtools_version]}
-		bcftools merge --merge none --output-type z --threads {threads} {input.vcf} \
-		 	> freebayesPrioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
+		case "{input.vcf}" in
+			*\ *)
+				bcftools merge --merge none --missing-to-ref --output-type z --threads {threads} {input.vcf} \
+				> freebayesPrioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
+				;;
+			*)
+				cp {input.vcf} freebayesPrioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
+				;;
+		esac
 		sleep 2
 		tabix -f -p vcf freebayesPrioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
 		touch {output}

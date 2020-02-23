@@ -7,13 +7,13 @@ args <- commandArgs(trailingOnly=TRUE)
 library(tidyverse)
 library(readxl)
 
-predSV_VEP <- read_tsv(args[1], col_names = TRUE, na = c("NA", "", "None", "."), col_types = cols(.default = col_character())) %>%
+predSV <- read_tsv(args[1], col_names = TRUE, na = c("NA", "", "None", "."), col_types = cols(.default = col_character())) %>%
   type_convert()
-  
-classificationDF <- read_xlsx(args[2], na = c("NA", "", "None", ".")) %>%
+
+classificationDF <- read_xlsx(args[2], sheet = "SV", na = c("NA", "", "None", ".")) %>%
   select("leftChr", "leftPos", "leftStrand", "rightChr", "rightPos", "rightStrand", "SVtype",
-          "classification", "popAF", "note")
-classificationDF$classification = factor(classificationDF$classification, levels = c("Pathogenic", "Likely pathogenic", "VOUS", "Not classified", "Likely benign", "Benign")) 
+         "classification", "popAF", "note")
+classificationDF$classification = factor(classificationDF$classification, levels = c("Pathogenic", "Likely pathogenic", "VOUS", "Not classified", "Likely benign", "Benign", "Artifact")) 
 
 
 #"leftGene", "leftSplicing", "leftAA", "rightGene", "rightSplicing", "rightAA",
@@ -24,5 +24,5 @@ annoted <- left_join(predSV, classificationDF, by = c("leftChr", "leftPos", "lef
   replace_na(list(classification = "Not classified")) %>% 
   mutate(consensusSequences = sub("^","https://genome.ucsc.edu/cgi-bin/hgBlat?type=BLAT%27s+guess&userSeq=", consensusSequences)) %>% 
   arrange(classification, desc(sumReads))
-         
+
 openxlsx::write.xlsx(annoted, file = args[3])

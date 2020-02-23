@@ -8,15 +8,30 @@
 		"error" : "00log/{rule}_{wildcards}.err",
 		"extra" : ""
 	},
-	"split_cram_by_rg" : 
+	"split_cram_by_rg" :
 	{
 		"partition" : "norm",
 		"extra" : "--gres=lscratch:10",
 		"time" : "8:00:00"
 	},
+	"bazam" :
+	{
+		"partition" : "norm",
+		"time" : "48:00:00",
+		"mem" : "64g",
+		"threads" : "32"
+	},
+	"freebayes_individual" :
+	{
+		"partition" : "quick",
+		"time" : "2:00:00",
+		"mem" : "96g",
+		"threads" : "32"
+	},
 	"merge_freebayes" :
 	{
-		"mem" : "64g"
+		"mem" : "64g",
+		"threads" : "8"
 	},
 	"align" :
 	{
@@ -36,6 +51,7 @@
 		"partition" : "norm",
 		"time" : "24:00:00",
 		"mem" : "32G",
+		"threads": "16",
 		"extra" : "--gres=lscratch:300"
 	},
 	"merge_RG_bams_back_together" :
@@ -58,8 +74,18 @@
 	"picard_bam_index" : {
 		"mem" : "64g"
 	},
+	"picard_alignmentQC" :
+	{
+		"partition" : "norm",
+		"time" : "6:00:00",
+		"mem" : "16g"		
+	},
 	"picard_merge_gvcfs" : {
 		"mem" : "16g"
+	},
+	"cat_fbvcfs" : {
+		"mem" : "16g",
+		"threads" : "8"
 	},
 	"gatk_base_recalibrator" : {
 		"partition" : "norm",

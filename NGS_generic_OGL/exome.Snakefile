@@ -512,8 +512,8 @@ rule picard_mark_dups_allchr:
 		bam = 'sample_bam/{sample}/{sample}.b37.bam',
 		bai = 'sample_bam/{sample}/{sample}.b37.bai'
 	output:
-		bam = temp('sample_bam/{sample}.markDup.bam'),
-		bai = temp('sample_bam/{sample}.markDup.bai'),
+		bam = 'sample_bam/{sample}.markDup.bam',
+		bai = 'sample_bam/{sample}.markDup.bai',
 		metrics = 'GATK_metrics/{sample}.markDup.metrics'
 	threads: 2
 	shell:

@@ -753,8 +753,8 @@ rule picard_mark_dups:
 	input:
 		'sample_bam/{sample}.sorted.bam'
 	output:
-		bam = temp('sample_bam/{sample}.markDup.bam'),
-		bai = temp('sample_bam/{sample}.markDup.bai'),
+		bam = 'sample_bam/{sample}.markDup.bam',
+		bai = 'sample_bam/{sample}.markDup.bai',
 		metrics = 'GATK_metrics/{sample}.markDup.metrics'
 	threads: 2
 	shell:

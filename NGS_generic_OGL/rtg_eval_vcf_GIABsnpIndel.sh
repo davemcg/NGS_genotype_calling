@@ -8,7 +8,7 @@
 #Should be very quick to finish.
 #sbatch --partition=quick --mem=64g ~/git/NGS_genotype_calling/NGS_generic_OGL/rtg_eval_vcf_GIAB.sh vcf.gz output_folder
 #$3 could be /data/OGL/GIAB/NA12878/HG001_GRCh37_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf.bed
-#GIAB true set did not contain any block_substitution. 
+#512g memory is sufficient for rtg of a WGS dataset. 
 
 set -e
 module load  vt/0.57721
@@ -26,7 +26,7 @@ else
 	bed="/data/OGL/GIAB/OGLv1_GIAB_highconf.bed"
 fi
 
-zcat $1 | vt decompose -s - | vt decompose_blocksub -a - | vt normalize -n -r /data/OGVFB/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta - | bgzip -c > ${filename%.vcf.gz}.vt.vcf.gz
+zcat $1 | vt decompose -s - | vt normalize -n -r /data/OGVFB/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta - | bgzip -c > ${filename%.vcf.gz}.vt.vcf.gz
 tabix -f -p vcf ${filename%.vcf.gz}.vt.vcf.gz
 
 zcat ${filename%.vcf.gz}.vt.vcf.gz | head -500 | grep "#" > header
@@ -59,9 +59,9 @@ tabix -f -p vcf ${filename%.vcf.gz}.INDEL.vcf.gz
 
 module load rtg/3.8.4
 
-rtg vcfeval -b /data/OGL/GIAB/NA12878/HG001_GRCh37_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf.SNP.vcf.gz -c ${filename%.vcf.gz}.SNP.vcf.gz -t /data/OGL/resources/genomes/hg19/human_g1k_v37decoy_sdf --ref-overlap --vcf-score-field QUAL --evaluation-regions $bed -o $2-SNP
+rtg vcfeval -b /data/OGL/GIAB/NA12878/HG001_GRCh37_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf.SNP.vcf.gz -c ${filename%.vcf.gz}.SNP.vcf.gz -t /data/OGL/resources/genomes/hg19/human_g1k_v37decoy_sdf --ref-overlap --evaluation-regions $bed -o $2-SNP
 
-rtg vcfeval -b /data/OGL/GIAB/NA12878/HG001_GRCh37_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf.INDEL.vcf.gz -c ${filename%.vcf.gz}.INDEL.vcf.gz -t /data/OGL/resources/genomes/hg19/human_g1k_v37decoy_sdf --ref-overlap --vcf-score-field QUAL --evaluation-regions $bed -o $2-INDEL
+rtg vcfeval -b /data/OGL/GIAB/NA12878/HG001_GRCh37_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf.INDEL.vcf.gz -c ${filename%.vcf.gz}.INDEL.vcf.gz -t /data/OGL/resources/genomes/hg19/human_g1k_v37decoy_sdf --ref-overlap --evaluation-regions $bed -o $2-INDEL
 
 #
 #--vcf-score-field QUAL 

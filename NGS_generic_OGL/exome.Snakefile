@@ -385,7 +385,7 @@ rule CRESTannotation:
 			$ANNOVAR_DATA/hg19 \
 			-buildver hg19 \
 			-remove \
-			-out {wildcards.sample}.left \
+			-out CRESTanno/{wildcards.sample}.left \
 			--protocol refGene \
 			-operation  g \
 			--argument '-splicing 100 -hgvs' \
@@ -395,7 +395,7 @@ rule CRESTannotation:
 			$ANNOVAR_DATA/hg19 \
 			-buildver hg19 \
 			-remove \
-			-out {wildcards.sample}.right \
+			-out CRESTanno/{wildcards.sample}.right \
 			--protocol refGene \
 			-operation  g \
 			--argument '-splicing 100 -hgvs' \

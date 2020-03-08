@@ -30,7 +30,7 @@
 	"coverage" :
 	{
 		"mem" : "32g",
-		"threads" : "16"
+		"threads" : "8"
 	},
 	"align" :
 	{
@@ -90,7 +90,8 @@
 		"mem" : "64g"
 	},
 	"picard_mark_dups" : {
-		"mem" : "20g"
+		"mem" : "64g",
+		"threads" : "2"
 	},
 	"picard_mark_dups_hg19" : {
 		"mem" : "20g"

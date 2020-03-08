@@ -252,33 +252,34 @@ else:
 			"""
 
 
-rule merge_lane_bam_hg19:
+# rule merge_lane_bam_hg19:
+# 	input:
+# 		lambda wildcards: expand('lane_bam/hg19bam/hg19.{lane}.realigned.bam', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]])))
+# 	output:
+# 		bam = temp('sample_bam/hg19bam/hg19.{sample}.bam'),
+# 		bai = temp('sample_bam/hg19bam/hg19.{sample}.bai')
+# 	shell:
+# 		"""
+# 		module load {config[picard_version]}
+# 		picard_i=""
+# 		for bam in {input}; do
+# 			picard_i+=" I=$bam"
+# 		done
+# 		java -Xmx8g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+# 			MergeSamFiles \
+# 			TMP_DIR=/scratch/$SLURM_JOB_ID \
+# 			$picard_i \
+# 			O={output.bam} \
+# 			SORT_ORDER=coordinate \
+# 			CREATE_INDEX=true
+# 		"""
+
+rule picard_mark_dups_hg19:
 	input:
 		lambda wildcards: expand('lane_bam/hg19bam/hg19.{lane}.realigned.bam', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]])))
 	output:
-		bam = temp('sample_bam/hg19bam/hg19.{sample}.bam'),
-		bai = temp('sample_bam/hg19bam/hg19.{sample}.bai')
-	shell:
-		"""
-		module load {config[picard_version]}
-		picard_i=""
-		for bam in {input}; do
-			picard_i+=" I=$bam"
-		done
-		java -Xmx8g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
-			MergeSamFiles \
-			TMP_DIR=/scratch/$SLURM_JOB_ID \
-			$picard_i \
-			O={output.bam} \
-			SORT_ORDER=coordinate \
-			CREATE_INDEX=true
-		"""
-#Try samtools rmdup instead in next version? CREST may not read the markDup reads.
-rule picard_mark_dups_hg19:
-# Mark duplicate reads
-	input:
-		'sample_bam/hg19bam/hg19.{sample}.bam'
-	output:
+		merged_bam = temp('sample_bam/hg19bam/hg19.{sample}.bam'),
+		merged_bai = temp('sample_bam/hg19bam/hg19.{sample}.bai'),
 		bam = temp('sample_bam/hg19bam/{sample}/hg19.{sample}.markDup.bam'),
 		bai1 = temp('sample_bam/hg19bam/{sample}/hg19.{sample}.markDup.bai'),
 		bai2 = temp('sample_bam/hg19bam/{sample}/hg19.{sample}.markDup.bam.bai'),
@@ -287,15 +288,51 @@ rule picard_mark_dups_hg19:
 	shell:
 		"""
 		module load {config[picard_version]}
+		picard_i=""
+		for bam in {input}; do
+			picard_i+=" I=$bam"
+		done
+		java -Xmx16g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+			MergeSamFiles \
+			TMP_DIR=/scratch/$SLURM_JOB_ID \
+			$picard_i \
+			O={output.merged_bam} \
+			SORT_ORDER=coordinate \
+			CREATE_INDEX=true
 		java -Xmx16g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
 			MarkDuplicates \
-			INPUT={input} \
+			INPUT={output.merged_bam} \
 			OUTPUT={output.bam} \
 			METRICS_FILE={output.metrics} \
 			REMOVE_DUPLICATES=true \
 			CREATE_INDEX=true
 		cp {output.bai1} {output.bai2}
 		"""
+
+
+#Try samtools rmdup instead in next version? CREST may not read the markDup reads.
+# rule picard_mark_dups_hg19:
+# # Mark duplicate reads
+# 	input:
+# 		'sample_bam/hg19bam/hg19.{sample}.bam'
+# 	output:
+# 		bam = temp('sample_bam/hg19bam/{sample}/hg19.{sample}.markDup.bam'),
+# 		bai1 = temp('sample_bam/hg19bam/{sample}/hg19.{sample}.markDup.bai'),
+# 		bai2 = temp('sample_bam/hg19bam/{sample}/hg19.{sample}.markDup.bam.bai'),
+# 		metrics = temp('sample_bam/hg19bam/{sample}/GATK_metrics/{sample}.markDup.metrics')
+# 	threads: 2
+# 	shell:
+# 		"""
+# 		module load {config[picard_version]}
+# 		java -Xmx16g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+# 			MarkDuplicates \
+# 			INPUT={input} \
+# 			OUTPUT={output.bam} \
+# 			METRICS_FILE={output.metrics} \
+# 			REMOVE_DUPLICATES=true \
+# 			CREATE_INDEX=true
+# 		cp {output.bai1} {output.bai2}
+# 		"""
 
 # when a node has too many blat going on, some blats will not start leading to problems. Thus tried the followings:
 # in panel.cluster.json, I used 64 g only because "exclusive" and each node has at least 121g - worked well without error
@@ -362,6 +399,8 @@ rule mvCREST:
 		sort -nrk 2,2 - > {output}
 		sed -i '1 i\sample\tsumReads\tindelSize\tleftChr\tleftPos\tleftStrand\tNumofLeftSoftClippedReads\trightChr\trightPos\trightStrand\tNumofRightSoftClippedReads\tSVtype\tcoverageAtLeftPos\tcoverageAtRightPos\tassembledLengthAtLeftPos\tassembledLengthAtRightPos\taveragePercentIdentityAtLeftPos\tPercentOfNon-uniqueMappingReadsAtLeftPos\taveragePercentIdentityAtRightPos\tpercentOfNon-uniqueMappingReadsAtRightPos\tstartPositionOfConsensusMappingToGenome\tstartingChromosomeOfConsensusMapping\tpositionOfTheGenomicMappingOfConsensusStartingPosition\tendPositionOfConsensusMappingToGenome\tendingChromsomeOfConsnesusMapping\tpositionOfGenomicMappingOfConsensusEndingPosiiton\tconsensusSequences' {output}
 		"""
+
+localrules: CRESTannotation
 rule CRESTannotation:
 	input:
 		'CREST/{sample}.predSV.txt'
@@ -405,7 +444,7 @@ rule CRESTannotation:
 		awk -F"\t" 'BEGIN{{OFS="\t"}} NR==1 {{print "rightGene","rightSplicing","rightAA"}} NR>1 {{print $7,$8,$10}}' {output.rightAnnovar} > {output.rightAnnovarR}
 		paste {input} {output.leftAnnovarR} {output.rightAnnovarR} > {output.crestR}
 		Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/CRESTanno.R \
-			{output.crestR} {config[CRESTdb]} {output.anno}
+			{output.crestR} {config[CRESTdb]} {config[OGL_Dx_research_genes]} {output.anno}
 		"""
 
 # if multiple sets of fastq/bam provided for a sample, now merge together
@@ -417,7 +456,6 @@ rule merge_lane_bam:
 		bai = temp('sample_bam/{sample}/{sample}.b37.bai')
 	shell:
 		"""
-		module load {config[samtools_version]}
 		module load {config[picard_version]}
 		picard_i=""
 		for bam in {input}; do
@@ -431,34 +469,7 @@ rule merge_lane_bam:
 			SORT_ORDER=coordinate \
 			CREATE_INDEX=true
 		"""
-#cp {sample}.bai {sample}.bam.bai
 
-# rule sort:
-# 	input:
-# 		bam = 'sample_bam/{sample}.bam',
-# 		bai = 'sample_bam/{sample}.bam.bai'
-# 	output:
-# 		temp('sample_bam/{sample}.sorted.bam')
-# 	threads: 8
-# 	shell:
-# 		"""
-# 		export REF_CACHE=/scratch/$SLURM_JOB_ID/hts-refcache
-# 		module load {config[samtools_version]}
-# 		samtools sort {input.bam} -@ {threads} -T /scratch/$SLURM_JOB_ID -o {output}
-# 		"""
-#
-# rule build_index:
-# 	input:
-# 		'sample_bam/{sample}.sorted.bam'
-# 	output:
-# 		temp('sample_bam/{sample}.sorted.bam.bai')
-# 	threads: 2
-# 	shell:
-# 		"""
-# 		export REF_CACHE=/lscratch/$SLURM_JOB_ID/hts-refcache
-# 		module load {config[samtools_version]}
-# 		samtools index {input} {output}
-# 		"""
 
 # 30% smaller!
 rule bam_to_cram:
@@ -512,9 +523,9 @@ rule picard_mark_dups_allchr:
 		bam = 'sample_bam/{sample}/{sample}.b37.bam',
 		bai = 'sample_bam/{sample}/{sample}.b37.bai'
 	output:
-		bam = 'sample_bam/{sample}.markDup.bam',
-		bai = 'sample_bam/{sample}.markDup.bai',
-		metrics = 'GATK_metrics/{sample}.markDup.metrics'
+		bam = temp('sample_bam/{sample}.markDup.bam'),
+		bai = temp('sample_bam/{sample}.markDup.bai'),
+		metrics = temp('GATK_metrics/{sample}.markDup.metrics')
 	threads: 2
 	shell:
 		"""
@@ -673,46 +684,13 @@ rule split_bam_by_chr:
 		fi
 		"""
 
-rule picard_clean_sam:
-# "Soft-clipping beyond-end-of-reference alignments and setting MAPQ to 0 for unmapped reads"
-	input:
-		'sample_bam/chr_split/{sample}/{sample}__{chr}.bam'
-	output:
-		temp('sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.bam')
-	threads: 2
-	shell:
-		"""
-		module load {config[picard_version]}
-		java -Xmx60g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
-			CleanSam \
-			TMP_DIR=/lscratch/$SLURM_JOB_ID \
-			INPUT={input} \
-			OUTPUT={output}
-		"""
-
-rule picard_fix_mate_information:
-# "Verify mate-pair information between mates and fix if needed."
-# also coord sorts
-	input:
-		'sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.bam'
-	output:
-		temp('sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.bam')
-	threads: 2
-	shell:
-		"""
-		module load {config[picard_version]}
-		java -Xmx60g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
-		FixMateInformation \
-			SORT_ORDER=coordinate \
-			INPUT={input} \
-			OUTPUT={output}
-		"""
-
 rule picard_mark_dups:
 # Mark duplicate reads
 	input:
-		'sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.bam'
+		'sample_bam/chr_split/{sample}/{sample}__{chr}.bam'
 	output:
+		clean_bam = temp('sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.bam'),
+		sorted_bam = temp('sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.bam'),
 		bam = temp('sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.markDup.bam'),
 		bai = temp('sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.markDup.bai'),
 		metrics = 'GATK_metrics/{sample}__{chr}.markDup.metrics'
@@ -721,27 +699,76 @@ rule picard_mark_dups:
 		"""
 		module load {config[picard_version]}
 		java -Xmx60g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
-			MarkDuplicates \
+			CleanSam \
+			TMP_DIR=/lscratch/$SLURM_JOB_ID \
 			INPUT={input} \
+			OUTPUT={output.clean_bam}
+		java -Xmx60g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+			FixMateInformation \
+			SORT_ORDER=coordinate \
+			INPUT={output.clean_bam} \
+			OUTPUT={output.sorted_bam}
+		java -Xmx60g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+			MarkDuplicates \
+			INPUT={output.sorted_bam}	 \
 			OUTPUT={output.bam} \
 			METRICS_FILE={output.metrics} \
 			CREATE_INDEX=true
 		"""
 
-# rule picard_bam_index:
-# # Build bam index
+# rule picard_clean_sam:
+# # "Soft-clipping beyond-end-of-reference alignments and setting MAPQ to 0 for unmapped reads"
 # 	input:
-# 		'sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.markDup.bam'
+# 		'sample_bam/chr_split/{sample}/{sample}__{chr}.bam'
 # 	output:
-# 		temp('sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.markDup.bam.bai')
+# 		temp('sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.bam')
 # 	threads: 2
 # 	shell:
 # 		"""
 # 		module load {config[picard_version]}
 # 		java -Xmx60g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
-# 		BuildBamIndex \
+# 			CleanSam \
+# 			TMP_DIR=/lscratch/$SLURM_JOB_ID \
 # 			INPUT={input} \
 # 			OUTPUT={output}
+# 		"""
+#
+# rule picard_fix_mate_information:
+# # "Verify mate-pair information between mates and fix if needed."
+# # also coord sorts
+# 	input:
+# 		'sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.bam'
+# 	output:
+# 		temp('sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.bam')
+# 	threads: 2
+# 	shell:
+# 		"""
+# 		module load {config[picard_version]}
+# 		java -Xmx60g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+# 		FixMateInformation \
+# 			SORT_ORDER=coordinate \
+# 			INPUT={input} \
+# 			OUTPUT={output}
+# 		"""
+#
+# rule picard_mark_dups:
+# # Mark duplicate reads
+# 	input:
+# 		'sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.bam'
+# 	output:
+# 		bam = temp('sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.markDup.bam'),
+# 		bai = temp('sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.markDup.bai'),
+# 		metrics = 'GATK_metrics/{sample}__{chr}.markDup.metrics'
+# 	threads: 2
+# 	shell:
+# 		"""
+# 		module load {config[picard_version]}
+# 		java -Xmx60g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+# 			MarkDuplicates \
+# 			INPUT={input} \
+# 			OUTPUT={output.bam} \
+# 			METRICS_FILE={output.metrics} \
+# 			CREATE_INDEX=true
 # 		"""
 
 
@@ -904,7 +931,7 @@ rule picard_merge_bams:
 # 	INPUT={output.bam} \
 # 	OUTPUT={output.bai}
 
-
+localrules: picard_merge_gvcfs
 rule picard_merge_gvcfs:
 # merge chr split gvcf back into one gvcf per sample
 	input:

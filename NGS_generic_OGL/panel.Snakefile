@@ -224,34 +224,12 @@ else:
 				{output}
 			"""
 
-
-rule merge_lane_bam_hg19:
+rule picard_mark_dups_hg19:
 	input:
 		lambda wildcards: expand('lane_bam/hg19bam/hg19.{lane}.realigned.bam', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]])))
 	output:
-		bam = temp('sample_bam/hg19bam/hg19.{sample}.bam'),
-		bai = temp('sample_bam/hg19bam/hg19.{sample}.bai')
-	shell:
-		"""
-		module load {config[picard_version]}
-		picard_i=""
-		for bam in {input}; do
-			picard_i+=" I=$bam"
-		done
-		java -Xmx8g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
-			MergeSamFiles \
-			TMP_DIR=/scratch/$SLURM_JOB_ID \
-			$picard_i \
-			O={output.bam} \
-			SORT_ORDER=coordinate \
-			CREATE_INDEX=true
-		"""
-#Try samtools rmdup instead in next version? CREST may not read the markDup reads.
-rule picard_mark_dups_hg19:
-# Mark duplicate reads
-	input:
-		'sample_bam/hg19bam/hg19.{sample}.bam'
-	output:
+		merged_bam = temp('sample_bam/hg19bam/hg19.{sample}.bam'),
+		merged_bai = temp('sample_bam/hg19bam/hg19.{sample}.bai'),
 		bam = temp('sample_bam/hg19bam/{sample}/hg19.{sample}.markDup.bam'),
 		bai1 = temp('sample_bam/hg19bam/{sample}/hg19.{sample}.markDup.bai'),
 		bai2 = temp('sample_bam/hg19bam/{sample}/hg19.{sample}.markDup.bam.bai'),
@@ -260,15 +238,71 @@ rule picard_mark_dups_hg19:
 	shell:
 		"""
 		module load {config[picard_version]}
+		picard_i=""
+		for bam in {input}; do
+			picard_i+=" I=$bam"
+		done
+		java -Xmx16g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+			MergeSamFiles \
+			TMP_DIR=/scratch/$SLURM_JOB_ID \
+			$picard_i \
+			O={output.merged_bam} \
+			SORT_ORDER=coordinate \
+			CREATE_INDEX=true
 		java -Xmx16g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
 			MarkDuplicates \
-			INPUT={input} \
+			INPUT={output.merged_bam} \
 			OUTPUT={output.bam} \
 			METRICS_FILE={output.metrics} \
 			REMOVE_DUPLICATES=true \
 			CREATE_INDEX=true
 		cp {output.bai1} {output.bai2}
 		"""
+
+# rule merge_lane_bam_hg19:
+# 	input:
+# 		lambda wildcards: expand('lane_bam/hg19bam/hg19.{lane}.realigned.bam', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]])))
+# 	output:
+# 		bam = temp('sample_bam/hg19bam/hg19.{sample}.bam'),
+# 		bai = temp('sample_bam/hg19bam/hg19.{sample}.bai')
+# 	shell:
+# 		"""
+# 		module load {config[picard_version]}
+# 		picard_i=""
+# 		for bam in {input}; do
+# 			picard_i+=" I=$bam"
+# 		done
+# 		java -Xmx8g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+# 			MergeSamFiles \
+# 			TMP_DIR=/scratch/$SLURM_JOB_ID \
+# 			$picard_i \
+# 			O={output.bam} \
+# 			SORT_ORDER=coordinate \
+# 			CREATE_INDEX=true
+# 		"""
+# #Try samtools rmdup instead in next version? CREST may not read the markDup reads.
+# rule picard_mark_dups_hg19:
+# # Mark duplicate reads
+# 	input:
+# 		'sample_bam/hg19bam/hg19.{sample}.bam'
+# 	output:
+# 		bam = temp('sample_bam/hg19bam/{sample}/hg19.{sample}.markDup.bam'),
+# 		bai1 = temp('sample_bam/hg19bam/{sample}/hg19.{sample}.markDup.bai'),
+# 		bai2 = temp('sample_bam/hg19bam/{sample}/hg19.{sample}.markDup.bam.bai'),
+# 		metrics = temp('sample_bam/hg19bam/{sample}/GATK_metrics/{sample}.markDup.metrics')
+# 	threads: 2
+# 	shell:
+# 		"""
+# 		module load {config[picard_version]}
+# 		java -Xmx16g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+# 			MarkDuplicates \
+# 			INPUT={input} \
+# 			OUTPUT={output.bam} \
+# 			METRICS_FILE={output.metrics} \
+# 			REMOVE_DUPLICATES=true \
+# 			CREATE_INDEX=true
+# 		cp {output.bai1} {output.bai2}
+# 		"""
 
 #may be better run with lscratch.
 #to be done: need to run by chromosome then combine
@@ -386,6 +420,7 @@ rule mvCREST:
 		sed -i '1 i\sample\tsumReads\tindelSize\tleftChr\tleftPos\tleftStrand\tNumofLeftSoftClippedReads\trightChr\trightPos\trightStrand\tNumofRightSoftClippedReads\tSVtype\tcoverageAtLeftPos\tcoverageAtRightPos\tassembledLengthAtLeftPos\tassembledLengthAtRightPos\taveragePercentIdentityAtLeftPos\tPercentOfNon-uniqueMappingReadsAtLeftPos\taveragePercentIdentityAtRightPos\tpercentOfNon-uniqueMappingReadsAtRightPos\tstartPositionOfConsensusMappingToGenome\tstartingChromosomeOfConsensusMapping\tpositionOfTheGenomicMappingOfConsensusStartingPosition\tendPositionOfConsensusMappingToGenome\tendingChromsomeOfConsnesusMapping\tpositionOfGenomicMappingOfConsensusEndingPosiiton\tconsensusSequences' {output}
 		"""
 
+localrules: CRESTannotation
 rule CRESTannotation:
 	input:
 		'CREST/{sample}.predSV.txt'
@@ -429,7 +464,7 @@ rule CRESTannotation:
 		awk -F"\t" 'BEGIN{{OFS="\t"}} NR==1 {{print "rightGene","rightSplicing","rightAA"}} NR>1 {{print $7,$8,$10}}' {output.rightAnnovar} > {output.rightAnnovarR}
 		paste {input} {output.leftAnnovarR} {output.rightAnnovarR} > {output.crestR}
 		Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/CRESTanno.R \
-			{output.crestR} {config[CRESTdb]} {output.anno}
+			{output.crestR} {config[CRESTdb]} {config[OGL_Dx_research_genes]} {output.anno}
 		"""
 
 #cp -l: use hard-links instead of copying data of the regular files
@@ -712,13 +747,18 @@ rule CoNVaDING_2:
 ### 				-controlSamples 20 for "StartWithMatchScore" for the male samples because low sample no.
 #need 30 samples for step 2 above.
 
-rule picard_clean_sam:
-# "Soft-clipping beyond-end-of-reference alignments and setting MAPQ to 0 for unmapped reads"
+
+rule picard_mark_dups:
+# Mark duplicate reads
 	input:
 		bam = 'sample_bam/{sample}/{sample}.b37.bam',
 		bai = 'sample_bam/{sample}/{sample}.b37.bai'
 	output:
-		temp('sample_bam/{sample}.CleanSam.bam')
+		clean_bam =	temp('sample_bam/{sample}.CleanSam.bam'),
+		sorted_bam = temp('sample_bam/{sample}.sorted.bam'),
+		bam = temp('sample_bam/{sample}.markDup.bam'),
+		bai = temp('sample_bam/{sample}.markDup.bai'),
+		metrics = 'GATK_metrics/{sample}.markDup.metrics'
 	threads: 2
 	shell:
 		"""
@@ -727,47 +767,22 @@ rule picard_clean_sam:
 			CleanSam \
 			TMP_DIR=/lscratch/$SLURM_JOB_ID \
 			INPUT={input.bam} \
-			OUTPUT={output}
-		"""
-
-rule picard_fix_mate_information:
-# "Verify mate-pair information between mates and fix if needed."
-# also coord sorts
-	input:
-		'sample_bam/{sample}.CleanSam.bam'
-	output:
-		temp('sample_bam/{sample}.sorted.bam')
-	threads: 2
-	shell:
-		"""
-		module load {config[picard_version]}
+			OUTPUT={output.clean_bam}
 		java -Xmx60g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
-		FixMateInformation \
+			FixMateInformation \
 			SORT_ORDER=coordinate \
-			INPUT={input} \
-			OUTPUT={output}
-		"""
-
-rule picard_mark_dups:
-# Mark duplicate reads
-	input:
-		'sample_bam/{sample}.sorted.bam'
-	output:
-		bam = 'sample_bam/{sample}.markDup.bam',
-		bai = 'sample_bam/{sample}.markDup.bai',
-		metrics = 'GATK_metrics/{sample}.markDup.metrics'
-	threads: 2
-	shell:
-		"""
-		module load {config[picard_version]}
-		java -Xmx16g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+			INPUT={output.clean_bam} \
+			OUTPUT={output.sorted_bam}
+		java -Xmx60g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
 			MarkDuplicates \
-			INPUT={input} \
+			INPUT={output.sorted_bam} \
 			OUTPUT={output.bam} \
 			METRICS_FILE={output.metrics} \
 			CREATE_INDEX=true
 		"""
 
+#sbatch 8 threads and 32g
+localrules: coverage
 rule coverage:
 	input:
 		bam = 'sample_bam/{sample}.markDup.bam',
@@ -775,7 +790,7 @@ rule coverage:
 	output:
 		thresholds = 'coverage/mosdepth/{sample}.thresholds.bed.gz',
 		xlsx = 'coverage/{sample}.coverage.xlsx'
-	threads: 16
+	threads: 8
 	shell:
 		"""
 		module load {config[mosedepth_version]}

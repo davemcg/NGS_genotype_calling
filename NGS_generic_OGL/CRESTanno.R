@@ -15,14 +15,21 @@ classificationDF <- read_xlsx(args[2], sheet = "SV", na = c("NA", "", "None", ".
          "classification", "popAF", "note")
 classificationDF$classification = factor(classificationDF$classification, levels = c("Pathogenic", "Likely pathogenic", "VOUS", "Not classified", "Likely benign", "Benign", "Artifact")) 
 
+panelGene <- read_tsv(args[3], col_names = TRUE, col_types = cols(.default = col_character())) %>% select(gene, panel_class)
 
 #"leftGene", "leftSplicing", "leftAA", "rightGene", "rightSplicing", "rightAA",
 annoted <- left_join(predSV, classificationDF, by = c("leftChr", "leftPos", "leftStrand", "rightChr", "rightPos", "rightStrand", "SVtype")) %>% 
-  select(sample, sumReads, indelSize, leftChr, leftPos, leftStrand, NumofLeftSoftClippedReads, 
+  replace_na(list(classification = "Not classified")) %>% 
+  mutate(consensusSequences = sub("^","https://genome.ucsc.edu/cgi-bin/hgBlat?type=BLAT%27s+guess&userSeq=", consensusSequences))
+
+annoted1 <- left_join(annoted, panelGene, by = c("leftGene" = "gene")) %>% rename(leftclass = panel_class) %>% 
+  replace_na(list(leftclass = "Other"))
+annoted2 <- left_join(annoted1, panelGene, by = c("rightGene" = "gene")) %>%  rename(rightclass = panel_class) %>% 
+  replace_na(list(rightclass = "Other")) %>% 
+  mutate(eyeGene = ifelse(leftclass %in% c("Dx", "Candidate") | rightclass %in% c("Dx", "Candidate"), 1, 0)) %>% 
+  select(sample, eyeGene, sumReads, indelSize, leftChr, leftPos, leftStrand, NumofLeftSoftClippedReads, 
          rightChr, rightPos, rightStrand, NumofRightSoftClippedReads, SVtype, 
          leftGene, leftSplicing, leftAA, rightGene, rightSplicing, rightAA, classification, popAF, note, consensusSequences, everything()) %>% 
-  replace_na(list(classification = "Not classified")) %>% 
-  mutate(consensusSequences = sub("^","https://genome.ucsc.edu/cgi-bin/hgBlat?type=BLAT%27s+guess&userSeq=", consensusSequences)) %>% 
-  arrange(classification, desc(sumReads))
+  arrange(classification, desc(eyeGene), desc(sumReads))
 
-openxlsx::write.xlsx(annoted, file = args[3])
+openxlsx::write.xlsx(annoted2, file = args[4])

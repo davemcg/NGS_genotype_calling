@@ -2,11 +2,12 @@
 
 # to run snakemake as batch job
 # run in the data folder for this project, fastq files must be in the folder fastq.
-# sbatch --time=12:0:0 ~/git/NGS_genotype_calling/Snakemake.wrapper.sh ~/git/NGS_genotype_calling/config_panel.yaml OGL733v1 panel
+# sbatch --cpus-per-task=8 --mem=32g --time=12:0:0 ~/git/NGS_genotype_calling/Snakemake.wrapper.sh config_panel.yaml OGL733v1 panel
 # $2: Libary Information, such as OGLv1
 # $3: If typing in "panel", the panel.Snakefile and panel.cluster.json will be run. If "exome", then exome snakefile/exome.json will be used. Anything else including empty will run the WGS pipeline. The config file is the $1.
 #When there is two or more *metadata_file*.csv present in the folder, then -e *metadata_file.csv will produce "binary operator expected". Thus changed to only single file.
 
+cp /data/OGL/resources/NGS_genotype_calling.git.log . 
 mkdir -p 00log
 module load snakemake/5.7.4 || exit 1
 #current version 5.7.4
@@ -53,7 +54,7 @@ case "${ngstype^^}" in
 		--cluster "$sbcmd"  --latency-wait 120 --rerun-incomplete \
 		-k --restart-times 1 \
 		--resources parallel=4 \
-		--configfile $1 --notemp
+		--configfile $1
 		;;
 	"EXOME")
 		snakemake -s /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/exome.Snakefile \

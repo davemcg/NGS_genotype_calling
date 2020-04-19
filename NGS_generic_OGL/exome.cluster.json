@@ -15,7 +15,7 @@
 		"mem" : "720g",
 		"threads" : "36"
 	},
-	"freebayes_individual" :
+	"freebayes_phasing" :
 	{
 		"partition" : "norm",
 		"time" : "8:00:00",

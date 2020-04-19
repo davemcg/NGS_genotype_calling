@@ -21,7 +21,7 @@
 		"mem" : "64g",
 		"threads" : "32"
 	},
-	"freebayes_individual" :
+	"freebayes_phasing" :
 	{
 		"partition" : "quick",
 		"time" : "2:00:00",
@@ -78,7 +78,7 @@
 	{
 		"partition" : "norm",
 		"time" : "6:00:00",
-		"mem" : "16g"		
+		"mem" : "16g"
 	},
 	"picard_merge_gvcfs" : {
 		"mem" : "16g"

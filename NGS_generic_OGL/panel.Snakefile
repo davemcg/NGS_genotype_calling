@@ -463,10 +463,9 @@ rule CRESTannotation:
 		awk -F"\t" 'BEGIN{{OFS="\t"}} NR==1 {{print "leftGene","leftSplicing","leftAA"}} NR>1 {{print $7,$8,$10}}' {output.leftAnnovar} > {output.leftAnnovarR}
 		awk -F"\t" 'BEGIN{{OFS="\t"}} NR==1 {{print "rightGene","rightSplicing","rightAA"}} NR>1 {{print $7,$8,$10}}' {output.rightAnnovar} > {output.rightAnnovarR}
 		paste {input} {output.leftAnnovarR} {output.rightAnnovarR} > {output.crestR}
-		Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/CRESTanno.R \
-			{output.crestR} {config[CRESTdb]} {config[OGL_Dx_research_genes]} {output.anno}
+		if [[ -s {input} ]]; then Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/CRESTanno.R {output.crestR} {config[CRESTdb]} {config[OGL_Dx_research_genes]} {output.anno}; else touch {output.anno}; fi
 		"""
-
+#if [[ -s {input} ]]: check if {input} is empty.
 #cp -l: use hard-links instead of copying data of the regular files
 #cp -p: preserve attributes;
 #
@@ -1014,14 +1013,16 @@ rule multiqc_fastqc:
 #need to have unique RG ID fields for each sample. Use the RG made by the wrapper.
 #Using CleanSam and FixMateInformation, freebayes was able to call one additional ins variant using the panel NA12878 data.
 
-rule freebayes_individual:
+rule freebayes_phasing:
 	input:
 		bam = 'sample_bam/{sample}.markDup.bam',
 		bai = 'sample_bam/{sample}.markDup.bai'
 	output:
 		vcf = 'freebayes/{sample}.vcf.gz',
-		filteredvcf = 'freebayes/{sample}.filtered.vcf.gz',
-		tbi = 'freebayes/{sample}.filtered.vcf.gz.tbi'
+		filteredvcf = temp('freebayes/{sample}.filtered.vcf.gz'),
+		tbi = temp('freebayes/{sample}.filtered.vcf.gz.tbi'),
+		phasedvcf = 'freebayes/{sample}.phased.vcf.gz',
+		phasedvcf_tbi = 'freebayes/{sample}.phased.vcf.gz.tbi'
 	threads: 16
 	shell:
 		"""
@@ -1043,9 +1044,14 @@ rule freebayes_individual:
 			| bgzip -f > {output.filteredvcf}
 		sleep 2
 		tabix -f -p vcf {output.filteredvcf}
+		module unload {config[freebayes_version]}
+		module unload {config[vcflib_version]}
+		module unload {config[vt_version]}
+		module load {config[whatshap_version]}
+		whatshap phase {output.filteredvcf} {input.bam} | bgzip -f > {output.phasedvcf}
+		tabix -f -p vcf {output.phasedvcf}
 		"""
 #vt decompose_blocksub -a separated inframe insertion to fs. thus do not use.
-
 # --gvcf: after gvcf,I tried to pipe it to vcffilter, which removed the reference regions | vcffilter -f "QUAL > 1"
 #freebayes -f /data/OGVFB/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta --gvcf --limit-coverage 1000 --min-coverage 4 sample_bam/14_NA12878.markDup.bam > 14_NA12878.test.gvcf
 #Tag with "PASS" worked as shown below. It's possible to use --gvcf then tag with PASS?
@@ -1062,8 +1068,8 @@ rule freebayes_individual:
 
 rule merge_freebayes:
 	input:
-		vcf = expand('freebayes/{sample}.filtered.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
-		tbi = expand('freebayes/{sample}.filtered.vcf.gz.tbi', sample=list(SAMPLE_LANEFILE.keys()))
+		vcf = expand('freebayes/{sample}.phased.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
+		tbi = expand('freebayes/{sample}.phased.vcf.gz.tbi', sample=list(SAMPLE_LANEFILE.keys()))
 	output:
 		'freebayesPrioritization/freebayes.merge.done.txt'
 	threads: 8

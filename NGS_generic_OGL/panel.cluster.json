@@ -8,7 +8,7 @@
 		"error" : "00log/{rule}_{wildcards}.err",
 		"extra" : ""
 	},
-	"freebayes_individual" :
+	"freebayes_phasing" :
 	{
 		"partition" : "quick",
 		"time" : "4:00:00",

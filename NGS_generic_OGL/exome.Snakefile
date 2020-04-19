@@ -567,14 +567,16 @@ rule picard_alignmentQC:
 		"""
 
 #Try this strategy,if not working well, consider split by chr as in the GATK.
-rule freebayes_individual:
+rule freebayes_phasing:
 	input:
 		bam = 'sample_bam/{sample}.markDup.bam',
 		bai = 'sample_bam/{sample}.markDup.bai'
 	output:
 		vcf = 'freebayes/{sample}.vcf.gz',
-		filteredvcf = 'freebayes/{sample}.filtered.vcf.gz',
-		tbi = 'freebayes/{sample}.filtered.vcf.gz.tbi'
+		filteredvcf = temp('freebayes/{sample}.filtered.vcf.gz'),
+		tbi = temp('freebayes/{sample}.filtered.vcf.gz.tbi'),
+		phasedvcf = 'freebayes/{sample}.phased.vcf.gz',
+		phasedvcf_tbi = 'freebayes/{sample}.phased.vcf.gz.tbi'
 	threads: 16
 	shell:
 		"""
@@ -596,12 +598,18 @@ rule freebayes_individual:
 			| bgzip -f > {output.filteredvcf}
 		sleep 2
 		tabix -f -p vcf {output.filteredvcf}
+		module unload {config[freebayes_version]}
+		module unload {config[vcflib_version]}
+		module unload {config[vt_version]}
+		module load {config[whatshap_version]}
+		whatshap phase {output.filteredvcf} {input.bam} | bgzip -f > {output.phasedvcf}
+		tabix -f -p vcf {output.phasedvcf}
 		"""
 
 rule merge_freebayes:
 	input:
-		vcf = expand('freebayes/{sample}.filtered.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
-		tbi = expand('freebayes/{sample}.filtered.vcf.gz.tbi', sample=list(SAMPLE_LANEFILE.keys()))
+		vcf = expand('freebayes/{sample}.phased.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
+		tbi = expand('freebayes/{sample}.phased.vcf.gz.tbi', sample=list(SAMPLE_LANEFILE.keys()))
 	output:
 		'freebayesPrioritization/freebayes.merge.done.txt'
 	threads: 8

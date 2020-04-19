@@ -20,6 +20,15 @@ def chr_fbVCF_to_single_fbVCF_filtered(wildcards):
 		sample_by_chr.append('freebayes/chr_split/' + sample + '/' + sample + '__' + str(chrom) + '.filtered.vcf.gz')
 	return(sample_by_chr)
 
+def chr_fbVCF_to_single_fbVCF_phased(wildcards):
+	# creates the filenames for the chr level GVCFs to use to concatenate to a single file
+	# ensures that input GVCF chrs are provided in order (same as CHRS) below
+	sample = str(wildcards)
+	sample_by_chr = []
+	for chrom in CHRS:
+		sample_by_chr.append('freebayes/chr_split/' + sample + '/' + sample + '__' + str(chrom) + '.phased.vcf.gz')
+	return(sample_by_chr)
+
 def chr_fbVCF_to_single_fbVCF(wildcards):
 	# creates the filenames for the chr level GVCFs to use to concatenate to a single file
 	# ensures that input GVCF chrs are provided in order (same as CHRS) below
@@ -391,7 +400,7 @@ rule picard_mark_dups:
 			CREATE_INDEX=true
 		"""
 
-rule freebayes_individual:
+rule freebayes_phasing:
 	input:
 		bam = 'sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.markDup.bam',
 		bai = 'sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.markDup.bai'
@@ -399,7 +408,9 @@ rule freebayes_individual:
 		vcf = temp('freebayes/chr_split/{sample}/{sample}__{chr}.vcf.gz'),
 		tbi = temp('freebayes/chr_split/{sample}/{sample}__{chr}.vcf.gz.tbi'),
 		filteredvcf = temp('freebayes/chr_split/{sample}/{sample}__{chr}.filtered.vcf.gz'),
-		filteredtbi = temp('freebayes/chr_split/{sample}/{sample}__{chr}.filtered.vcf.gz.tbi')
+		filteredtbi = temp('freebayes/chr_split/{sample}/{sample}__{chr}.filtered.vcf.gz.tbi'),
+		phasedvcf = temp('freebayes/chr_split/{sample}/{sample}__{chr}.phased.vcf.gz'),
+		phasedvcf_tbi = temp('freebayes/chr_split/{sample}/{sample}__{chr}.phased.vcf.gz.tbi')
 	threads: 32
 	shell:
 		"""
@@ -420,6 +431,12 @@ rule freebayes_individual:
 		vcffilter -f "QUAL > 15 & QA / AO > 15 & SAF > 0 & SAR > 0 & RPR > 0 & RPL > 0 & AO > 2 & DP > 3" {output.vcf} | bgzip -f > {output.filteredvcf}
 		sleep 2
 		tabix -f -p vcf {output.filteredvcf}
+		module unload {config[freebayes_version]}
+		module unload {config[vcflib_version]}
+		module unload {config[vt_version]}
+		module load {config[whatshap_version]}
+		whatshap phase {output.filteredvcf} {input.bam} | bgzip -f > {output.phasedvcf}
+		tabix -f -p vcf {output.phasedvcf}
 		"""
 
 # try rtg eval wihtout vt and see how it goes.
@@ -434,23 +451,27 @@ rule freebayes_individual:
 rule cat_fbvcfs:
 	input:
 		vcf = chr_fbVCF_to_single_fbVCF,
-		filteredvcf = chr_fbVCF_to_single_fbVCF_filtered
+		filteredvcf = chr_fbVCF_to_single_fbVCF_filtered,
+		phasedvcf = chr_fbVCF_to_single_fbVCF_phased
 	output:
 		vcf = 'freebayes/{sample}.vcf.gz',
-		filteredvcf = 'freebayes/{sample}.filtered.vcf.gz'
+		filteredvcf = 'freebayes/{sample}.filtered.vcf.gz',
+		phasedvcf = 'freebayes/{sample}.phased.vcf.gz'
 	threads: 8
 	shell:
 		"""
 		module load {config[samtools_version]}
-		bcftools concat --threads {threads} --output-type z {input.filteredvcf} > {output.filteredvcf}
-		tabix -f -p vcf {output.filteredvcf}
 		bcftools concat --threads {threads} --output-type z {input.vcf} > {output.vcf}
 		tabix -f -p vcf {output.vcf}
+		bcftools concat --threads {threads} --output-type z {input.filteredvcf} > {output.filteredvcf}
+		tabix -f -p vcf {output.filteredvcf}
+		bcftools concat --threads {threads} --output-type z {input.phasedvcf} > {output.phasedvcf}
+		tabix -f -p vcf {output.phasedvcf}
 		"""
 
 rule merge_freebayes:
 	input:
-		vcf = expand('freebayes/{sample}.filtered.vcf.gz', sample=list(SAMPLE_LANEFILE.keys()))
+		vcf = expand('freebayes/{sample}.phased.vcf.gz', sample=list(SAMPLE_LANEFILE.keys()))
 	output:
 		'freebayesPrioritization/freebayes.merge.done.txt'
 	threads: 8

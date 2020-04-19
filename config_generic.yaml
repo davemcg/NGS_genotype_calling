@@ -2,7 +2,7 @@ metadata_file: 'metadata_file.csv' # if making metadata file before running this
 analysis_batch_name: 'YYYYMMDD' # name for freebayes vcf file. If leaving as YYYYMMDD, current date will be used as name
 ped: '' #Can leave as blank ''. Mainly for ChrX CNV, has to have ped extenstion, header if present has to starts with # miseq0626_0719.ped
 inputFileType: 'fastq' # fastq, bam or cram.
-cram: 'TRUE' # TRUE to convert bam to cram, values other than TRUE will not convert.
+cram: 'FALSE' # TRUE to convert bam to cram, values other than TRUE will not convert. #Keep bam for panel and exome, use cram for wgs
 #recal_bam: 'FALSE' #TRUE to merge chr bams to single sample recalibrated bam
 multiqc: 'TRUE' # will run only if TrueSeq
 picardQC: 'TRUE'
@@ -43,3 +43,4 @@ freebayes_exome_region: '/data/OGL/resources/freebayesRegion/bpExome.10000.regio
 freebayes_wgs_region: '/data/OGL/resources/freebayesRegion/v37d5/region'
 CRESTdb: '/data/OGL/resources/CRESTvariantClassification.xlsx'
 OGL_Dx_research_genes: '/data/OGVFB/OGL_NGS/variant_prioritization/data/OGLv1_panel_DxORcandidate.tsv'
+whatshap_version: 'whatshap/0.18'

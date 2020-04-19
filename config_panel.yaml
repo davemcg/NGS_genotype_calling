@@ -1,7 +1,7 @@
 metadata_file: 'metadata_file.csv' # if making metadata file before running this snakemake, make sure the file name is metadata_file.csv. Otherwise, keep the file name as is.
 analysis_batch_name: 'YYYYMMDD' # name for freebayes vcf file. If leaving as YYYYMMDD, current date will be used as name
 ped: '' #Can leave as blank ''. Mainly for ChrX CNV, has to have ped extenstion, header if present has to starts with # miseq0626_0719.ped
-cram: 'FALSE' # TRUE to convert bam to cram, values other than TRUE will not convert.
+cram: 'FALSE' # TRUE to convert bam to cram, values other than TRUE will not convert. #Keep bam for panel and exome, use cram for wgs
 inputFileType: 'fastq' # fastq, bam or cram.
 multiqc: 'TRUE' # will run only if TrueSeq
 picardQC: 'TRUE'
@@ -44,3 +44,4 @@ CRESTdb: '/data/OGL/resources/CRESTvariantClassification.xlsx'
 mosedepth_version: 'mosdepth/0.2.8'
 bedtools_version: 'bedtools/2.29.0'
 OGL_Dx_research_genes: '/data/OGVFB/OGL_NGS/variant_prioritization/data/OGLv1_panel_DxORcandidate.tsv'
+whatshap_version: 'whatshap/0.18'

@@ -5,6 +5,7 @@
 # sbatch --cpus-per-task=8 --mem=32g --time=12:0:0 ~/git/NGS_genotype_calling/Snakemake.wrapper.sh config_panel.yaml OGL733v1 panel
 # $2: Libary Information, such as OGLv1
 # $3: If typing in "panel", the panel.Snakefile and panel.cluster.json will be run. If "exome", then exome snakefile/exome.json will be used. Anything else including empty will run the WGS pipeline. The config file is the $1.
+# $4: --notemp --dryrun --unlock or empty
 #When there is two or more *metadata_file*.csv present in the folder, then -e *metadata_file.csv will produce "binary operator expected". Thus changed to only single file.
 
 cp /data/OGL/resources/NGS_genotype_calling.git.log . 
@@ -54,7 +55,7 @@ case "${ngstype^^}" in
 		--cluster "$sbcmd"  --latency-wait 120 --rerun-incomplete \
 		-k --restart-times 1 \
 		--resources parallel=4 \
-		--configfile $1
+		--configfile $1 $4
 		;;
 	"EXOME")
 		snakemake -s /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/exome.Snakefile \
@@ -63,7 +64,7 @@ case "${ngstype^^}" in
 		--cluster "$sbcmd"  --latency-wait 120 --rerun-incomplete \
 		-k --restart-times 1 \
 		--resources parallel=4 \
-		--configfile $1
+		--configfile $1 $4
 		;;
 	*)
 		snakemake -s /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/Snakefile \
@@ -72,7 +73,7 @@ case "${ngstype^^}" in
 		--cluster "$sbcmd"  --latency-wait 120 --rerun-incomplete \
 		-k --restart-times 1 \
 		--resources parallel=4 \
-		--configfile $1
+		--configfile $1 $4
 		;;
 esac
 

@@ -84,7 +84,7 @@ rule all:
 		'GATK_metrics/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
 		'fastqc/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
 		expand('picardQC/{sample}.insert_size_metrics.txt', sample=list(SAMPLE_LANEFILE.keys())) if config['picardQC'] == 'TRUE' else 'dummy.txt',
-		'freebayesPrioritization/freebayes.merge.done.txt' if config['freebayes_individual'] == 'TRUE' else 'dummy.txt',
+		'prioritization/freebayes.merge.done.txt' if config['freebayes_phasing'] == 'TRUE' else 'dummy.txt',
 		'freebayes.vcf' if config['freebayes'] == 'TRUE' else 'dummy.txt'
 
 
@@ -602,7 +602,7 @@ rule freebayes_phasing:
 		module unload {config[vcflib_version]}
 		module unload {config[vt_version]}
 		module load {config[whatshap_version]}
-		whatshap phase {output.filteredvcf} {input.bam} | bgzip -f > {output.phasedvcf}
+		whatshap phase --reference {config[bwa_genome]} --indels {output.filteredvcf} {input.bam} | bgzip -f > {output.phasedvcf}
 		tabix -f -p vcf {output.phasedvcf}
 		"""
 
@@ -611,7 +611,7 @@ rule merge_freebayes:
 		vcf = expand('freebayes/{sample}.phased.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
 		tbi = expand('freebayes/{sample}.phased.vcf.gz.tbi', sample=list(SAMPLE_LANEFILE.keys()))
 	output:
-		'freebayesPrioritization/freebayes.merge.done.txt'
+		'prioritization/freebayes.merge.done.txt'
 	threads: 8
 	shell:
 		"""
@@ -619,22 +619,22 @@ rule merge_freebayes:
 		case "{input.vcf}" in
 			*\ *)
 				bcftools merge --merge none --missing-to-ref --output-type z --threads {threads} {input.vcf} \
-				> freebayesPrioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
+				> prioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
 				;;
 			*)
-				cp {input.vcf} freebayesPrioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
+				cp {input.vcf} prioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
 				;;
 		esac
 		sleep 2
-		tabix -f -p vcf freebayesPrioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
+		tabix -f -p vcf prioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
 		touch {output}
 		"""
 
 		# """
 		# module load {config[vcftools_version]}
-		# vcf-merge {input.vcf} | bgzip -c > freebayesPrioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
+		# vcf-merge {input.vcf} | bgzip -c > prioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
 		# sleep 60
-		# tabix -f -p vcf freebayesPrioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
+		# tabix -f -p vcf prioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
 		# touch {output}
 		# """
 #	module load {config[samtools_version]} - samtools automaticcally loaded when loading vcftools.

@@ -83,9 +83,11 @@ rule all:
 		expand('picardQC/{sample}.insert_size_metrics.txt', sample=list(SAMPLE_LANEFILE.keys())) if config['picardQC'] == 'TRUE' else 'dummy.txt',
 		'CoNVaDING/progress2.done' if config['CoNVaDING'] == 'TRUE' else 'dummy.txt',
 		'freebayes.vcf' if config['freebayes'] == 'TRUE' else 'dummy.txt',
-		'freebayesPrioritization/freebayes.merge.done.txt' if config['freebayes_individual'] == 'TRUE' else 'dummy.txt',
+		'prioritization/freebayes.merge.done.txt' if config['freebayes_phasing'] == 'TRUE' else 'dummy.txt',
 		expand('coverage/{sample}.coverage.xlsx', sample=list(SAMPLE_LANEFILE.keys())) if config['coverage'] == 'TRUE' else 'dummy.txt',
-		expand('sample_cram/{sample}.cram', sample=list(SAMPLE_LANEFILE.keys())) if config['cram'] == 'TRUE' else expand('sample_bam/{sample}.bam', sample=list(SAMPLE_LANEFILE.keys()))
+		expand('cram/{sample}.cram', sample=list(SAMPLE_LANEFILE.keys())) if config['cram'] == 'TRUE' else expand('bam/{sample}.bam', sample=list(SAMPLE_LANEFILE.keys())),
+		expand('scramble_anno/{sample}.scramble.xlsx', sample=list(SAMPLE_LANEFILE.keys())) if config['SCRAMble'] == 'TRUE' else 'dummy.txt'
+
 
 localrules: dummy
 rule dummy:
@@ -447,7 +449,7 @@ rule CRESTannotation:
 			-out CRESTanno/{wildcards.sample}.left \
 			--protocol refGene \
 			-operation  g \
-			--argument '-splicing 100 -hgvs' \
+			--argument '-hgvs' --intronhgvs 100 \
 			--polish -nastring . \
 			--thread 1
 		table_annovar.pl {output.rightAVinput} \
@@ -457,13 +459,13 @@ rule CRESTannotation:
 			-out CRESTanno/{wildcards.sample}.right \
 			--protocol refGene \
 			-operation  g \
-			--argument '-splicing 100 -hgvs' \
+			--argument '-hgvs' --intronhgvs 100 \
 			--polish -nastring . \
 			--thread 1
-		awk -F"\t" 'BEGIN{{OFS="\t"}} NR==1 {{print "leftGene","leftSplicing","leftAA"}} NR>1 {{print $7,$8,$10}}' {output.leftAnnovar} > {output.leftAnnovarR}
-		awk -F"\t" 'BEGIN{{OFS="\t"}} NR==1 {{print "rightGene","rightSplicing","rightAA"}} NR>1 {{print $7,$8,$10}}' {output.rightAnnovar} > {output.rightAnnovarR}
+		awk -F"\t" 'BEGIN{{OFS="\t"}} NR==1 {{print "leftGene","leftIntronic","leftAA"}} NR>1 {{print $7,$8,$10}}' {output.leftAnnovar} > {output.leftAnnovarR}
+		awk -F"\t" 'BEGIN{{OFS="\t"}} NR==1 {{print "rightGene","rightIntronic","rightAA"}} NR>1 {{print $7,$8,$10}}' {output.rightAnnovar} > {output.rightAnnovarR}
 		paste {input} {output.leftAnnovarR} {output.rightAnnovarR} > {output.crestR}
-		if [[ -s {input} ]]; then Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/CRESTanno.R {output.crestR} {config[CRESTdb]} {config[OGL_Dx_research_genes]} {output.anno}; else touch {output.anno}; fi
+		if [[ -s {input} ]]; then Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/CRESTanno.R {output.crestR} {config[CRESTdb]} {config[OGL_Dx_research_genes]} {config[HGMDtranscript]} {output.anno}; else touch {output.anno}; fi
 		"""
 #if [[ -s {input} ]]: check if {input} is empty.
 #cp -l: use hard-links instead of copying data of the regular files
@@ -529,8 +531,8 @@ rule bam_to_cram:
 		bam = 'sample_bam/{sample}/{sample}.b37.bam',
 		bai = 'sample_bam/{sample}/{sample}.b37.bai'
 	output:
-		cram = 'sample_cram/{sample}.cram',
-		crai = 'sample_cram/{sample}.crai'
+		cram = 'cram/{sample}.cram',
+		crai = 'cram/{sample}.crai'
 	threads:
 		8
 	shell:
@@ -547,8 +549,8 @@ rule keep_bam:
 		bam = 'sample_bam/{sample}/{sample}.b37.bam',
 		bai = 'sample_bam/{sample}/{sample}.b37.bai'
 	output:
-		bam = 'sample_bam/{sample}.bam',
-		bai = 'sample_bam/{sample}.bai'
+		bam = 'bam/{sample}.bam',
+		bai = 'bam/{sample}.bai'
 	shell:
 		"""
 		cp -p -l {input.bam} {output.bam}
@@ -1048,7 +1050,7 @@ rule freebayes_phasing:
 		module unload {config[vcflib_version]}
 		module unload {config[vt_version]}
 		module load {config[whatshap_version]}
-		whatshap phase {output.filteredvcf} {input.bam} | bgzip -f > {output.phasedvcf}
+		whatshap phase --reference {config[bwa_genome]} --indels {output.filteredvcf} {input.bam} | bgzip -f > {output.phasedvcf}
 		tabix -f -p vcf {output.phasedvcf}
 		"""
 #vt decompose_blocksub -a separated inframe insertion to fs. thus do not use.
@@ -1071,7 +1073,7 @@ rule merge_freebayes:
 		vcf = expand('freebayes/{sample}.phased.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
 		tbi = expand('freebayes/{sample}.phased.vcf.gz.tbi', sample=list(SAMPLE_LANEFILE.keys()))
 	output:
-		'freebayesPrioritization/freebayes.merge.done.txt'
+		'prioritization/freebayes.merge.done.txt'
 	threads: 8
 	shell:
 		"""
@@ -1079,39 +1081,16 @@ rule merge_freebayes:
 		case "{input.vcf}" in
 			*\ *)
 				bcftools merge --merge none --missing-to-ref --output-type z --threads {threads} {input.vcf} \
-				> freebayesPrioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
+				> prioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
 				;;
 			*)
-				cp {input.vcf} freebayesPrioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
+				cp {input.vcf} prioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
 				;;
 		esac
 		sleep 2
-		tabix -f -p vcf freebayesPrioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
+		tabix -f -p vcf prioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
 		touch {output}
 		"""
-
-# rule merge_freebayes:
-# 	input:
-# 		vcf = expand('freebayes/{sample}.filtered.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
-# 		tbi = expand('freebayes/{sample}.filtered.vcf.gz.tbi', sample=list(SAMPLE_LANEFILE.keys()))
-# 	output:
-# 		'freebayesPrioritization/freebayes.merge.done.txt'
-# 	threads: 8
-# 	shell:
-# 		"""
-# 		module load {config[gatk_version]}
-# 		module load {config[samtools_version]}
-# 		ls freebayes/*.filtered.vcf.gz > freebayes/vcfs.list
-# 		GATK -p {threads} -m 60g CombineVariants \
-# 			-R {config[ref_genome]} \
-# 			-V freebayes/vcfs.list \
-# 			-o freebayesPrioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
-# 		sleep 2
-# 		tabix -f -p vcf freebayesPrioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
-# 		rm freebayes/vcfs.list
-# 		touch {output}
-# 		"""
-
 
 rule freebayes:
 	input:
@@ -1141,3 +1120,58 @@ rule freebayes:
 #48 OGLv1 panel on MiSeq 7/17/19, failed after one batch of writing when running on 36 threads and 720gb mem, when on 500 regions, when not setting "--use-best-n-alleles 4"
 #48 samples above worked when using --use-best-n-alleles 4 7/21/19 took ~ 3 hours.
 #removed --use-best-n-alleles 4 on 7/23/2019 When working with 12 samples, and use "QUAL > 20 & QUAL / AO > 5 & SAF > 0 & SAR > 0 & RPR > 1 & RPL > 1" retained both orf15 variants.
+
+localrules: scramble
+rule scramble:
+	input:
+		bam = 'sample_bam/{sample}.markDup.bam',
+		bai = 'sample_bam/{sample}.markDup.bai'
+	output:
+		cluster = temp('scramble/{sample}.cluster.txt'),
+		mei = 'scramble/{sample}.mei.txt',
+	shell:
+		"""
+		module load scramble
+		scramble cluster_identifier {input.bam} > {output.cluster}
+		scramble Rscript --vanilla /app/cluster_analysis/bin/SCRAMble-MEIs.R \
+			--out-name ${{PWD}}/{output.mei} \
+			--cluster-file ${{PWD}}/{output.cluster} \
+			--install-dir /app/cluster_analysis/bin \
+			--mei-refs /app/cluster_analysis/resources/MEI_consensus_seqs.fa
+		"""
+#--bind /gpfs,/spin1,/data,/lscratch,/scratch,/fdb
+localrules: scramble_annotation
+rule scramble_annotation:
+	input:
+		mei = 'scramble/{sample}.mei.txt'
+	output:
+		avinput = temp('scramble_anno/{sample}.avinput'),
+		annovar = temp('scramble_anno/{sample}.hg19_multianno.txt'),
+		annovarR = temp('scramble_anno/{sample}.forR.txt'),
+		anno = 'scramble_anno/{sample}.scramble.xlsx'
+	shell:
+		"""
+		module load {config[R_version]}
+		module load {config[annovar_version]}
+		if [[ $(wc -l {input.mei} | cut -d " " -f 1) == 1 ]]
+		then
+			touch {output.avinput}
+			touch {output.annovar}
+			touch {output.annovarR}
+			touch {output.anno}
+		else
+			cut -f 1 {input.mei} | awk -F ":" 'BEGIN{{OFS="\t"}} NR>1 {{print $1,$2,$2,"0","-"}}' > {output.avinput}
+			table_annovar.pl {output.avinput} \
+				$ANNOVAR_DATA/hg19 \
+				-buildver hg19 \
+				-remove \
+				-out scramble_anno/{wildcards.sample} \
+				--protocol refGene \
+				-operation  g \
+				--argument '-hgvs' --intronhgvs 100 \
+				--polish -nastring . \
+				--thread 1
+			awk -F"\t" 'BEGIN{{OFS="\t"}} NR==1 {{print "Gene","Intronic","AA"}} NR>1 {{print $7,$8,$10}}' {output.annovar} | paste {input.mei} - > {output.annovarR}
+			Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/scramble_anno.R {output.annovarR} {config[SCRAMBLEdb]} {config[OGL_Dx_research_genes]} {config[HGMDtranscript]} {output.anno} {wildcards.sample}
+		fi
+		"""

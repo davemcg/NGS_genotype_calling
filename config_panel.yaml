@@ -11,7 +11,7 @@ CREST: 'TRUE' # TRUE or FALSE, This is for panel.Snakefile only.
 regions: '/home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/chr_split_24_coords.txt' #chr1 to chr22, chrX, chrY
 CoNVaDING: 'TRUE' # Will run only if TRUE.
 SCRAMble: 'TRUE' #will run only if TRUE
-freebayes: 'FALSE' # freebayes will run only if TRUE
+freebayes: 'FALSE' # freebayes joint-calling will run only if TRUE
 freebayes_phasing: 'TRUE'
 coverage: 'TRUE'
 lane_pair_delim: ['_R1_001', '_R2_001']

@@ -80,12 +80,13 @@ rule all:
 		expand('CRESTanno/{sample}.predSV.xlsx', sample=list(SAMPLE_LANEFILE.keys())) if config['CREST'] == 'TRUE' else 'dummy.txt',
 		expand('gvcfs/{sample}.g.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())) if config['GATKgvcf'] == 'TRUE' else 'dummy.txt',
 		# expand('recal_bam/{sample}.recal.bam', sample=list(SAMPLE_LANEFILE.keys())) if config['recal_bam'] == 'TRUE' else 'dummy.txt',
-		expand('sample_cram/{sample}.cram', sample=list(SAMPLE_LANEFILE.keys())) if config['cram'] == 'TRUE' else expand('sample_bam/{sample}.bam', sample=list(SAMPLE_LANEFILE.keys())),
+		expand('cram/{sample}.cram', sample=list(SAMPLE_LANEFILE.keys())) if config['cram'] == 'TRUE' else expand('bam/{sample}.bam', sample=list(SAMPLE_LANEFILE.keys())),
 		'GATK_metrics/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
 		'fastqc/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
 		expand('picardQC/{sample}.insert_size_metrics.txt', sample=list(SAMPLE_LANEFILE.keys())) if config['picardQC'] == 'TRUE' else 'dummy.txt',
 		'prioritization/freebayes.merge.done.txt' if config['freebayes_phasing'] == 'TRUE' else 'dummy.txt',
-		'freebayes.vcf' if config['freebayes'] == 'TRUE' else 'dummy.txt'
+		'freebayes.vcf' if config['freebayes'] == 'TRUE' else 'dummy.txt',
+		expand('scramble_anno/{sample}.scramble.xlsx', sample=list(SAMPLE_LANEFILE.keys())) if config['SCRAMble'] == 'TRUE' else 'dummy.txt'
 
 
 localrules: dummy
@@ -477,8 +478,8 @@ rule bam_to_cram:
 		bam = 'sample_bam/{sample}/{sample}.b37.bam',
 		bai = 'sample_bam/{sample}/{sample}.b37.bai'
 	output:
-		cram = 'sample_cram/{sample}.cram',
-		crai = 'sample_cram/{sample}.crai'
+		cram = 'cram/{sample}.cram',
+		crai = 'cram/{sample}.crai'
 	threads:
 		8
 	shell:
@@ -495,8 +496,8 @@ rule keep_bam:
 		bam = 'sample_bam/{sample}/{sample}.b37.bam',
 		bai = 'sample_bam/{sample}/{sample}.b37.bai'
 	output:
-		bam = 'sample_bam/{sample}.bam',
-		bai = 'sample_bam/{sample}.bai'
+		bam = 'bam/{sample}.bam',
+		bai = 'bam/{sample}.bai'
 	shell:
 		"""
 		cp -p -l {input.bam} {output.bam}
@@ -981,4 +982,60 @@ rule multiqc_fastqc:
 		"""
 		module load multiqc
 		multiqc -f -o {output} fastqc/
+		"""
+
+#if too slow, then seperate by chr as above.
+#localrules: scramble
+rule scramble:
+	input:
+		bam = 'sample_bam/{sample}.markDup.bam',
+		bai = 'sample_bam/{sample}.markDup.bai'
+	output:
+		cluster = temp('scramble/{sample}.cluster.txt'),
+		mei = 'scramble/{sample}.mei.txt',
+	shell:
+		"""
+		module load scramble
+		scramble cluster_identifier {input.bam} > {output.cluster}
+		scramble Rscript --vanilla /app/cluster_analysis/bin/SCRAMble-MEIs.R \
+			--out-name ${{PWD}}/{output.mei} \
+			--cluster-file ${{PWD}}/{output.cluster} \
+			--install-dir /app/cluster_analysis/bin \
+			--mei-refs /app/cluster_analysis/resources/MEI_consensus_seqs.fa
+		"""
+#--bind /gpfs,/spin1,/data,/lscratch,/scratch,/fdb
+#localrules: scramble_annotation
+rule scramble_annotation:
+	input:
+		mei = 'scramble/{sample}.mei.txt'
+	output:
+		avinput = temp('scramble_anno/{sample}.avinput'),
+		annovar = temp('scramble_anno/{sample}.hg19_multianno.txt'),
+		annovarR = temp('scramble_anno/{sample}.forR.txt'),
+		anno = 'scramble_anno/{sample}.scramble.xlsx'
+	shell:
+		"""
+		module load {config[R_version]}
+		module load {config[annovar_version]}
+		if [[ $(wc -l {input.mei} | cut -d " " -f 1) == 1 ]]
+		then
+			touch {output.avinput}
+			touch {output.annovar}
+			touch {output.annovarR}
+			touch {output.anno}
+		else
+			cut -f 1 {input.mei} | awk -F ":" 'BEGIN{{OFS="\t"}} NR>1 {{print $1,$2,$2,"0","-"}}' > {output.avinput}
+			table_annovar.pl {output.avinput} \
+				$ANNOVAR_DATA/hg19 \
+				-buildver hg19 \
+				-remove \
+				-out scramble_anno/{wildcards.sample} \
+				--protocol refGene \
+				-operation  g \
+				--argument '-splicing 100 -hgvs' \
+				--polish -nastring . \
+				--thread 1
+			awk -F"\t" 'BEGIN{{OFS="\t"}} NR==1 {{print "Func_refGene","Gene","Intronic","AA"}} NR>1 {{print $6,$7,$8,$10}}' {output.annovar} | paste {input.mei} - > {output.annovarR}
+			Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/scramble_anno.R {output.annovarR} {config[SCRAMBLEdb]} {config[OGL_Dx_research_genes]} {config[HGMDtranscript]} {output.anno} {wildcards.sample}
+		fi
 		"""

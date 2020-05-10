@@ -9,7 +9,9 @@ library(tidyverse)
 library(readxl)
 
 annovar <- read_tsv(args[1], col_names = TRUE, na = c("NA", "", "None", "."), col_types = cols(.default = col_character())) %>% 
-  mutate(sample = args[6])
+  mutate(sample = args[6]) %>% 
+  mutate(Intronic = gsub("0>-", "", Intronic))
+# Do not use type_convert() because it converts chr:pos.
 
 classificationDF <- read_xlsx(args[2], sheet = "Variant", na = c("NA", "", "None", ".")) %>% 
   select("Insertion", "MEI_Family", "Insertion_Direction", "classification", "popAF", "note")
@@ -46,10 +48,11 @@ annoted$classification = factor(annoted$classification, levels = c("Pathogenic",
 annoted1 <- left_join(annoted, panelGene, by = c("Gene" = "gene")) %>%
   replace_na(list(panel_class = "Other")) %>% 
   mutate(eyeGene = ifelse(panel_class %in% c("Dx", "Candidate"), 1, 0)) %>% 
+  mutate(Clipped_Reads_In_Cluster = as.integer(Clipped_Reads_In_Cluster)) %>% 
   select(eyeGene, Insertion, MEI_Family, Insertion_Direction, Clipped_Reads_In_Cluster, Alignment_Score, 
          Alignment_Percent_Length, Alignment_Percent_Identity, Clipped_Sequence, Clipped_Side, Start_In_MEI, Stop_In_MEI, 
-         polyA_Position, polyA_Seq, polyA_SupportingReads, TSD, TSD_length, panel_class, Gene, Intronic, AA, classification, popAF, sample, note) %>% 
-  filter(classification %in% c("Pathogenic", "Likely pathogenic", "VOUS", "Not classified"), !grepl("GL", Insertion)) %>% 
+         polyA_Position, polyA_Seq, polyA_SupportingReads, TSD, TSD_length, panel_class, Func_refGene, Gene, Intronic, AA, classification, popAF, sample, note) %>% 
+  filter(classification %in% c("Pathogenic", "Likely pathogenic", "VOUS", "Not classified"), !grepl("GL", Insertion), Func_refGene %in% c("splicing", "exonic", "UTR5", "UTR3", "upstream")) %>% 
   arrange(classification, desc(eyeGene), desc(Clipped_Reads_In_Cluster))
 
 if (dim(annoted1)[1] == 0) {

@@ -542,20 +542,20 @@ rule bam_to_cram:
 		samtools view -T {config[bwa_genome]} --threads {threads} -C -o {output.cram} -
 		samtools index {output.cram} {output.crai}
 		"""
-
-localrules: keep_bam
-rule keep_bam:
-	input:
-		bam = 'sample_bam/{sample}/{sample}.b37.bam',
-		bai = 'sample_bam/{sample}/{sample}.b37.bai'
-	output:
-		bam = 'bam/{sample}.bam',
-		bai = 'bam/{sample}.bai'
-	shell:
-		"""
-		cp -p -l {input.bam} {output.bam}
-		cp -p -l {input.bai} {output.bai}
-		"""
+#
+# localrules: keep_bam
+# rule keep_bam:
+# 	input:
+# 		bam = 'sample_bam/{sample}/{sample}.b37.bam',
+# 		bai = 'sample_bam/{sample}/{sample}.b37.bai'
+# 	output:
+# 		bam = 'bam/{sample}.bam',
+# 		bai = 'bam/{sample}.bai'
+# 	shell:
+# 		"""
+# 		cp -p -l {input.bam} {output.bam}
+# 		cp -p -l {input.bai} {output.bai}
+# 		"""
 
 rule fastqc:
 	input:
@@ -780,6 +780,21 @@ rule picard_mark_dups:
 			OUTPUT={output.bam} \
 			METRICS_FILE={output.metrics} \
 			CREATE_INDEX=true
+		"""
+
+
+localrules: keep_bam
+rule keep_bam:
+	input:
+		bam = 'sample_bam/{sample}.markDup.bam',
+		bai = 'sample_bam/{sample}.markDup.bai'
+	output:
+		bam = 'bam/{sample}.bam',
+		bai = 'bam/{sample}.bai'
+	shell:
+		"""
+		cp -p -l {input.bam} {output.bam}
+		cp -p -l {input.bai} {output.bai}
 		"""
 
 #sbatch 8 threads and 32g
@@ -1168,10 +1183,11 @@ rule scramble_annotation:
 				-out scramble_anno/{wildcards.sample} \
 				--protocol refGene \
 				-operation  g \
-				--argument '-hgvs' --intronhgvs 100 \
+				--argument '-splicing 100 -hgvs' \
 				--polish -nastring . \
 				--thread 1
-			awk -F"\t" 'BEGIN{{OFS="\t"}} NR==1 {{print "Gene","Intronic","AA"}} NR>1 {{print $7,$8,$10}}' {output.annovar} | paste {input.mei} - > {output.annovarR}
+			awk -F"\t" 'BEGIN{{OFS="\t"}} NR==1 {{print "Func_refGene","Gene","Intronic","AA"}} NR>1 {{print $6,$7,$8,$10}}' {output.annovar} | paste {input.mei} - > {output.annovarR}
 			Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/scramble_anno.R {output.annovarR} {config[SCRAMBLEdb]} {config[OGL_Dx_research_genes]} {config[HGMDtranscript]} {output.anno} {wildcards.sample}
 		fi
 		"""
+#--intronhgvs 100

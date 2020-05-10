@@ -46,6 +46,15 @@ def chr_bam_to_single_bam(wildcards):
 		sample_by_chr.append('sample_bam/chr_split/' + sample + '/' + sample + '__' + str(chrom) + '.CleanSam.sorted.markDup.gatk_realigner.recalibrated.bam')
 	return(sample_by_chr)
 
+def chr_scramble_to_single_scramble(wildcards):
+	# creates the filenames for the chr level GVCFs to use to concatenate to a single file
+	# ensures that input GVCF chrs are provided in order (same as CHRS) below
+	sample = str(wildcards)
+	sample_by_chr = []
+	for chrom in CHRS:
+		sample_by_chr.append('scramble/chr_split/' + sample + '/' + sample + '__' + str(chrom) + '.scramble.tsv')
+	return(sample_by_chr)
+
 # the 'metadata_file' is a csv with three columns
 # the first is the sample name (e.g. Patient001)
 # the second is the name of the fastq or bam associated with the sample
@@ -104,11 +113,12 @@ wildcard_constraints:
 rule all:
 	input:
 		expand('gvcfs/{sample}.g.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())) if config['GATKgvcf'] == 'TRUE' else 'dummy.txt',
-		expand('sample_cram/{sample}.cram', sample=list(SAMPLE_LANEFILE.keys())) if config['cram'] == 'TRUE' else expand('sample_bam/{sample}.bam', sample=list(SAMPLE_LANEFILE.keys())),
+		expand('cram/{sample}.cram', sample=list(SAMPLE_LANEFILE.keys())) if config['cram'] == 'TRUE' else expand('bam/{sample}.bam', sample=list(SAMPLE_LANEFILE.keys())),
 		'GATK_metrics/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
 		'fastqc/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
 		expand('picardQC/{sample}.insert_size_metrics.txt', sample=list(SAMPLE_LANEFILE.keys())) if config['picardQC'] == 'TRUE' else 'dummy.txt',
-		'prioritization/freebayes.merge.done.txt' if config['freebayes_phasing'] == 'TRUE' else 'dummy.txt'
+		'prioritization/freebayes.merge.done.txt' if config['freebayes_phasing'] == 'TRUE' else 'dummy.txt',
+		expand('scramble_anno/{sample}.scramble.xlsx', sample=list(SAMPLE_LANEFILE.keys())) if config['SCRAMble'] == 'TRUE' else 'dummy.txt'
 #		expand('freebayes/{sample}.freebayes.filtered.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())) if config['freebayes_individual'] == 'TRUE' else 'dummy.txt',
 #		'freebayes.vcf' if config['freebayes'] == 'TRUE' else 'dummy.txt'
 #freebayes_individual can consider gvcf files.
@@ -301,8 +311,8 @@ rule bam_to_cram:
 		bam = 'sample_bam/{sample}.b37.bam',
 		bai = 'sample_bam/{sample}.b37.bai'
 	output:
-		cram = 'sample_cram/{sample}.cram',
-		crai = 'sample_cram/{sample}.crai'
+		cram = 'cram/{sample}.cram',
+		crai = 'cram/{sample}.crai'
 	threads:
 		8
 	shell:
@@ -319,8 +329,8 @@ rule keep_bam:
 		bam = 'sample_bam/{sample}.b37.bam',
 		bai = 'sample_bam/{sample}.b37.bai'
 	output:
-		bam = 'sample_bam/{sample}.bam',
-		bai = 'sample_bam/{sample}.bai'
+		bam = 'bam/{sample}.bam',
+		bai = 'bam/{sample}.bai'
 	shell:
 		"""
 		cp -p -l {input.bam} {output.bam}
@@ -721,3 +731,73 @@ rule multiqc_fastqc:
 		"""
 ##freebayes
 #freebayes-parallel <(fasta_generate_regions.py ref.fa.fai 100000) 36 -f ref.fa aln.bam >out.vcf"
+
+
+rule scramble:
+	input:
+		bam = 'sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.markDup.bam',
+		bai = 'sample_bam/chr_split/{sample}/{sample}__{chr}.CleanSam.sorted.markDup.bai'
+	output:
+		cluster = temp('scramble/chr_split/{sample}/{sample}__{chr}.cluster.txt'),
+		mei = 'scramble/chr_split/{sample}/{sample}__{chr}.mei.txt'
+	shell:
+		"""
+		module load scramble
+		scramble cluster_identifier {input.bam} > {output.cluster}
+		scramble Rscript --vanilla /app/cluster_analysis/bin/SCRAMble-MEIs.R \
+			--out-name ${{PWD}}/{output.mei} \
+			--cluster-file ${{PWD}}/{output.cluster} \
+			--install-dir /app/cluster_analysis/bin \
+			--mei-refs /app/cluster_analysis/resources/MEI_consensus_seqs.fa
+		"""
+
+#localrules: scramble_annotation
+rule scramble_annotation:
+	input:
+		mei = 'scramble/chr_split/{sample}/{sample}__{chr}.mei.txt'
+	output:
+		avinput = temp('scramble/chr_split/{sample}/{sample}__{chr}.avinput'),
+		annovar = temp('scramble/chr_split/{sample}/{sample}__{chr}.hg19_multianno.txt'),
+		annovarR = temp('scramble/chr_split/{sample}/{sample}__{chr}.forR.txt'),
+		anno = 'scramble/chr_split/{sample}/{sample}__{chr}.scramble.tsv'
+	shell:
+		"""
+		module load {config[R_version]}
+		module load {config[annovar_version]}
+		if [[ $(wc -l {input.mei} | cut -d " " -f 1) == 1 ]]
+		then
+			touch {output.avinput}
+			touch {output.annovar}
+			touch {output.annovarR}
+			touch {output.anno}
+		else
+			cut -f 1 {input.mei} | awk -F ":" 'BEGIN{{OFS="\t"}} NR>1 {{print $1,$2,$2,"0","-"}}' > {output.avinput}
+			table_annovar.pl {output.avinput} \
+				$ANNOVAR_DATA/hg19 \
+				-buildver hg19 \
+				-remove \
+				-out scramble_anno/{wildcards.sample} \
+				--protocol refGene \
+				-operation  g \
+				--argument '-splicing 100 -hgvs' \
+				--polish -nastring . \
+				--thread 1
+			awk -F"\t" 'BEGIN{{OFS="\t"}} NR==1 {{print "Func_refGene","Gene","Intronic","AA"}} NR>1 {{print $6,$7,$8,$10}}' {output.annovar} | paste {input.mei} - > {output.annovarR}
+			Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/scramble_CHRanno.R {output.annovarR} {config[SCRAMBLEdb]} {config[OGL_Dx_research_genes]} {config[HGMDtranscript]} {output.anno} {wildcards.sample}
+		fi
+		"""
+
+localrules: cat_scramble
+rule cat_scramble:
+	input:
+		tsv = chr_scramble_to_single_scramble
+	output:
+		tsv = temp('scramble_anno/{sample}.scramble.tsv'),
+		xlsx = 'scramble_anno/{sample}.scramble.xlsx'
+	shell:
+		"""
+		module load {config[R_version]}
+		cat {input} | grep -v "^eyeGene" > {output.tsv}
+		sed -i "1 i\eyeGene\tInsertion\tMEI_Family\tInsertion_Direction\tClipped_Reads_In_Cluster\tAlignment_Score\tAlignment_Percent_Length\tAlignment_Percent_Identity\tClipped_Sequence\tClipped_Side\tStart_In_MEI\tStop_In_MEI\tpolyA_Position\tpolyA_Seq\tpolyA_SupportingReads\tTSD\tTSD_length\tpanel_class\tGene\tIntronic\tAA\tclassification\tpopAF\tsample\tnote" {output.tsv}
+		Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/scramble_sortanno.R {output.tsv} {output.xlsx}
+		"""

@@ -490,19 +490,19 @@ rule bam_to_cram:
 		samtools index {output.cram} {output.crai}
 		"""
 
-localrules: keep_bam
-rule keep_bam:
-	input:
-		bam = 'sample_bam/{sample}/{sample}.b37.bam',
-		bai = 'sample_bam/{sample}/{sample}.b37.bai'
-	output:
-		bam = 'bam/{sample}.bam',
-		bai = 'bam/{sample}.bai'
-	shell:
-		"""
-		cp -p -l {input.bam} {output.bam}
-		cp -p -l {input.bai} {output.bai}
-		"""
+# localrules: keep_bam
+# rule keep_bam:
+# 	input:
+# 		bam = 'sample_bam/{sample}/{sample}.b37.bam',
+# 		bai = 'sample_bam/{sample}/{sample}.b37.bai'
+# 	output:
+# 		bam = 'bam/{sample}.bam',
+# 		bai = 'bam/{sample}.bai'
+# 	shell:
+# 		"""
+# 		cp -p -l {input.bam} {output.bam}
+# 		cp -p -l {input.bai} {output.bai}
+# 		"""
 
 rule fastqc:
 	input:
@@ -537,6 +537,20 @@ rule picard_mark_dups_allchr:
 			OUTPUT={output.bam} \
 			METRICS_FILE={output.metrics} \
 			CREATE_INDEX=true
+		"""
+
+localrules: keep_bam
+rule keep_bam:
+	input:
+		bam = 'sample_bam/{sample}.markDup.bam',
+		bai = 'sample_bam/{sample}.markDup.bai'
+	output:
+		bam = 'bam/{sample}.bam',
+		bai = 'bam/{sample}.bai'
+	shell:
+		"""
+		cp -p -l {input.bam} {output.bam}
+		cp -p -l {input.bai} {output.bai}
 		"""
 
 rule picard_alignmentQC:

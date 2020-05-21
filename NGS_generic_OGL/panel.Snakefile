@@ -811,7 +811,7 @@ rule coverage:
 		"""
 		module load {config[mosedepth_version]}
 		module load {config[R_version]}
-		mosdepth -t {threads} --by {config[bed]} --mapq 0 --thresholds 10,20,30 \
+		mosdepth -t {threads} --by {config[bed]} --use-median --mapq 1 --thresholds 10,20,30 \
 			{wildcards.sample} {input.bam}
 		mv {wildcards.sample}.thresholds.bed.gz* coverage/mosdepth/.
 		mv {wildcards.sample}.mosdepth* coverage/mosdepth/.

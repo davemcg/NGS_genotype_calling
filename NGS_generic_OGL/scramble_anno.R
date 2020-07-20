@@ -16,7 +16,8 @@ annovar <- read_tsv(args[1], col_names = TRUE, na = c("NA", "", "None", "."), co
 classificationDF <- read_xlsx(args[2], sheet = "Variant", na = c("NA", "", "None", ".")) %>% 
   select("Insertion", "MEI_Family", "Insertion_Direction", "classification", "popAF", "note")
 
-panelGene <- read_tsv(args[3], col_names = TRUE, col_types = cols(.default = col_character())) %>% select(gene, panel_class)
+#panelGene <- read_tsv(args[3], col_names = TRUE, col_types = cols(.default = col_character())) %>% select(gene, panel_class)
+panelGene <- read_xlsx(args[3], sheet = "analysis", na = c("NA", "", "None", ".")) %>% select(gene, panel_class)
 
 HGMD <- read_tsv(args[4], col_names = TRUE, na = c("NA", "", "None", "."), col_types = cols(.default = col_character()))
 hgmdNM <- dplyr::pull(HGMD, name)

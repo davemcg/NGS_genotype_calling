@@ -15,8 +15,8 @@ classificationDF <- read_xlsx(args[2], sheet = "SV", na = c("NA", "", "None", ".
          "classification", "popAF", "note")
 classificationDF$classification = factor(classificationDF$classification, levels = c("Pathogenic", "Likely pathogenic", "VOUS", "Not classified", "Likely benign", "Benign", "Artifact")) 
 
-panelGene <- read_tsv(args[3], col_names = TRUE, col_types = cols(.default = col_character())) %>% select(gene, panel_class)
-
+#panelGene <- read_tsv(args[3], col_names = TRUE, col_types = cols(.default = col_character())) %>% select(gene, panel_class)
+panelGene <- read_xlsx(args[3], sheet = "analysis", na = c("NA", "", "None", ".")) %>% select(gene, panel_class)
 
 HGMD <- read_tsv(args[4], col_names = TRUE, na = c("NA", "", "None", "."), col_types = cols(.default = col_character()))
 hgmdNM <- dplyr::pull(HGMD, name)

@@ -8,6 +8,14 @@
 		"error" : "00log/{rule}_{wildcards}.err",
 		"extra" : ""
 	},
+	"sve" :
+	{
+		"partition" : "norm",
+		"extra" : "--gres=lscratch:200",
+		"time" : "8:00:00",
+		"threads" : "16",
+		"mem" : "64g"
+	},
 	"split_cram_by_rg" :
 	{
 		"partition" : "norm",

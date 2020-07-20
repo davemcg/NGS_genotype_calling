@@ -44,6 +44,6 @@ freebayes_exome_region: '/data/OGL/resources/freebayesRegion/bpExome.10000.regio
 freebayes_wgs_region: '/data/OGL/resources/freebayesRegion/v37d5/region'
 CRESTdb: '/data/OGL/resources/CRESTvariantClassification.xlsx'
 SCRAMBLEdb: '/data/OGL/resources/SCRAMBLEvariantClassification.xlsx'
-OGL_Dx_research_genes: '/data/OGVFB/OGL_NGS/variant_prioritization/data/OGLv1_panel_DxORcandidate.tsv'
+OGL_Dx_research_genes: '/data/OGL/resources/OGLpanelGeneDxORcandidate.xlsx'
 whatshap_version: 'whatshap/0.18'
 HGMDtranscript: '/data/OGL/resources/HGMD/HGMDtranscript.txt'

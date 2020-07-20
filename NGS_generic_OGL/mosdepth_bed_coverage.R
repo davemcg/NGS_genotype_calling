@@ -13,8 +13,9 @@ args <- commandArgs(trailingOnly=TRUE)
 
 
 readDepth <- fread(args[1], header=T) %>% mutate(targetSize = end - start) 
-panelGene <- read_tsv(args[2], col_names = TRUE, col_types = cols(.default = col_character())) %>% select(gene, panel_class)
- 
+#panelGene <- read_tsv(args[2], col_names = TRUE, col_types = cols(.default = col_character())) %>% select(gene, panel_class)
+panelGene <- read_xlsx(args[2], sheet = "analysis", na = c("NA", "", "None", ".")) %>% select(gene, panel_class)
+
 RDtype <- left_join(readDepth, panelGene, by = c("gene")) %>% replace_na(list(panel_class="Other"))
 RDtype$panel_class = factor(RDtype$panel_class, levels = c("Dx", "Candidate", "Other"))
 

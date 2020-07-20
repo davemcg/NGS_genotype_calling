@@ -43,7 +43,7 @@ def chr_bam_to_single_bam(wildcards):
 	sample = str(wildcards)
 	sample_by_chr = []
 	for chrom in CHRS:
-		sample_by_chr.append('sample_bam/chr_split/' + sample + '/' + sample + '__' + str(chrom) + '.CleanSam.sorted.markDup.gatk_realigner.recalibrated.bam')
+		sample_by_chr.append('sample_bam/chr_split/' + sample + '/' + sample + '__' + str(chrom) + '.CleanSam.sorted.markDup.bam')
 	return(sample_by_chr)
 
 def chr_scramble_to_single_scramble(wildcards):
@@ -337,6 +337,7 @@ rule keep_bam:
 		cp -p -l {input.bai} {output.bai}
 		"""
 
+
 rule split_bam_by_chr:
 	input:
 		bam = 'sample_bam/{sample}.b37.bam',
@@ -408,6 +409,45 @@ rule picard_mark_dups:
 			OUTPUT={output.bam} \
 			METRICS_FILE={output.metrics} \
 			CREATE_INDEX=true
+		"""
+
+rule picard_merge_bams:
+# merge chr split bams into one bam per sample
+	input:
+		chr_bam_to_single_bam
+	output:
+		bam = temp('sample_bam/{sample}.bam'),
+		bai = temp('sample_bam/{sample}.bai'),
+		bai2 = temp('sample_bam/{sample}.bam.bai')
+	threads: 2
+	shell:
+		"""
+		module load {config[picard_version]}
+		cat_inputs_i=""
+		for bam in {input}; do
+			cat_inputs_i+="I=$bam "; done
+		java -Xmx15g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+			MergeSamFiles \
+			$cat_inputs_i \
+			O={output.bam} \
+			SORT_ORDER=coordinate \
+			CREATE_INDEX=true
+		cp {output.bai} {output.bai2}
+		"""
+#SV, use 16 threads and 64 g
+rule sve:
+	input:
+		bam = 'sample_bam/{sample}.bam',
+		bai = 'sample_bam/{sample}.bai',
+		bai2 = 'sample_bam/{sample}.bam.bai'
+	output:
+		vcf = 'sve/{sample}/{sample}_S4.vcf'
+	shell:
+		"""
+		module load sve/0.1.0
+		for method in breakdancer breakseq cnvnator delly lumpy cnmops; do
+		 	sve call -r {config[bwa_genome]} -o sve/{wildcards.sample} \
+			-t 16 -M 4 -g hg19 -a $method {input.bam}; done
 		"""
 
 rule freebayes_phasing:

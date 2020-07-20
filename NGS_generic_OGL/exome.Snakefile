@@ -445,7 +445,7 @@ rule CRESTannotation:
 		awk -F"\t" 'BEGIN{{OFS="\t"}} NR==1 {{print "rightGene","rightSplicing","rightAA"}} NR>1 {{print $7,$8,$10}}' {output.rightAnnovar} > {output.rightAnnovarR}
 		paste {input} {output.leftAnnovarR} {output.rightAnnovarR} > {output.crestR}
 		Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/CRESTanno.R \
-			{output.crestR} {config[CRESTdb]} {config[OGL_Dx_research_genes]} {output.anno}
+			{output.crestR} {config[CRESTdb]} {config[OGL_Dx_research_genes]} {config[HGMDtranscript]} {output.anno}
 		"""
 
 # if multiple sets of fastq/bam provided for a sample, now merge together

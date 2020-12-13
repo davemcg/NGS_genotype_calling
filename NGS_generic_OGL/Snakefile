@@ -186,17 +186,14 @@ if config['inputFileType'] == 'single_lane_fastq':
 	rule cp_lane_bam:
 		input:
 			bam = lambda wildcards: expand('lane_bam/{lane}.bam', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]]))),
-			bai = lambda wildcards: expand('lane_bam/{lane}.bai', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]]))),
-			metrics = lambda wildcards: expand('lane_bam/{lane}.duplication_metrics.txt', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]])))
+			bai = lambda wildcards: expand('lane_bam/{lane}.bai', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]])))
 		output:
 			bam = temp('sample_bam/{sample}.markDup.bam'),
-			bai = temp('sample_bam/{sample}.markDup.bai'),
-			metrics = 'sample_bam/{sample}.duplication_metrics.txt'
+			bai = temp('sample_bam/{sample}.markDup.bai')
 		shell:
 			"""
 			cp -p -l {input.bam} {output.bam}
 			cp -p -l {input.bai} {output.bai}
-			cp -p -l {input.metrics} {output.metrics}
 			"""
 elif config['inputFileType'] == 'bam':
 	rule realign:

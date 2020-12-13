@@ -6,7 +6,31 @@
 		"mem" : "8g",
 		"output"  : "00log/{rule}_{wildcards}.out",
 		"error" : "00log/{rule}_{wildcards}.err",
-		"extra" : ""
+		"extra" : "--gres=lscratch:20"
+	},
+	"deepvariantS1" :
+	{
+		"partition" : "norm,quick",
+		"extra" : "--gres=lscratch:200",
+		"time" : "8:00:00",
+		"threads" : "56",
+		"mem" : "56g"
+	},
+	"deepvariantS2" :
+	{
+		"partition" : "gpu",
+		"extra" : "--constraint='[gpuv100|gpup100|gpuv100x]' --gres=lscratch:100,gpu:1",
+		"time" : "2:00:00",
+		"threads" : "24",
+		"mem" : "16g",
+		"time" : "2:00:00"
+	},
+	"deepvariantS3" :
+	{
+		"partition" : "norm",
+		"extra" : "--gres=lscratch:30",
+		"time" : "8:00:00",
+		"mem" : "32g"
 	},
 	"sve" :
 	{
@@ -15,6 +39,12 @@
 		"time" : "8:00:00",
 		"threads" : "16",
 		"mem" : "64g"
+	},
+	"split_bam_by_chr" :
+	{
+		"extra" : "--gres=lscratch:20",
+		"mem" : "16g",
+		"threads" : "4"
 	},
 	"split_cram_by_rg" :
 	{
@@ -36,17 +66,53 @@
 		"mem" : "96g",
 		"threads" : "32"
 	},
+	"merge_deepvariantVcf" :
+	{
+		"mem" : "64g",
+		"threads" : "16"
+	},
 	"merge_freebayes" :
 	{
 		"mem" : "64g",
-		"threads" : "8"
+		"threads" : "16"
+	},
+	"align_markdup" :
+	{
+		"partition" : "norm",
+		"time" : "12:00:00",
+		"mem" : "100g",
+		"threads" : "56",
+		"extra" : "--gres=lscratch:400"
+	},
+	"realign" :
+	{
+		"partition" : "norm",
+		"time" : "12:00:00",
+		"mem" : "200g",
+		"threads" : "36",
+		"extra" : "--gres=lscratch:200"
 	},
 	"align" :
 	{
 		"partition" : "norm",
-		"time" : "48:00:00",
+		"time" : "12:00:00",
+		"mem" : "96g",
+		"threads" : "36",
+		"extra" : "--gres=lscratch:200"
+	},
+	"manta" :
+	{
+		"partition" : "norm",
+		"time" : "6:00:00",
 		"mem" : "64g",
-		"threads" : "32"
+		"threads" : "32",
+		"extra" : "--gres=lscratch:100"
+	},
+	"scramble" :
+	{
+		"partition" : "norm",
+		"time" : "8:00:00",
+		"mem" : "32g"
 	},
 	"picard_merge_bams" :
 	{

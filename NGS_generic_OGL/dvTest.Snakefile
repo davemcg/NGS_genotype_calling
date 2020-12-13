@@ -118,8 +118,8 @@ rule all:
 		'fastqc/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
 		# expand('picardQC/{sample}.insert_size_metrics.txt', sample=list(SAMPLE_LANEFILE.keys())) if config['picardQC'] == 'TRUE' else 'dummy.txt',
 		'prioritization/freebayes.merge.done.txt' if config['freebayes_phasing'] == 'TRUE' else 'dummy.txt',
-		'deepvariant/deepvariantVcf.merge.done.txt' if config['deepvariant'] == 'TRUE' else 'dummy.txt',
-		expand('manta/manta.{sample}.annotated.tsv', sample=list(SAMPLE_LANEFILE.keys())) if config['manta'] == 'TRUE' else 'dummy.txt',
+		expand('deepvariant/{sample}/{sample}.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())) if config['deepvariant'] == 'TRUE' else 'dummy.txt',
+		expand('manta/manta.{sample}.annotated.tsv', sample=list(SAMPLE_LANEFILE.keys())),
 		expand('scramble_anno/{sample}.scramble.xlsx', sample=list(SAMPLE_LANEFILE.keys())) if config['SCRAMble'] == 'TRUE' else 'dummy.txt'
 #		expand('freebayes/{sample}.freebayes.filtered.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())) if config['freebayes_individual'] == 'TRUE' else 'dummy.txt',
 #		'freebayes.vcf' if config['freebayes'] == 'TRUE' else 'dummy.txt'
@@ -166,7 +166,8 @@ if config['inputFileType'] == 'single_lane_fastq':
 			expand('fastq/{{lane}}{pair}.fastq.gz', pair = config['lane_pair_delim'])
 		output:
 			bam = temp('lane_bam/{lane}.bam'),
-			bai = temp('lane_bam/{lane}.bai')
+			bai = temp('lane_bam/{lane}.bai'),
+			metrics = temp('lane_bam/{lane}.duplication_metrics.txt')
 		params:
 			read_group = rg
 		threads: 56
@@ -180,7 +181,6 @@ if config['inputFileType'] == 'single_lane_fastq':
 			 	| samblaster -M --addMateTags --quiet \
 				| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t {threads} -o {output.bam} \
 					<(sambamba view -S -f bam -l 0 -t $SLURM_CPUS_PER_TASK /dev/stdin)
-			sambamba index -t {threads} {output.bam}
 			"""
 	localrules: cp_lane_bam
 	rule cp_lane_bam:
@@ -388,13 +388,14 @@ rule keep_bam:
 		cp -p -l {input.bai} {output.bai}
 		"""
 
+localrules: deepvariantS1
 rule deepvariantS1:
 	input:
 		bam = 'sample_bam/{sample}.markDup.bam',
 		bai = 'sample_bam/{sample}.markDup.bai'
 	output:
-		examples = temp(directory('deepvariant/{sample}/examples')),
-		gvcf_tfrecords = temp(directory('deepvariant/{sample}/gvcf_tfrecords'))
+		examples = directory('deepvariant/{sample}/examples'),
+		gvcf_tfrecords = directory('deepvariant/{sample}/gvcf_tfrecords')
 	threads: 56
 	shell:
 		"""
@@ -425,12 +426,43 @@ rule deepvariantS1:
 		cp ${{DV_OUTPUT_DIR}}/{wildcards.sample}.examples.* ${{PROJECT}}/examples
 		cp ${{DV_OUTPUT_DIR}}/{wildcards.sample}.gvcf.* ${{PROJECT}}/gvcf_tfrecords || exit 1
 		"""
-
+	# output:
+	# 	tfrecord = temp('deepvariant/{sample}.tfrecord.gz'),
+	# 	gvcf_tfrecord = temp('deepvariant/{sample}.gvcf.tfrecord.gz'),
+	# 	call_variants = temp('deepvariant/{sample}.call_variants.tfrecord.gz'),
+	# 	vcf = 'deepvariant/vcf/{sample}.dv.vcf.gz',
+	# 	gvcf = 'deepvariant/gvcf/{sample}.dv.g.vcf.gz'
+	# threads: 56
+	# shell:
+	# 	"""
+	# 	module load {config[deepvariant_version]} parallel
+	# 	BASE=$PWD
+	# 	N_SHARDS="${SLURM_CPUS_PER_TASK}"
+	# 	time seq 0 $((N_SHARDS-1)) | parallel -j {threads} --eta --halt 2 --line-buffer \
+	# 		make_examples --mode calling \
+	# 		--ref {config[ref_genome]} \
+	# 		--reads {input.bam} \
+	# 		--examples {output.tfrecord} \
+	# 		--gvcf {output.gvcf_tfrecord} \
+	# 		--task {}
+	# 	call_variants \
+	# 		--outfile {output.call_variants} \
+	# 		--examples {output.tfrecord} \
+	# 		--checkpoint /opt/models/wes/model.ckpt
+	# 	postprocess_variants \
+	# 		--ref {config[ref_genome]} \
+	# 		--infile {output.call_variants} \
+	# 		--outfile {output.vcf} \
+	# 		--nonvariant_site_tfrecord_path {output.gvcf_tfrecord} \
+	# 		--gvcf_outfile {output.gvcf}
+	# 	"""
+	#
+localrules: deepvariantS2
 rule deepvariantS2:
 	input:
 		'deepvariant/{sample}/examples'
 	output:
-		temp('deepvariant/{sample}/call_variants/{sample}.call_variants_output.tfrecord.gz')
+		'deepvariant/{sample}/call_variants/{sample}.call_variants_output.tfrecord.gz'
 	threads: 24
 	shell:
 		"""
@@ -459,18 +491,13 @@ rule deepvariantS2:
 		echo "Done." || exit 1
 		cp ${{CALL_VARIANTS_OUTPUT}} ${{PROJECT}}/call_variants || exit 1
 		"""
-
+localrules: deepvariantS3
 rule deepvariantS3:
 	input:
-		tfrecord = 'deepvariant/{sample}/call_variants/{sample}.call_variants_output.tfrecord.gz',
-		bam = 'sample_bam/{sample}.markDup.bam',
-		bai = 'sample_bam/{sample}.markDup.bai'
+		'deepvariant/{sample}/call_variants/{sample}.call_variants_output.tfrecord.gz'
 	output:
-		vcf = 'deepvariant/{sample}.vcf.gz',
-		gvcf = 'deepvariant/{sample}.g.vcf.gz',
-		filteredvcf = temp('deepvariant/vcf/{sample}.dv.filtered.vcf.gz'),
-		filteretbi = temp('deepvariant/vcf/{sample}.dv.filtered.vcf.gz.tbi'),
-		phasedvcf = 'deepvariant/phasedvcf/{sample}.dv.phased.vcf.gz'
+		vcf = 'deepvariant/{sample}/{sample}.vcf.gz',
+		gvcf = 'deepvariant/{sample}/{sample}.g.vcf.gz'
 	shell:
 		"""
 		module load {config[deepvariant_version]} parallel
@@ -499,43 +526,9 @@ rule deepvariantS3:
       		--nonvariant_site_tfrecord_path "${{GVCF_TFRECORDS}}" \
       		--gvcf_outfile "${{OUTPUT_GVCF}}" \
 		) 2>&1 | tee "${{LOG}}/{wildcards.sample}.postprocess_variants.log" || exit 1
-		cp ${{OUTPUT_VCF}}* ${{OUTPUT_GVCF}}* ${{DV_OUTPUT_DIR}}/*.html deepvariant || exit 1
-		module unload {config[deepvariant_version]}
-		module load {config[samtools_version]}
-		bcftools norm --multiallelics -any --output-type v {output.vcf} \
-			| bcftools norm -d none --output-type v - \
-			| bcftools filter --include 'QUAL>0' --output-type z --output {output.filteredvcf}
-		sleep 2
-		tabix -f -p vcf {output.filteredvcf}
-		module load {config[whatshap_version]}
-		whatshap phase --reference {config[ref_genome]} --indels {output.filteredvcf} {input.bam} | bgzip -f > {output.phasedvcf}
-		tabix -f -p vcf {output.phasedvcf}
+		cp ${{OUTPUT_VCF}}* ${{OUTPUT_GVCF}}* ${{DV_OUTPUT_DIR}}/*.html ${{PROJECT}} || exit 1
 		"""
 #deepvariant separates MNPs, thus no need to use decompose_blocksub.
-
-rule merge_deepvariantVcf:
-	input:
-		vcf = expand('deepvariant/phasedvcf/{sample}.dv.phased.vcf.gz', sample=list(SAMPLE_LANEFILE.keys()))
-	output:
-		'deepvariant/deepvariantVcf.merge.done.txt'
-	threads: 16
-	shell:
-		"""
-		module load {config[samtools_version]}
-		case "{input.vcf}" in
-			*\ *)
-				bcftools merge --merge none --missing-to-ref --output-type z --threads {threads} {input.vcf} \
-				> deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
-				;;
-			*)
-				cp {input.vcf} deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
-				;;
-		esac
-		sleep 2
-		tabix -f -p vcf deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
-		touch {output}
-		"""
-
 #if too slow, then seperate by chr as above.
 #localrules: scramble
 rule scramble:
@@ -741,7 +734,7 @@ rule merge_freebayes:
 		vcf = expand('freebayes/{sample}.phased.vcf.gz', sample=list(SAMPLE_LANEFILE.keys()))
 	output:
 		'prioritization/freebayes.merge.done.txt'
-	threads: 16
+	threads: 8
 	shell:
 		"""
 		module load {config[samtools_version]}

@@ -35,7 +35,8 @@ for line in metadata:
 		SAMPLE_LANEFILE[sample] = old_lane_file
 	LANEFILE_READGROUP[lane_file] = [read_group]
 metadata.close()
-
+for i in SAMPLE_LANEFILE:
+	print (i, SAMPLE_LANEFILE[i], len(SAMPLE_LANEFILE[i]))
 #default sample sex is 0 as setting above
 #if config['ped'] != '':
 if config['ped']:
@@ -76,17 +77,17 @@ wildcard_constraints:
 
 rule all:
 	input:
-		expand('CRESTanno/{sample}.predSV.xlsx', sample=list(SAMPLE_LANEFILE.keys())) if config['CREST'] == 'TRUE' else 'dummy.txt',
 		expand('gvcfs/{sample}.g.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())) if config['GATKgvcf'] == 'TRUE' else 'dummy.txt',
-		'GATK_metrics/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
+		#'GATK_metrics/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
 		'fastqc/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
 		expand('picardQC/{sample}.insert_size_metrics.txt', sample=list(SAMPLE_LANEFILE.keys())) if config['picardQC'] == 'TRUE' else 'dummy.txt',
 		'CoNVaDING/progress2.done' if config['CoNVaDING'] == 'TRUE' else 'dummy.txt',
-		'freebayes.vcf' if config['freebayes'] == 'TRUE' else 'dummy.txt',
+		'deepvariant/deepvariantVcf.merge.done.txt' if config['deepvariant'] == 'TRUE' else 'dummy.txt',
 		'prioritization/freebayes.merge.done.txt' if config['freebayes_phasing'] == 'TRUE' else 'dummy.txt',
 		expand('coverage/{sample}.coverage.xlsx', sample=list(SAMPLE_LANEFILE.keys())) if config['coverage'] == 'TRUE' else 'dummy.txt',
 		expand('cram/{sample}.cram', sample=list(SAMPLE_LANEFILE.keys())) if config['cram'] == 'TRUE' else expand('bam/{sample}.bam', sample=list(SAMPLE_LANEFILE.keys())),
-		expand('scramble_anno/{sample}.scramble.xlsx', sample=list(SAMPLE_LANEFILE.keys())) if config['SCRAMble'] == 'TRUE' else 'dummy.txt'
+		expand('scramble_anno/{sample}.scramble.xlsx', sample=list(SAMPLE_LANEFILE.keys())) if config['SCRAMble'] == 'TRUE' else 'dummy.txt',
+		expand('manta/manta.{sample}.annotated.tsv', sample=list(SAMPLE_LANEFILE.keys()))
 
 
 localrules: dummy
@@ -140,26 +141,6 @@ if config['cutadapt'] == 'TRUE':
 			module load {config[cutadapt_version]}
 			cutadapt -a {config[R1_adaptor]} -A {config[R2_adaptor]} --minimum-length 2:2 -o {output.R1} -p {output.R2} {input}
 			"""
-	rule align_hg19:
-		input:
-			R1 = 'trimmed/{lane}_R1_001.fastq.gz',
-			R2 = 'trimmed/{lane}_R2_001.fastq.gz'
-		output:
-			temp('lane_bam/hg19bam/hg19.{lane}.realigned.bam')
-		params:
-			read_group = rg
-		threads: 8
-		shell:
-			"""
-			echo {params.read_group}
-			module load {config[bwa_version]};
-			module load {config[samtools_version]};
-			bwa mem -t {threads} -K 100000000 -Y -B 4 -O 6 -E 1 -R {params.read_group} \
-				/data/OGVFB/OGL_NGS/genomes/hg19/hg19.fa \
-				{input} | \
-				samtools view -1 - > \
-				{output}
-			"""
 	rule align:
 		input:
 			R1 = 'trimmed/{lane}_R1_001.fastq.gz',
@@ -172,34 +153,15 @@ if config['cutadapt'] == 'TRUE':
 		shell:
 			"""
 			echo {params.read_group}
-			module load {config[bwa_version]};
-			module load {config[samtools_version]};
-			bwa mem -t {threads} -K 100000000 -M -B 4 -O 6 -E 1 -R {params.read_group} \
-				{config[bwa_genome]} \
+			module load {config[bwa-mem2_version]}
+			module load {config[samtools_version]}
+			bwa-mem2 mem -t {threads} -K 100000000 -M -B 4 -O 6 -E 1 -R {params.read_group} \
+				{config[ref_genome]} \
 				{input} | \
 				samtools view -1 - > \
 				{output}
 			"""
 else:
-	rule align_hg19:
-		input:
-			expand('fastq/{{lane}}{pair}.fastq.gz', pair = config['lane_pair_delim'])
-		output:
-			temp('lane_bam/hg19bam/hg19.{lane}.realigned.bam')
-		params:
-			read_group = rg
-		threads: 8
-		shell:
-			"""
-			echo {params.read_group}
-			module load {config[bwa_version]};
-			module load {config[samtools_version]};
-			bwa mem -t {threads} -K 100000000 -Y -B 4 -O 6 -E 1 -R {params.read_group} \
-				/data/OGVFB/OGL_NGS/genomes/hg19/hg19.fa \
-				{input} | \
-				samtools view -1 - > \
-				{output}
-			"""
 	rule align:
 		input:
 			# config['lane_pair_delim'] is the string differentiating
@@ -217,350 +179,57 @@ else:
 		shell:
 			"""
 			echo {params.read_group}
-			module load {config[bwa_version]};
-			module load {config[samtools_version]};
-			bwa mem -t {threads} -K 100000000 -M -B 4 -O 6 -E 1 -R {params.read_group} \
-				{config[bwa_genome]} \
-				{input} | \
-				samtools view -1 - > \
-				{output}
+			module load {config[bwa-mem2_version]}
+			module load {config[samtools_version]}
+			bwa-mem2 mem -t {threads} -K 100000000 -M -B 4 -O 6 -E 1 -R {params.read_group} \
+				{config[ref_genome]} {input} \
+				| samtools view -1 - > {output}
 			"""
-
-rule picard_mark_dups_hg19:
-	input:
-		lambda wildcards: expand('lane_bam/hg19bam/hg19.{lane}.realigned.bam', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]])))
-	output:
-		merged_bam = temp('sample_bam/hg19bam/hg19.{sample}.bam'),
-		merged_bai = temp('sample_bam/hg19bam/hg19.{sample}.bai'),
-		bam = temp('sample_bam/hg19bam/{sample}/hg19.{sample}.markDup.bam'),
-		bai1 = temp('sample_bam/hg19bam/{sample}/hg19.{sample}.markDup.bai'),
-		bai2 = temp('sample_bam/hg19bam/{sample}/hg19.{sample}.markDup.bam.bai'),
-		metrics = temp('sample_bam/hg19bam/{sample}/GATK_metrics/{sample}.markDup.metrics')
-	threads: 2
-	shell:
-		"""
-		module load {config[picard_version]}
-		picard_i=""
-		for bam in {input}; do
-			picard_i+=" I=$bam"
-		done
-		java -Xmx16g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
-			MergeSamFiles \
-			TMP_DIR=/scratch/$SLURM_JOB_ID \
-			$picard_i \
-			O={output.merged_bam} \
-			SORT_ORDER=coordinate \
-			CREATE_INDEX=true
-		java -Xmx16g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
-			MarkDuplicates \
-			INPUT={output.merged_bam} \
-			OUTPUT={output.bam} \
-			METRICS_FILE={output.metrics} \
-			REMOVE_DUPLICATES=true \
-			CREATE_INDEX=true
-		cp {output.bai1} {output.bai2}
-		"""
-
-# rule merge_lane_bam_hg19:
-# 	input:
-# 		lambda wildcards: expand('lane_bam/hg19bam/hg19.{lane}.realigned.bam', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]])))
-# 	output:
-# 		bam = temp('sample_bam/hg19bam/hg19.{sample}.bam'),
-# 		bai = temp('sample_bam/hg19bam/hg19.{sample}.bai')
-# 	shell:
-# 		"""
-# 		module load {config[picard_version]}
-# 		picard_i=""
-# 		for bam in {input}; do
-# 			picard_i+=" I=$bam"
-# 		done
-# 		java -Xmx8g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
-# 			MergeSamFiles \
-# 			TMP_DIR=/scratch/$SLURM_JOB_ID \
-# 			$picard_i \
-# 			O={output.bam} \
-# 			SORT_ORDER=coordinate \
-# 			CREATE_INDEX=true
-# 		"""
-# #Try samtools rmdup instead in next version? CREST may not read the markDup reads.
-# rule picard_mark_dups_hg19:
-# # Mark duplicate reads
-# 	input:
-# 		'sample_bam/hg19bam/hg19.{sample}.bam'
-# 	output:
-# 		bam = temp('sample_bam/hg19bam/{sample}/hg19.{sample}.markDup.bam'),
-# 		bai1 = temp('sample_bam/hg19bam/{sample}/hg19.{sample}.markDup.bai'),
-# 		bai2 = temp('sample_bam/hg19bam/{sample}/hg19.{sample}.markDup.bam.bai'),
-# 		metrics = temp('sample_bam/hg19bam/{sample}/GATK_metrics/{sample}.markDup.metrics')
-# 	threads: 2
-# 	shell:
-# 		"""
-# 		module load {config[picard_version]}
-# 		java -Xmx16g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
-# 			MarkDuplicates \
-# 			INPUT={input} \
-# 			OUTPUT={output.bam} \
-# 			METRICS_FILE={output.metrics} \
-# 			REMOVE_DUPLICATES=true \
-# 			CREATE_INDEX=true
-# 		cp {output.bai1} {output.bai2}
-# 		"""
-
-#may be better run with lscratch.
-#to be done: need to run by chromosome then combine
-#to be done: need to remove common variants seen all the time
-# rule CREST:
-# 	input:
-# 		bam = 'sample_bam/hg19bam/{sample}/hg19.{sample}.markDup.bam',
-# 		bai = 'sample_bam/hg19bam/{sample}/hg19.{sample}.markDup.bam.bai'
-# 	output:
-# 		cover = temp('hg19.{sample}.markDup.bam.cover'),
-# 		predSV = 'hg19.{sample}.markDup.bam.predSV.txt',
-# 		sclip = temp('hg19.{sample}.markDup.bam.sclip.txt')
-# 	shell:
-# 		"""
-# 		BLAT_PORT=50000
-# 		function safe_start_blat {{
-#     		local genome_2bit=$1
-#     		# sleep random amount up to 30s to avoid risk of race condition
-#     		sleep $((RANDOM % 30))
-# 			# count how many gfServers there are already running
-# 			local other_gfservers=$(ps -eo comm | grep -c gfServer)
-# 			echo "there are $other_gfservers other gfServers running"
-# 			BLAT_PORT=$((BLAT_PORT + other_gfservers))
-# 			# start gfServer
-# 			echo "startig gfServer on port $BLAT_PORT"
-# 			gfServer start localhost $BLAT_PORT $genome_2bit -canStop \
-# 					-log=blatServer_${{BLAT_PORT}}.log &> /dev/null &
-# 			# wait until gfServer is running
-# 			while [[ $(gfServer files localhost $BLAT_PORT 2>&1) =~ "Error in TCP" ]]; do
-# 			 	echo "Waiting for BLAT server to start..."
-# 				sleep 10
-# 			done
-# 			echo "BLAT server is running!"
-# 		}}
-# 		module load CREST
-# 		tmp=$(mktemp -d ./XXXX)
-# 		export TMPDIR=${{tmp}}
-# 		# Start up BLAT server:
-# 		safe_start_blat /data/OGVFB/OGL_NGS/genomes/hg19/hg19.2bit
-# 		trap "gfServer stop localhost $BLAT_PORT; rm -rf ${{tmp}}" EXIT
-# 		extractSClip.pl -i {input.bam} --ref_genome /data/OGVFB/OGL_NGS/genomes/hg19/hg19.fa
-# 		CREST.pl -f {output.cover} \
-# 			-d {input.bam} \
-# 			--ref_genome /data/OGVFB/OGL_NGS/genomes/hg19/hg19.fa \
-# 			-t /data/OGVFB/OGL_NGS/genomes/hg19/hg19.2bit --blatserver localhost \
-# 			--blatport $BLAT_PORT \
-# 			--read_len 150
-# 		"""
-
-# when a node has too many blat going on, some blats will not start leading to problems. Thus tried the followings:
-# in panel.cluster.json, I used 64 g only because "exclusive" and each node has at least 121g - worked well without error
-# Also tried 8 cpus-per-task and 64g memory - queued faster than exclusive. probably all jobs were run in a seperate gnomad_exome
-# 8 cpus-per-task and 16g - up to 3 blats on the node. 3/48 jobs failed.
-rule CRESTbyChr:
-	input:
-		bam = 'sample_bam/hg19bam/{sample}/hg19.{sample}.markDup.bam',
-		bai = 'sample_bam/hg19bam/{sample}/hg19.{sample}.markDup.bam.bai'
-	output:
-		cover = temp('temp/{sample}/{region}/hg19.{sample}.markDup.bam.{region}.cover'),
-		predSV = temp('temp/{sample}/{region}/{sample}_{region}.predSV.txt'),
-		sclip = temp('temp/{sample}/{region}/hg19.{sample}.markDup.bam.{region}.sclip.txt')
-	shell:
-		"""
-		#cp /data/OGVFB/OGL_NGS/genomes/hg19/hg19.2bit /lscratch/$SLURM_JOB_ID/.
-		cd temp/{wildcards.sample}/{wildcards.region}
-		BLAT_PORT=50000
-		function safe_start_blat {{
-    		local genome_2bit=$1
-    		# sleep random amount up to 30s to avoid risk of race condition, # change to 60s did not help 1/17/20
-    		sleep $((RANDOM % 30))
-			# count how many gfServers there are already running
-			local other_gfservers=$(ps -eo comm | grep -c gfServer)
-			echo "there are $other_gfservers other gfServers running"
-			BLAT_PORT=$((BLAT_PORT + other_gfservers))
-			# start gfServer
-			echo "startig gfServer on port $BLAT_PORT"
-			gfServer start localhost $BLAT_PORT $genome_2bit -canStop \
-					-log=blatServer_${{BLAT_PORT}}.log &> /dev/null &
-			# wait until gfServer is running, change to 20s did not help
-			while [[ $(gfServer files localhost $BLAT_PORT 2>&1) =~ "Error in TCP" ]]; do
-			 	echo "Waiting for BLAT server to start..."
-				sleep 10
-			done
-			echo "BLAT server is running!"
-		}}
-		module load CREST
-		tmp=$(mktemp -d ./XXXX)
-		export TMPDIR=${{tmp}}
-		# Start up BLAT server:
-		safe_start_blat /data/OGVFB/OGL_NGS/genomes/hg19/hg19.2bit
-		trap "gfServer stop localhost $BLAT_PORT; rm -rf ${{tmp}}" EXIT
-		extractSClip.pl -i ../../../{input.bam} --ref_genome /data/OGVFB/OGL_NGS/genomes/hg19/hg19.fa -r {wildcards.region}
-		CREST.pl -f ../../../{output.cover} \
-			-d ../../../{input.bam} \
-			--ref_genome /data/OGVFB/OGL_NGS/genomes/hg19/hg19.fa \
-			-t /data/OGVFB/OGL_NGS/genomes/hg19/hg19.2bit --blatserver localhost \
-			--blatport $BLAT_PORT \
-			--read_len 150 -r {wildcards.region} \
-			-p {wildcards.sample}_{wildcards.region}
-		rm blatServer_$BLAT_PORT.log
-		"""
-
-#### Create blat hyperlink (can be done in the previous step), use R to remove the common calls found in too many samples, also annotate the region???
-
-localrules: mvCREST
-rule mvCREST:
-	input:
-	 	expand('temp/{{sample}}/{region}/{{sample}}_{region}.predSV.txt', region=REGIONS)
-	output:
-		'CREST/{sample}.predSV.txt'
-	shell:
-		"""
-		cat {input} | awk -F "\t" 'BEGIN{{OFS="\t"}} {{if ($1 == $5) {{print "{wildcards.sample}",$4+$8,$6-$2,$0}} else {{print "{wildcards.sample}",$4+$8,".",$0}}}}' - | \
-		sort -nrk 2,2 - > {output}
-		sed -i '1 i\sample\tsumReads\tindelSize\tleftChr\tleftPos\tleftStrand\tNumofLeftSoftClippedReads\trightChr\trightPos\trightStrand\tNumofRightSoftClippedReads\tSVtype\tcoverageAtLeftPos\tcoverageAtRightPos\tassembledLengthAtLeftPos\tassembledLengthAtRightPos\taveragePercentIdentityAtLeftPos\tPercentOfNon-uniqueMappingReadsAtLeftPos\taveragePercentIdentityAtRightPos\tpercentOfNon-uniqueMappingReadsAtRightPos\tstartPositionOfConsensusMappingToGenome\tstartingChromosomeOfConsensusMapping\tpositionOfTheGenomicMappingOfConsensusStartingPosition\tendPositionOfConsensusMappingToGenome\tendingChromsomeOfConsnesusMapping\tpositionOfGenomicMappingOfConsensusEndingPosiiton\tconsensusSequences' {output}
-		"""
-
-localrules: CRESTannotation
-rule CRESTannotation:
-	input:
-		'CREST/{sample}.predSV.txt'
-	output:
-		leftAVinput = temp('CRESTanno/{sample}.left.avinput'),
-		rightAVinput = temp('CRESTanno/{sample}.right.avinput'),
-		leftAnnovar = temp('CRESTanno/{sample}.left.hg19_multianno.txt'),
-		rightAnnovar = temp('CRESTanno/{sample}.right.hg19_multianno.txt'),
-		leftAnnovarR = temp('CRESTanno/{sample}.left.forR.txt'),
-		rightAnnovarR = temp('CRESTanno/{sample}.right.forR.txt'),
-		crestR = temp('CRESTanno/{sample}.forR.txt'),
-		anno = 'CRESTanno/{sample}.predSV.xlsx'
-
-	shell:
-		"""
-		module load {config[R_version]}
-		module load {config[annovar_version]}
-		awk -F"\t" 'BEGIN{{OFS="\t"}} NR>1 {{print $4,$5,$5,"0","-"}}' {input} > {output.leftAVinput}
-		awk -F"\t" 'BEGIN{{OFS="\t"}} NR>1 {{print $8,$9,$9,"0","-"}}' {input} > {output.rightAVinput}
-		table_annovar.pl {output.leftAVinput} \
-			$ANNOVAR_DATA/hg19 \
-			-buildver hg19 \
-			-remove \
-			-out CRESTanno/{wildcards.sample}.left \
-			--protocol refGene \
-			-operation  g \
-			--argument '-hgvs' --intronhgvs 100 \
-			--polish -nastring . \
-			--thread 1
-		table_annovar.pl {output.rightAVinput} \
-			$ANNOVAR_DATA/hg19 \
-			-buildver hg19 \
-			-remove \
-			-out CRESTanno/{wildcards.sample}.right \
-			--protocol refGene \
-			-operation  g \
-			--argument '-hgvs' --intronhgvs 100 \
-			--polish -nastring . \
-			--thread 1
-		awk -F"\t" 'BEGIN{{OFS="\t"}} NR==1 {{print "leftGene","leftIntronic","leftAA"}} NR>1 {{print $7,$8,$10}}' {output.leftAnnovar} > {output.leftAnnovarR}
-		awk -F"\t" 'BEGIN{{OFS="\t"}} NR==1 {{print "rightGene","rightIntronic","rightAA"}} NR>1 {{print $7,$8,$10}}' {output.rightAnnovar} > {output.rightAnnovarR}
-		paste {input} {output.leftAnnovarR} {output.rightAnnovarR} > {output.crestR}
-		if [[ -s {input} ]]; then Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/CRESTanno.R {output.crestR} {config[CRESTdb]} {config[OGL_Dx_research_genes]} {config[HGMDtranscript]} {output.anno}; else touch {output.anno}; fi
-		"""
-#if [[ -s {input} ]]: check if {input} is empty.
-#cp -l: use hard-links instead of copying data of the regular files
-#cp -p: preserve attributes;
-#
-# rule align:
-# 	input:
-# 		# config['lane_pair_delim'] is the string differentiating
-# 		# the forward from reverse
-# 		# e.g. ['_R1_001', '_R2_001'] if the file names are
-# 		# sample17_R1_001.fastq.gz and sample17_R2_001.fastq.gz
-# 		# for a set of paired end fastq
-# 		# if you don't have a paired fastq set, give as ['']
-# 		expand('fastq/{{lane}}{pair}.fastq.gz', pair = config['lane_pair_delim'])
-# 	output:
-# 		temp('lane_bam/{lane}.realigned.bam')
-# 	params:
-# 		read_group = rg
-# 	threads: 8
-# 	shell:
-# 		"""
-# 		echo {params.read_group}
-# 		module load {config[bwa_version]};
-# 		module load {config[samtools_version]};
-# 		bwa mem -t {threads} -K 100000000 -M -B 4 -O 6 -E 1 -R {params.read_group} \
-# 			{config[bwa_genome]} \
-# 			{input} | \
-# 			samtools view -1 - > \
-# 			{output}
-# 		"""
-# bwa mem -K 100000000 : process input bases in each batch reardless of nThreads (for reproducibility));
-# -Y : use soft clipping for supplementary alignments. This is necessary for CREST.
-# -M : mark shorter split hits as secondary. David used -M
-# flag -M is compatible with lumpy: https://genomebiology.biomedcentral.com/articles/10.1186/gb-2014-15-6-r84
-#-B 4 -O 6 -E 1 : these are bwa mem default.
-
-# if multiple sets of fastq/bam provided for a sample, now merge together
+#bwa-mem2 requires 32g mem with 8 threads.
+#for WGS use bwa-mem2
+			# module load {config[bwa-mem2_version]}
+			# module load {config[samtools_version]};
+			# bwa-mem2 mem -t {threads} -K 100000000 -M -B 4 -O 6 -E 1 -R {params.read_group} \
 
 rule merge_lane_bam:
 	input:
 		lambda wildcards: expand('lane_bam/{lane}.realigned.bam', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]])))
 	output:
-		bam = temp('sample_bam/{sample}/{sample}.b37.bam'),
-		bai = temp('sample_bam/{sample}/{sample}.b37.bai')
+		merged_bam = temp('sample_bam/{sample}/{sample}.merged.bam'),
+		merged_bai = temp('sample_bam/{sample}/{sample}.merged.bai'),
+		bam = temp('sample_bam/{sample}/{sample}.markDup.bam'),
+		bai = temp('sample_bam/{sample}/{sample}.markDup.bai'),
+		metrics = 'sample_bam/{sample}/{sample}.duplication_metrics.txt'
+	threads: 8
 	shell:
 		"""
 		module load {config[picard_version]}
 		picard_i=""
 		for bam in {input}; do
-			picard_i+=" I=$bam"
+			picard_i+=" -I $bam"
 		done
-		java -Xmx8g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+		java -Xmx16g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
 			MergeSamFiles \
-			TMP_DIR=/scratch/$SLURM_JOB_ID \
+			-TMP_DIR /lscratch/$SLURM_JOB_ID \
 			$picard_i \
-			O={output.bam} \
-			SORT_ORDER=coordinate \
-			CREATE_INDEX=true
+			-O {output.merged_bam} \
+			--SORT_ORDER coordinate \
+			--CREATE_INDEX true
+		java -Xmx16g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+			MarkDuplicates \
+			-TMP_DIR /lscratch/$SLURM_JOB_ID \
+			--INPUT {output.merged_bam} \
+			--OUTPUT {output.bam} \
+			--METRICS_FILE {output.metrics} \
+			--CREATE_INDEX true
 		"""
-# 30% smaller!
-rule bam_to_cram:
-	input:
-		bam = 'sample_bam/{sample}/{sample}.b37.bam',
-		bai = 'sample_bam/{sample}/{sample}.b37.bai'
-	output:
-		cram = 'cram/{sample}.cram',
-		crai = 'cram/{sample}.crai'
-	threads:
-		8
-	shell:
-		"""
-		module load {config[samtools_version]}
-		samtools sort -O bam -l 0 --threads {threads} -T /lscratch/$SLURM_JOB_ID {input.bam} | \
-		samtools view -T {config[bwa_genome]} --threads {threads} -C -o {output.cram} -
-		samtools index {output.cram} {output.crai}
-		"""
-#
-# localrules: keep_bam
-# rule keep_bam:
-# 	input:
-# 		bam = 'sample_bam/{sample}/{sample}.b37.bam',
-# 		bai = 'sample_bam/{sample}/{sample}.b37.bai'
-# 	output:
-# 		bam = 'bam/{sample}.bam',
-# 		bai = 'bam/{sample}.bai'
-# 	shell:
-# 		"""
-# 		cp -p -l {input.bam} {output.bam}
-# 		cp -p -l {input.bai} {output.bai}
-# 		"""
+
+#no pipe for picard MergeSamFiles; markduplicates requires indexed bam files.
 
 rule fastqc:
 	input:
-		bam = 'sample_bam/{sample}/{sample}.b37.bam',
-		bai = 'sample_bam/{sample}/{sample}.b37.bai'
+		bam = 'sample_bam/{sample}/{sample}.markDup.bam',
+		bai = 'sample_bam/{sample}/{sample}.markDup.bai'
 	output:
 		directory('fastqc/{sample}')
 	threads: 8
@@ -571,23 +240,129 @@ rule fastqc:
 		mkdir -p fastqc/{wildcards.sample}
 		fastqc -t {threads} -o {output} {input.bam}
 		"""
+rule multiqc_fastqc:
+	input:
+		expand('fastqc/{sample}', sample=list(SAMPLE_LANEFILE.keys()))
+	output:
+		directory('fastqc/multiqc_report')
+	shell:
+		"""
+		module load multiqc
+		multiqc -f -o {output} fastqc/
+		"""
 
-# rule CoNVaDING_1:
+# rule picard_mark_dups:
+# # Mark duplicate reads
 # 	input:
 # 		bam = 'sample_bam/{sample}/{sample}.b37.bam',
 # 		bai = 'sample_bam/{sample}/{sample}.b37.bai'
 # 	output:
-# 		temp('CoNVaDING/progress1.{sample}')
-# 	params:
-# 		sex = lambda wildcards: SAMPLE_SEX[wildcards.sample]
-# 	run:
-# 		shell("bash ~/git/NGS_genotype_calling/NGS_generic_OGL/convading_1.sh {params.sex} {config[samtools_version]} {wildcards.sample} {config[bed]} {config[CoNVaDING_ctr_dir]} {config[chrRD_highcutoff]} {config[chrRD_lowcutoff]} {output}")
+# 		bam = temp('sample_bam/{sample}.markDup.bam'),
+# 		bai = temp('sample_bam/{sample}.markDup.bai'),
+# 		metrics = 'GATK_metrics/{sample}.markDup.metrics'
+# 	threads: 2
+# 	shell:
+# 		"""
+# 		module load {config[picard_version]}
+# 		java -Xmx60g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+# 			MarkDuplicates \
+# 			INPUT={input.bam} \
+# 			OUTPUT={output.bam} \
+# 			METRICS_FILE={output.metrics} \
+# 			CREATE_INDEX=true
+# 		"""
 
+rule picard_alignmentQC:
+#insert size and alignment metrics
+	input:
+		bam = 'sample_bam/{sample}/{sample}.markDup.bam',
+		bai = 'sample_bam/{sample}/{sample}.markDup.bai'
+	output:
+		insert_size_metrics = 'picardQC/{sample}.insert_size_metrics.txt',
+		insert_size_histogram = 'picardQC/{sample}.insert_size_histogram.pdf',
+		alignment_metrics = 'picardQC/{sample}.alignment_metrics.txt'
+	threads: 2
+	shell:
+		"""
+		module load {config[picard_version]}
+		java -Xmx8g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+			CollectInsertSizeMetrics \
+			INPUT={input.bam} \
+			O={output.insert_size_metrics} \
+		    H={output.insert_size_histogram} \
+		    M=0.5
+		java -Xmx8g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+			CollectAlignmentSummaryMetrics \
+			INPUT={input.bam} \
+			R={config[ref_genome]} \
+			METRIC_ACCUMULATION_LEVEL=SAMPLE \
+			METRIC_ACCUMULATION_LEVEL=READ_GROUP \
+			O={output.alignment_metrics}
+		"""
+
+#sbatch 8 threads and 32g
+localrules: coverage
+rule coverage:
+	input:
+		bam = 'sample_bam/{sample}/{sample}.markDup.bam',
+		bai = 'sample_bam/{sample}/{sample}.markDup.bai'
+	output:
+		thresholds = 'coverage/mosdepth/{sample}.thresholds.bed.gz',
+		xlsx = 'coverage/{sample}.coverage.xlsx'
+	threads: 8
+	shell:
+		"""
+		module load {config[mosdepth_version]}
+		module load {config[R_version]}
+		mosdepth -t {threads} --by {config[bed]} --use-median --mapq 1 --thresholds 10,20,30 \
+			{wildcards.sample} {input.bam}
+		mv {wildcards.sample}.thresholds.bed.gz* coverage/mosdepth/.
+		mv {wildcards.sample}.mosdepth* coverage/mosdepth/.
+		mv {wildcards.sample}.per-base.bed.gz* coverage/mosdepth/.
+		mv {wildcards.sample}.regions.bed.gz* coverage/mosdepth/.
+		zcat {output.thresholds} \
+			 | sed '1 s/^.*$/chr\tstart\tend\tgene\tcoverageTen\tcoverageTwenty\tcoverageThirty/' \
+			 > {output.thresholds}.tsv
+		Rscript ~/git/NGS_genotype_calling/NGS_generic_OGL/mosdepth_bed_coverage.R \
+			{output.thresholds}.tsv {config[OGL_Dx_research_genes]} {output.xlsx}
+		"""
+
+# 30% smaller!
+rule bam_to_cram:
+	input:
+		bam = 'sample_bam/{sample}/{sample}.markDup.bam',
+		bai = 'sample_bam/{sample}/{sample}.markDup.bai'
+	output:
+		cram = 'cram/{sample}.cram',
+		crai = 'cram/{sample}.crai'
+	threads:
+		8
+	shell:
+		"""
+		module load {config[samtools_version]}
+		samtools sort -O bam -l 0 --threads {threads} -T /lscratch/$SLURM_JOB_ID {input.bam} | \
+		samtools view -T {config[ref_genome]} --threads {threads} -C -o {output.cram} -
+		samtools index {output.cram} {output.crai}
+		"""
+
+localrules: keep_bam
+rule keep_bam:
+	input:
+		bam = 'sample_bam/{sample}/{sample}.markDup.bam',
+		bai = 'sample_bam/{sample}/{sample}.markDup.bai'
+	output:
+		bam = 'bam/{sample}.bam',
+		bai = 'bam/{sample}.bai'
+	shell:
+		"""
+		cp -p -l {input.bam} {output.bam}
+		cp -p -l {input.bai} {output.bai}
+		"""
 
 rule CoNVaDING_1:
 	input:
-		bam = 'sample_bam/{sample}/{sample}.b37.bam',
-		bai = 'sample_bam/{sample}/{sample}.b37.bai'
+		bam = 'sample_bam/{sample}/{sample}.markDup.bam',
+		bai = 'sample_bam/{sample}/{sample}.markDup.bai'
 	output:
 		temp('CoNVaDING/progress1.{sample}')
 	params:
@@ -691,6 +466,18 @@ rule CoNVaDING_2:
   				-controlsDir {config[CoNVaDING_ctr_dir]} \
   				-ratioCutOffLow 0.71 \
   				-ratioCutOffHigh 1.35
+			# perl ~/git/CoNVaDING/CoNVaDING.pl \
+  			# 	-mode GenerateTargetQcList \
+  			# 	-inputDir {config[CoNVaDING_ctr_dir]} \
+  			# 	-outputDir CoNVaDING/TargetQcList \
+  			# 	-controlsDir {config[CoNVaDING_ctr_dir]} \
+  			# 	-ratioCutOffLow 0.71 \
+  			# 	-ratioCutOffHigh 1.35
+			# perl ~/git/CoNVaDING/CoNVaDING.pl \
+			# 	-mode CreateFinalList \
+			# 	-inputDir CoNVaDING/CNV_hiSens \
+  			# 	-targetQcList CoNVaDING/TargetQcList \
+  			# 	--outputDir CoNVaDING/finalList
 			for i in CoNVaDING/CNV_hiSens/*.shortlist.txt; do awk -F "\t" '{{print FILENAME"\t"$0}}' $i >> CoNVaDING/shortlist.temp; done
 			awk -F"\t" 'BEGIN{{OFS="\t"}} {{sub(/CoNVaDING\/CNV_hiSens\//,""); sub(/.b37.aligned.only.best.score.shortlist.txt/,""); print }}' CoNVaDING/shortlist.temp \
 				| grep -v -P 'CHR\tSTART' - > CoNVaDING/SHORTlist.txt && \
@@ -748,115 +535,332 @@ rule CoNVaDING_2:
 ### 				-controlSamples 20 for "StartWithMatchScore" for the male samples because low sample no.
 #need 30 samples for step 2 above.
 
-
-rule picard_mark_dups:
-# Mark duplicate reads
+rule deepvariant:
 	input:
-		bam = 'sample_bam/{sample}/{sample}.b37.bam',
-		bai = 'sample_bam/{sample}/{sample}.b37.bai'
+		bam = 'sample_bam/{sample}/{sample}.markDup.bam',
+		bai = 'sample_bam/{sample}/{sample}.markDup.bai'
 	output:
-		clean_bam =	temp('sample_bam/{sample}.CleanSam.bam'),
-		sorted_bam = temp('sample_bam/{sample}.sorted.bam'),
-		bam = temp('sample_bam/{sample}.markDup.bam'),
-		bai = temp('sample_bam/{sample}.markDup.bai'),
-		metrics = 'GATK_metrics/{sample}.markDup.metrics'
-	threads: 2
+		vcf = 'deepvariant/vcf/{sample}.dv.vcf.gz',
+		gvcf = 'deepvariant/vcf/{sample}.dv.g.vcf.gz',
+		filteredvcf = temp('deepvariant/vcf/{sample}.dv.filtered.vcf.gz'),
+		filteretbi = temp('deepvariant/vcf/{sample}.dv.filtered.vcf.gz.tbi'),
+		phasedvcf = 'deepvariant/vcf/{sample}.dv.phased.vcf.gz'
 	shell:
 		"""
-		module load {config[picard_version]}
-		java -Xmx60g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
-			CleanSam \
-			TMP_DIR=/lscratch/$SLURM_JOB_ID \
-			INPUT={input.bam} \
-			OUTPUT={output.clean_bam}
-		java -Xmx60g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
-			FixMateInformation \
-			SORT_ORDER=coordinate \
-			INPUT={output.clean_bam} \
-			OUTPUT={output.sorted_bam}
-		java -Xmx60g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
-			MarkDuplicates \
-			INPUT={output.sorted_bam} \
-			OUTPUT={output.bam} \
-			METRICS_FILE={output.metrics} \
-			CREATE_INDEX=true
+		module load {config[deepvariant_version]}
+		run_deepvariant --model_type WES --num_shards 4 \
+			--ref {config[ref_genome]} \
+			--regions {config[padded_bed]} \
+			--reads {input.bam} \
+			--output_vcf {output.vcf} \
+			--output_gvcf {output.gvcf}
+		module unload {config[deepvariant_version]}
+		module load {config[samtools_version]}
+		bcftools norm --multiallelics -any --output-type v {output.vcf} \
+			| bcftools norm -d none --output-type v - \
+			| bcftools filter --include 'QUAL>0' --output-type z --output {output.filteredvcf}
+		sleep 2
+		tabix -f -p vcf {output.filteredvcf}
+		module load {config[whatshap_version]}
+		whatshap phase --reference {config[ref_genome]} --indels {output.filteredvcf} {input.bam} | bgzip -f > {output.phasedvcf}
+		tabix -f -p vcf {output.phasedvcf}
 		"""
+#FILTER="PASS"
 
 
-localrules: keep_bam
-rule keep_bam:
+localrules: merge_deepvariant_vcf
+rule merge_deepvariant_vcf:
 	input:
-		bam = 'sample_bam/{sample}.markDup.bam',
-		bai = 'sample_bam/{sample}.markDup.bai'
+		vcf = expand('deepvariant/vcf/{sample}.dv.phased.vcf.gz', sample=list(SAMPLE_LANEFILE.keys()))
 	output:
-		bam = 'bam/{sample}.bam',
-		bai = 'bam/{sample}.bai'
-	shell:
-		"""
-		cp -p -l {input.bam} {output.bam}
-		cp -p -l {input.bai} {output.bai}
-		"""
-
-#sbatch 8 threads and 32g
-localrules: coverage
-rule coverage:
-	input:
-		bam = 'sample_bam/{sample}.markDup.bam',
-		bai = 'sample_bam/{sample}.markDup.bai'
-	output:
-		thresholds = 'coverage/mosdepth/{sample}.thresholds.bed.gz',
-		xlsx = 'coverage/{sample}.coverage.xlsx'
+		'deepvariant/deepvariantVcf.merge.done.txt'
 	threads: 8
 	shell:
 		"""
-		module load {config[mosedepth_version]}
-		module load {config[R_version]}
-		mosdepth -t {threads} --by {config[bed]} --use-median --mapq 1 --thresholds 10,20,30 \
-			{wildcards.sample} {input.bam}
-		mv {wildcards.sample}.thresholds.bed.gz* coverage/mosdepth/.
-		mv {wildcards.sample}.mosdepth* coverage/mosdepth/.
-		mv {wildcards.sample}.per-base.bed.gz* coverage/mosdepth/.
-		mv {wildcards.sample}.regions.bed.gz* coverage/mosdepth/.
-		zcat {output.thresholds} \
-			 | sed '1 s/^.*$/chr\tstart\tend\tgene\tcoverageTen\tcoverageTwenty\tcoverageThirty/' \
-			 > {output.thresholds}.tsv
-		Rscript ~/git/NGS_genotype_calling/NGS_generic_OGL/mosdepth_bed_coverage.R \
-			{output.thresholds}.tsv {config[OGL_Dx_research_genes]} {output.xlsx}
+		module load {config[samtools_version]}
+		case "{input.vcf}" in
+			*\ *)
+				bcftools merge --merge none --missing-to-ref --output-type z --threads {threads} {input.vcf} \
+				> deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
+				;;
+			*)
+				cp {input.vcf} deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
+				;;
+		esac
+		sleep 2
+		tabix -f -p vcf deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
+		touch {output}
 		"""
 
-rule picard_alignmentQC:
-#insert size and alignment metrics
+# localrules: merge_deepvariant_gvcf
+# rule merge_deepvariant_gvcf:
+# 	input:
+# 		vcf = expand('deepvariant/vcf/{sample}.dv.g.vcf.gz', sample=list(SAMPLE_LANEFILE.keys()))
+# 	#	tbi = expand('freebayes/{sample}.phased.vcf.gz.tbi', sample=list(SAMPLE_LANEFILE.keys()))
+# 	output:
+# 		'deepvariant/deepvariant.txt'
+# 	threads: 8
+# 	shell:
+# 		"""
+# 		module load {config[glnexus_version]}
+# 		module load {config[samtools_version]}
+# 		glnexus --config DeepVariant --bed {config[padded_bed]} \
+# 			--threads {threads} \
+# 			{input.vcf} \
+# 			| bcftools view - | bgzip -c > deepvariant/{config[analysis_batch_name]}.deepvariant.vcf.gz
+# 		tabix -f -p vcf deepvariant/{config[analysis_batch_name]}.deepvariant.vcf.gz
+# 		touch {output}
+# 		"""
+#try phasing gvcf files
+
+#freebayes avoids indel_realign, base-quality_recalibration, better to run on all of the bam files
+#freebayes can identify MNP and complex indels.
+#need to have unique RG ID fields for each sample. Use the RG made by the wrapper.
+#Using CleanSam and FixMateInformation, freebayes was able to call one additional ins variant using the panel NA12878 data.
+
+rule freebayes_phasing:
 	input:
-		bam = 'sample_bam/{sample}.markDup.bam',
-		bai = 'sample_bam/{sample}.markDup.bai'
+		bam = 'sample_bam/{sample}/{sample}.markDup.bam',
+		bai = 'sample_bam/{sample}/{sample}.markDup.bai'
 	output:
-		insert_size_metrics = 'picardQC/{sample}.insert_size_metrics.txt',
-		insert_size_histogram = 'picardQC/{sample}.insert_size_histogram.pdf',
-		alignment_metrics = 'picardQC/{sample}.alignment_metrics.txt'
-	threads: 2
+		vcf = 'freebayes/{sample}.vcf.gz',
+		filteredvcf = temp('freebayes/{sample}.filtered.vcf.gz'),
+		tbi = temp('freebayes/{sample}.filtered.vcf.gz.tbi'),
+		phasedvcf = 'freebayes/{sample}.phased.vcf.gz',
+		phasedvcf_tbi = 'freebayes/{sample}.phased.vcf.gz.tbi'
+	threads: 16
 	shell:
 		"""
-		module load {config[picard_version]}
-		java -Xmx8g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
-			CollectInsertSizeMetrics \
-			INPUT={input.bam} \
-			O={output.insert_size_metrics} \
-		    H={output.insert_size_histogram} \
-		    M=0.5
-		java -Xmx8g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
-			CollectAlignmentSummaryMetrics \
-			INPUT={input.bam} \
-			R={config[bwa_genome]} \
-			METRIC_ACCUMULATION_LEVEL=SAMPLE \
-			METRIC_ACCUMULATION_LEVEL=READ_GROUP \
-			O={output.alignment_metrics}
+		module load {config[freebayes_version]}
+		module load {config[vcflib_version]}
+		module load {config[samtools_version]}
+		module load {config[vt_version]}
+		freebayes-parallel {config[freebayes_region]} {threads} -f {config[ref_genome]} \
+			--limit-coverage 1000 {input.bam} --min-alternate-fraction 0.05 \
+			--min-mapping-quality 1 --genotype-qualities --strict-vcf --use-mapping-quality \
+			| bgzip -f > {output.vcf}
+		sleep 2
+		tabix -f -p vcf {output.vcf}
+		bcftools norm --multiallelics -any --output-type v {output.vcf} \
+			| vt decompose_blocksub -p -m -d 2 - \
+			| bcftools norm --check-ref s --fasta-ref {config[ref_genome]} --output-type v - \
+			| bcftools norm -d none --output-type v - \
+			| vcffilter -f "( QUAL > 15 & QA / AO > 15 & SAF > 0 & SAR > 0 & RPR > 0 & RPL > 0 & AO > 2 & DP > 3 ) | ( QUAL > 30 & QA / AO > 25 & ( SAF = 0 | SAR = 0 | RPR = 0 | RPL = 0 ) & AO > 2 & DP > 3 )" \
+			| bgzip -f > {output.filteredvcf}
+		sleep 2
+		tabix -f -p vcf {output.filteredvcf}
+		module unload {config[freebayes_version]}
+		module unload {config[vcflib_version]}
+		module unload {config[vt_version]}
+		module load {config[whatshap_version]}
+		whatshap phase --reference {config[ref_genome]} --indels {output.filteredvcf} {input.bam} | bgzip -f > {output.phasedvcf}
+		tabix -f -p vcf {output.phasedvcf}
+		"""
+# bcftools norm -d none means remove duplicates if they are identical (keep the first instance)
+#vt decompose_blocksub -a separated inframe insertion to fs. thus do not use.
+# --gvcf: after gvcf,I tried to pipe it to vcffilter, which removed the reference regions | vcffilter -f "QUAL > 1"
+#freebayes -f /data/OGVFB/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta --gvcf --limit-coverage 1000 --min-coverage 4 sample_bam/14_NA12878.markDup.bam > 14_NA12878.test.gvcf
+#Tag with "PASS" worked as shown below. It's possible to use --gvcf then tag with PASS?
+#vcffilter -t "PASS" -f "( QUAL > 20 & QA / AO > 10 & SAF > 0 & SAR > 0 & RPR > 0 & RPL > 0 )  & AO > 2 & DP > 3 | ( QUAL > 30 & QA / AO > 25 & ( SAF = 0 | SAR = 0 | RPR = 0 | RPL = 0 ) & AO > 2 & DP > 3 )" 14_NA12878.freebayes.vcf.gz | bgzip > 14_NA12878.freebayes.filter7.vcf.gz
+#vcffilter -F "filter2" -f ... did not work
+##WGS vcffilter
+#vcffilter -f "QUAL > 20 & QA / AO > 10 & SAF > 0 & SAR > 0 & RPR > 1 & RPL > 1" {output.vcf} | bgzip > {output.filteredvcf}
+# QUAL > 1 removes horrible sites, testing 11/2/19
+# QUAL / AO > 10 additional contribution of each obs should be 10 log units (~ Q10 per read), Used QUAL/AO > 5 before 10/30/19;
+# QA / AO > 10 (QA: Sum of quality of the alternate observations), starting 11/1/19 - 99% specificity and 98% sensitivity
+# SAF > 0 & SAR > 0 reads on both strands, Number of alternate observations on the forward/reverse strand, remove this one for panel/exome data, use AO > 2 instead.
+# RPR > 1 & RPL > 1 at least two reads “balanced” to each side of the site
+
+
+rule merge_freebayes:
+	input:
+		vcf = expand('freebayes/{sample}.phased.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
+		tbi = expand('freebayes/{sample}.phased.vcf.gz.tbi', sample=list(SAMPLE_LANEFILE.keys()))
+	output:
+		'prioritization/freebayes.merge.done.txt'
+	threads: 8
+	shell:
+		"""
+		module load {config[samtools_version]}
+		case "{input.vcf}" in
+			*\ *)
+				bcftools merge --merge none --missing-to-ref --output-type z --threads {threads} {input.vcf} \
+				> prioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
+				;;
+			*)
+				cp {input.vcf} prioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
+				;;
+		esac
+		sleep 2
+		tabix -f -p vcf prioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
+		touch {output}
 		"""
 
+# rule freebayes:
+# 	input:
+# 		bam = expand('sample_bam/{sample}.markDup.bam', sample=list(SAMPLE_LANEFILE.keys())),
+# 		bai = expand('sample_bam/{sample}.markDup.bai', sample=list(SAMPLE_LANEFILE.keys()))
+# 	output:
+# 		temp('freebayes.vcf')
+# 	threads: 36
+# 	shell:
+# 		"""
+# 		module load {config[freebayes_version]}
+# 		module load {config[vcflib_version]}
+# 		module load {config[samtools_version]}
+# 		freebayes-parallel {config[freebayes_region]} {threads} -f {config[ref_genome]} \
+# 			--limit-coverage 1000 {input.bam} | vcffilter -f "QUAL > 1" | bgzip > {config[analysis_batch_name]}.freebayes.vcf.gz
+# 		sleep 2
+# 		tabix -f -p vcf {config[analysis_batch_name]}.freebayes.vcf.gz
+# 		vcffilter -f "QUAL > 20 & QUAL / AO > 5 & SAF > 0 & SAR > 0 & RPR > 1 & RPL > 1"  {config[analysis_batch_name]}.freebayes.vcf.gz | bgzip > {config[analysis_batch_name]}.freebayes.filtered.vcf.gz
+# 		sleep 2
+# 		tabix -f -p vcf {config[analysis_batch_name]}.freebayes.filtered.vcf.gz
+# 		touch freebayes.vcf
+# 		"""
+#For filtering: tried QUAL > 20 suggested in GitHub freebayes
+#consider change the filter option to according to Eric Garrison's Univ Iowa hardfilter suggestion: vcffilter -f "QUAL > 1 & QUAL / AO > 10 & SAF > 0 & SAR > 0 & RPR > 1 & RPL > 1"
+#For a single file: freebayes -f {config[ref_genome]} {input.bam} | vcffilter -f "QUAL > 20" > {output}
+#24 OGLv1 panel on MiSeq 7/17/19, finished in 70 min, when running on 32 threads and 128 gb mem: 500 regions: freebayes-parallel /data/OGVFB/OGL_NGS/bed/freebayes.OGLv1.500.region 32 -f /data/OGVFB/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta 24bam | vcffilter -f "QUAL > 20" > freebayes.vcf
+#48 OGLv1 panel on MiSeq 7/17/19, failed after one batch of writing when running on 36 threads and 720gb mem, when on 500 regions, when not setting "--use-best-n-alleles 4"
+#48 samples above worked when using --use-best-n-alleles 4 7/21/19 took ~ 3 hours.
+#removed --use-best-n-alleles 4 on 7/23/2019 When working with 12 samples, and use "QUAL > 20 & QUAL / AO > 5 & SAF > 0 & SAR > 0 & RPR > 1 & RPL > 1" retained both orf15 variants.
+
+localrules: scramble
+rule scramble:
+	input:
+		bam = 'sample_bam/{sample}/{sample}.markDup.bam',
+		bai = 'sample_bam/{sample}/{sample}.markDup.bai'
+	output:
+		cluster = temp('scramble/{sample}.cluster.txt'),
+		mei = 'scramble/{sample}_MEIs.txt',
+		deletion = 'scramble/{sample}_PredictedDeletions.txt'
+	shell:
+		"""
+		module load {config[scramble_version]}
+		scramble cluster_identifier {input.bam} > {output.cluster}
+		scramble Rscript --vanilla /app/cluster_analysis/bin/SCRAMble.R \
+			--out-name ${{PWD}}/scramble/{wildcards.sample} \
+			--cluster-file ${{PWD}}/{output.cluster} \
+			--install-dir /app/cluster_analysis/bin \
+			--mei-refs /app/cluster_analysis/resources/MEI_consensus_seqs.fa \
+			--ref {config[ref_genome]} \
+			--eval-meis \
+			--eval-dels \
+			--no-vcf
+		"""
+
+# change to smaller?       --min-del-len=MIN-DEL-LEN
+#                minimum deletion length to call [default 50]
+# module load ncbi-toolkit
+# makeblastdb -in human_g1k_v37_decoy.fasta -input_type fasta  -dbtype nucl
+#--bind /gpfs,/spin1,/data,/lscratch,/scratch,/fdb
+localrules: scramble_annotation
+rule scramble_annotation:
+	input:
+		mei = 'scramble/{sample}_MEIs.txt',
+		deletion = 'scramble/{sample}_PredictedDeletions.txt'
+	output:
+		avinput = temp('scramble_anno/{sample}.avinput'),
+		annovar = temp('scramble_anno/{sample}.hg19_multianno.txt'),
+		annovarR = temp('scramble_anno/{sample}.forR.txt'),
+		anno = 'scramble_anno/{sample}.scramble.xlsx'
+	shell:
+		"""
+		module load {config[R_version]}
+		module load {config[annovar_version]}
+		if [[ $(wc -l {input.mei} | cut -d " " -f 1) == 1 ]]
+		then
+			touch {output.avinput}
+			touch {output.annovar}
+			touch {output.annovarR}
+			touch {output.anno}
+		else
+			cut -f 1 {input.mei} | awk -F ":" 'BEGIN{{OFS="\t"}} NR>1 {{print $1,$2,$2,"0","-"}}' > {output.avinput}
+			table_annovar.pl {output.avinput} \
+				$ANNOVAR_DATA/hg19 \
+				-buildver hg19 \
+				-remove \
+				-out scramble_anno/{wildcards.sample} \
+				--protocol refGene \
+				-operation  g \
+				--argument '-splicing 100 -hgvs' \
+				--polish -nastring . \
+				--thread 1
+			awk -F"\t" 'BEGIN{{OFS="\t"}} NR==1 {{print "Func_refGene","Gene","Intronic","AA"}} NR>1 {{print $6,$7,$8,$10}}' {output.annovar} | paste {input.mei} - > {output.annovarR}
+			Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/scramble_anno.R {output.annovarR} {config[SCRAMBLEdb]} {config[OGL_Dx_research_genes]} {config[HGMDtranscript]} {output.anno} {wildcards.sample}
+		fi
+		"""
+#--intronhgvs 100
+localrules: configManta
+rule configManta:
+	input:
+ 		bam = 'sample_bam/{sample}/{sample}.markDup.bam',
+ 		bai = 'sample_bam/{sample}/{sample}.markDup.bai'
+	output:
+		'manta/{sample}/runWorkflow.py'
+	shell:
+		"""
+		module load {config[manta_version]}
+		configManta.py --referenceFasta {config[ref_genome]} --exome --runDir manta/{wildcards.sample} --bam {input.bam}
+		"""
+
+localrules: manta
+rule manta:
+	input:
+		'manta/{sample}/runWorkflow.py'
+	output:
+		'manta/manta.{sample}.annotated.tsv'
+	threads: 8
+	shell:
+		"""
+		module load {config[manta_version]}
+		manta/{wildcards.sample}/runWorkflow.py -m local -j {threads} -g $((SLURM_MEM_PER_NODE / 1024))
+		module load {config[annotsv_version]}
+		AnnotSV -SVinputFile manta/{wildcards.sample}/results/variants/diploidSV.vcf.gz \
+			-SVinputInfo 1 \
+			-outputFile manta/manta.{wildcards.sample}.annotated.tsv
+		"""
+
+# localrules: configManta_cohort
+# rule configManta_cohort:
+# 	input:
+#  		bam = expand('sample_bam/{sample}.markDup.bam', sample=list(SAMPLE_LANEFILE.keys())),
+#  		bai = expand('sample_bam/{sample}.markDup.bai', sample=list(SAMPLE_LANEFILE.keys()))
+# 	output:
+# 		'manta_cohort/runWorkflow.py'
+# 	shell:
+# 		"""
+# 		module load {config[manta_version]}
+# 		bam_i=""
+# 		for bam in {input.bam}; do
+# 			bam_i+=" --bam $bam"
+# 		done
+# 		configManta.py --referenceFasta {config[ref_genome]} --exome --runDir manta_cohort $bam_i
+# 		"""
+#
+# localrules: manta_cohort
+# rule manta_cohort:
+# 	input:
+# 		'manta_cohort/runWorkflow.py'
+# 	output:
+# 		temp('manta_cohort/manta.cohort.done.txt')
+# 	threads: 8
+# 	shell:
+# 		"""
+# 		module load {config[manta_version]}
+# 		manta/runWorkflow.py -m local -j {threads} -g $((SLURM_MEM_PER_NODE / 1024))
+# 		module load {config[annotsv_version]}
+# 		AnnotSV -SVinputFile manta_cohort/results/variants/diploidSV.vcf.gz \
+# 			-SVinputInfo 1 \
+# 			-outputFile manta_cohort/manta.cohort.{config[analysis_batch_name]}.annotated.tsv
+# 		touch {output}
+# 		"""
+#threads 8; mem=32g as in the list
 rule gatk_realigner_target:
 # identify regions which need realignment
 	input:
-		bam = 'sample_bam/{sample}.markDup.bam',
-		bai = 'sample_bam/{sample}.markDup.bai'
+		bam = 'sample_bam/{sample}/{sample}.markDup.bam',
+		bai = 'sample_bam/{sample}/{sample}.markDup.bai'
 	output:
 		temp('sample_bam/{sample}.forIndexRealigner.intervals')
 	threads: 2
@@ -876,8 +880,8 @@ rule gatk_realigner_target:
 rule gatk_indel_realigner:
 # realigns indels to improve quality
 	input:
-		bam = 'sample_bam/{sample}.markDup.bam',
-		bai = 'sample_bam/{sample}.markDup.bai',
+		bam = 'sample_bam/{sample}/{sample}.markDup.bam',
+		bai = 'sample_bam/{sample}/{sample}.markDup.bai',
 		targets = 'sample_bam/{sample}.forIndexRealigner.intervals'
 	output:
 		bam = temp('sample_bam/{sample}.gatk_realigner.bam'),
@@ -1013,181 +1017,3 @@ rule multiqc_gatk:
 		module load multiqc
 		multiqc -f -o {output} GATK_metrics
 		"""
-
-rule multiqc_fastqc:
-	input:
-		expand('fastqc/{sample}', sample=list(SAMPLE_LANEFILE.keys()))
-	output:
-		directory('fastqc/multiqc_report')
-	shell:
-		"""
-		module load multiqc
-		multiqc -f -o {output} fastqc/
-		"""
-
-#freebayes avoids indel_realign, base-quality_recalibration, better to run on all of the bam files
-#freebayes can identify MNP and complex indels.
-#need to have unique RG ID fields for each sample. Use the RG made by the wrapper.
-#Using CleanSam and FixMateInformation, freebayes was able to call one additional ins variant using the panel NA12878 data.
-
-rule freebayes_phasing:
-	input:
-		bam = 'sample_bam/{sample}.markDup.bam',
-		bai = 'sample_bam/{sample}.markDup.bai'
-	output:
-		vcf = 'freebayes/{sample}.vcf.gz',
-		filteredvcf = temp('freebayes/{sample}.filtered.vcf.gz'),
-		tbi = temp('freebayes/{sample}.filtered.vcf.gz.tbi'),
-		phasedvcf = 'freebayes/{sample}.phased.vcf.gz',
-		phasedvcf_tbi = 'freebayes/{sample}.phased.vcf.gz.tbi'
-	threads: 16
-	shell:
-		"""
-		module load {config[freebayes_version]}
-		module load {config[vcflib_version]}
-		module load {config[samtools_version]}
-		module load {config[vt_version]}
-		freebayes-parallel {config[freebayes_region]} {threads} -f {config[bwa_genome]} \
-			--limit-coverage 1000 {input.bam} --min-alternate-fraction 0.05 \
-			--min-mapping-quality 1 --genotype-qualities --strict-vcf --use-mapping-quality \
-			| bgzip -f > {output.vcf}
-		sleep 2
-		tabix -f -p vcf {output.vcf}
-		bcftools norm --multiallelics -any --output-type v {output.vcf} \
-			| vt decompose_blocksub -p -m -d 2 - \
-			| bcftools norm --check-ref s --fasta-ref {config[bwa_genome]} --output-type v - \
-			| bcftools norm -d none --output-type v - \
-			| vcffilter -f "( QUAL > 15 & QA / AO > 15 & SAF > 0 & SAR > 0 & RPR > 0 & RPL > 0 & AO > 2 & DP > 3 ) | ( QUAL > 30 & QA / AO > 25 & ( SAF = 0 | SAR = 0 | RPR = 0 | RPL = 0 ) & AO > 2 & DP > 3 )" \
-			| bgzip -f > {output.filteredvcf}
-		sleep 2
-		tabix -f -p vcf {output.filteredvcf}
-		module unload {config[freebayes_version]}
-		module unload {config[vcflib_version]}
-		module unload {config[vt_version]}
-		module load {config[whatshap_version]}
-		whatshap phase --reference {config[bwa_genome]} --indels {output.filteredvcf} {input.bam} | bgzip -f > {output.phasedvcf}
-		tabix -f -p vcf {output.phasedvcf}
-		"""
-#vt decompose_blocksub -a separated inframe insertion to fs. thus do not use.
-# --gvcf: after gvcf,I tried to pipe it to vcffilter, which removed the reference regions | vcffilter -f "QUAL > 1"
-#freebayes -f /data/OGVFB/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta --gvcf --limit-coverage 1000 --min-coverage 4 sample_bam/14_NA12878.markDup.bam > 14_NA12878.test.gvcf
-#Tag with "PASS" worked as shown below. It's possible to use --gvcf then tag with PASS?
-#vcffilter -t "PASS" -f "( QUAL > 20 & QA / AO > 10 & SAF > 0 & SAR > 0 & RPR > 0 & RPL > 0 )  & AO > 2 & DP > 3 | ( QUAL > 30 & QA / AO > 25 & ( SAF = 0 | SAR = 0 | RPR = 0 | RPL = 0 ) & AO > 2 & DP > 3 )" 14_NA12878.freebayes.vcf.gz | bgzip > 14_NA12878.freebayes.filter7.vcf.gz
-#vcffilter -F "filter2" -f ... did not work
-##WGS vcffilter
-#vcffilter -f "QUAL > 20 & QA / AO > 10 & SAF > 0 & SAR > 0 & RPR > 1 & RPL > 1" {output.vcf} | bgzip > {output.filteredvcf}
-# QUAL > 1 removes horrible sites, testing 11/2/19
-# QUAL / AO > 10 additional contribution of each obs should be 10 log units (~ Q10 per read), Used QUAL/AO > 5 before 10/30/19;
-# QA / AO > 10 (QA: Sum of quality of the alternate observations), starting 11/1/19 - 99% specificity and 98% sensitivity
-# SAF > 0 & SAR > 0 reads on both strands, Number of alternate observations on the forward/reverse strand, remove this one for panel/exome data, use AO > 2 instead.
-# RPR > 1 & RPL > 1 at least two reads “balanced” to each side of the site
-
-
-rule merge_freebayes:
-	input:
-		vcf = expand('freebayes/{sample}.phased.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
-		tbi = expand('freebayes/{sample}.phased.vcf.gz.tbi', sample=list(SAMPLE_LANEFILE.keys()))
-	output:
-		'prioritization/freebayes.merge.done.txt'
-	threads: 8
-	shell:
-		"""
-		module load {config[samtools_version]}
-		case "{input.vcf}" in
-			*\ *)
-				bcftools merge --merge none --missing-to-ref --output-type z --threads {threads} {input.vcf} \
-				> prioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
-				;;
-			*)
-				cp {input.vcf} prioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
-				;;
-		esac
-		sleep 2
-		tabix -f -p vcf prioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
-		touch {output}
-		"""
-
-rule freebayes:
-	input:
-		bam = expand('sample_bam/{sample}.markDup.bam', sample=list(SAMPLE_LANEFILE.keys())),
-		bai = expand('sample_bam/{sample}.markDup.bai', sample=list(SAMPLE_LANEFILE.keys()))
-	output:
-		temp('freebayes.vcf')
-	threads: 36
-	shell:
-		"""
-		module load {config[freebayes_version]}
-		module load {config[vcflib_version]}
-		module load {config[samtools_version]}
-		freebayes-parallel {config[freebayes_region]} {threads} -f {config[bwa_genome]} \
-			--limit-coverage 1000 {input.bam} | vcffilter -f "QUAL > 1" | bgzip > {config[analysis_batch_name]}.freebayes.vcf.gz
-		sleep 2
-		tabix -f -p vcf {config[analysis_batch_name]}.freebayes.vcf.gz
-		vcffilter -f "QUAL > 20 & QUAL / AO > 5 & SAF > 0 & SAR > 0 & RPR > 1 & RPL > 1"  {config[analysis_batch_name]}.freebayes.vcf.gz | bgzip > {config[analysis_batch_name]}.freebayes.filtered.vcf.gz
-		sleep 2
-		tabix -f -p vcf {config[analysis_batch_name]}.freebayes.filtered.vcf.gz
-		touch freebayes.vcf
-		"""
-#For filtering: tried QUAL > 20 suggested in GitHub freebayes
-#consider change the filter option to according to Eric Garrison's Univ Iowa hardfilter suggestion: vcffilter -f "QUAL > 1 & QUAL / AO > 10 & SAF > 0 & SAR > 0 & RPR > 1 & RPL > 1"
-#For a single file: freebayes -f {config[ref_genome]} {input.bam} | vcffilter -f "QUAL > 20" > {output}
-#24 OGLv1 panel on MiSeq 7/17/19, finished in 70 min, when running on 32 threads and 128 gb mem: 500 regions: freebayes-parallel /data/OGVFB/OGL_NGS/bed/freebayes.OGLv1.500.region 32 -f /data/OGVFB/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta 24bam | vcffilter -f "QUAL > 20" > freebayes.vcf
-#48 OGLv1 panel on MiSeq 7/17/19, failed after one batch of writing when running on 36 threads and 720gb mem, when on 500 regions, when not setting "--use-best-n-alleles 4"
-#48 samples above worked when using --use-best-n-alleles 4 7/21/19 took ~ 3 hours.
-#removed --use-best-n-alleles 4 on 7/23/2019 When working with 12 samples, and use "QUAL > 20 & QUAL / AO > 5 & SAF > 0 & SAR > 0 & RPR > 1 & RPL > 1" retained both orf15 variants.
-
-localrules: scramble
-rule scramble:
-	input:
-		bam = 'sample_bam/{sample}.markDup.bam',
-		bai = 'sample_bam/{sample}.markDup.bai'
-	output:
-		cluster = temp('scramble/{sample}.cluster.txt'),
-		mei = 'scramble/{sample}.mei.txt',
-	shell:
-		"""
-		module load scramble
-		scramble cluster_identifier {input.bam} > {output.cluster}
-		scramble Rscript --vanilla /app/cluster_analysis/bin/SCRAMble-MEIs.R \
-			--out-name ${{PWD}}/{output.mei} \
-			--cluster-file ${{PWD}}/{output.cluster} \
-			--install-dir /app/cluster_analysis/bin \
-			--mei-refs /app/cluster_analysis/resources/MEI_consensus_seqs.fa
-		"""
-#--bind /gpfs,/spin1,/data,/lscratch,/scratch,/fdb
-localrules: scramble_annotation
-rule scramble_annotation:
-	input:
-		mei = 'scramble/{sample}.mei.txt'
-	output:
-		avinput = temp('scramble_anno/{sample}.avinput'),
-		annovar = temp('scramble_anno/{sample}.hg19_multianno.txt'),
-		annovarR = temp('scramble_anno/{sample}.forR.txt'),
-		anno = 'scramble_anno/{sample}.scramble.xlsx'
-	shell:
-		"""
-		module load {config[R_version]}
-		module load {config[annovar_version]}
-		if [[ $(wc -l {input.mei} | cut -d " " -f 1) == 1 ]]
-		then
-			touch {output.avinput}
-			touch {output.annovar}
-			touch {output.annovarR}
-			touch {output.anno}
-		else
-			cut -f 1 {input.mei} | awk -F ":" 'BEGIN{{OFS="\t"}} NR>1 {{print $1,$2,$2,"0","-"}}' > {output.avinput}
-			table_annovar.pl {output.avinput} \
-				$ANNOVAR_DATA/hg19 \
-				-buildver hg19 \
-				-remove \
-				-out scramble_anno/{wildcards.sample} \
-				--protocol refGene \
-				-operation  g \
-				--argument '-splicing 100 -hgvs' \
-				--polish -nastring . \
-				--thread 1
-			awk -F"\t" 'BEGIN{{OFS="\t"}} NR==1 {{print "Func_refGene","Gene","Intronic","AA"}} NR>1 {{print $6,$7,$8,$10}}' {output.annovar} | paste {input.mei} - > {output.annovarR}
-			Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/scramble_anno.R {output.annovarR} {config[SCRAMBLEdb]} {config[OGL_Dx_research_genes]} {config[HGMDtranscript]} {output.anno} {wildcards.sample}
-		fi
-		"""
-#--intronhgvs 100

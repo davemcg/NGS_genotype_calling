@@ -6,7 +6,15 @@
 		"mem" : "8g",
 		"output"  : "00log/{rule}_{wildcards}.out",
 		"error" : "00log/{rule}_{wildcards}.err",
-		"extra" : ""
+		"extra" : "--gres=lscratch:20"
+	},
+	"deepvariant" :
+	{
+		"partition" : "quick",
+		"time" : "2:00:00",
+		"mem" : "16g",
+		"threads" : "4",
+		"extra" : "--gres=lscratch:50"
 	},
 	"freebayes_phasing" :
 	{
@@ -34,7 +42,7 @@
 	},
 	"align" :
 	{
-		"mem" : "16g",
+		"mem" : "32g",
 		"threads" : "8"
 	},
 	"align_hg19" :

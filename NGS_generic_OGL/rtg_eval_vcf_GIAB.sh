@@ -26,7 +26,7 @@ else
 fi
 
 
-zcat $1 | vt decompose -s - | vt decompose_blocksub -a - | vt normalize -n -r /data/OGVFB/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta - | bgzip -c > ${filename%.vcf.gz}.vt.vcf.gz
+zcat $1 | vt decompose -s - | vt decompose_blocksub -a - | vt normalize -n -r /data/OGL/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta - | bgzip -c > ${filename%.vcf.gz}.vt.vcf.gz
 
 tabix -f -p vcf ${filename%.vcf.gz}.vt.vcf.gz
 

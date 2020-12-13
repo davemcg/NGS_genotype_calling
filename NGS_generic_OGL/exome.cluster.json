@@ -6,7 +6,15 @@
 		"mem" : "8g",
 		"output"  : "00log/{rule}_{wildcards}.out",
 		"error" : "00log/{rule}_{wildcards}.err",
-		"extra" : ""
+		"extra" : "--gres=lscratch:20"
+	},
+	"deepvariant" :
+	{
+		"partition" : "norm",
+		"time" : "6:00:00",
+		"mem" : "64g",
+		"threads" : "36",
+		"extra" : "--gres=lscratch:50"
 	},
 	"freebayes" :
 	{
@@ -36,9 +44,26 @@
 	"align" :
 	{
 		"partition" : "norm",
-		"time" : "48:00:00",
+		"time" : "12:00:00",
 		"mem" : "64g",
-		"threads" : "32"
+		"threads" : "16",
+		"extra" : "--gres=lscratch:50"
+	},
+	"realign" :
+	{
+		"partition" : "norm",
+		"time" : "12:00:00",
+		"mem" : "64g",
+		"threads" : "32",
+		"extra" : "--gres=lscratch:50"
+	},
+	"align_markdup" :
+	{
+		"partition" : "norm",
+		"time" : "12:00:00",
+		"mem" : "64g",
+		"threads" : "32",
+		"extra" : "--gres=lscratch:50"
 	},
 	"align_hg19" :
 	{

@@ -5,21 +5,17 @@ args <- commandArgs(trailingOnly=TRUE)
 #           "Y:/resources/SCRAMBLEvariantClassification.xlsx", "Z:/OGL_NGS/variant_prioritization/data/OGLv1_panel_DxORcandidate.tsv",
 #           "W:/ddl_nisc_custom_capture/042020/scramble/107910Y.annoted.xlsx")
 
-#R_version: 'R/3.6.3'
-
 library(tidyverse)
 library(readxl)
 
 annovar <- read_tsv(args[1], col_names = TRUE, na = c("NA", "", "None", "."), col_types = cols(.default = col_character())) %>% 
-  mutate(sample = args[6]) %>% 
-  mutate(Intronic = gsub("0>-", "", Intronic))
-# Do not use type_convert() because it converts chr:pos.
+  mutate(sample = args[6]) 
+#do not use type_convert() because it converts chr:pos.
 
 classificationDF <- read_xlsx(args[2], sheet = "Variant", na = c("NA", "", "None", ".")) %>% 
   select("Insertion", "MEI_Family", "Insertion_Direction", "classification", "popAF", "note")
 
-#panelGene <- read_tsv(args[3], col_names = TRUE, col_types = cols(.default = col_character())) %>% select(gene, panel_class)
-panelGene <- read_xlsx(args[3], sheet = "analysis", na = c("NA", "", "None", ".")) %>% select(gene, panel_class)
+panelGene <- read_tsv(args[3], col_names = TRUE, col_types = cols(.default = col_character())) %>% select(gene, panel_class)
 
 HGMD <- read_tsv(args[4], col_names = TRUE, na = c("NA", "", "None", "."), col_types = cols(.default = col_character()))
 hgmdNM <- dplyr::pull(HGMD, name)
@@ -58,8 +54,4 @@ annoted1 <- left_join(annoted, panelGene, by = c("Gene" = "gene")) %>%
   filter(classification %in% c("Pathogenic", "Likely pathogenic", "VOUS", "Not classified"), !grepl("GL", Insertion), Func_refGene %in% c("splicing", "exonic", "UTR5", "UTR3", "upstream")) %>% 
   arrange(classification, desc(eyeGene), desc(Clipped_Reads_In_Cluster))
 
-if (dim(annoted1)[1] == 0) {
-  write_tsv(annoted1, path = args[5])
-} else {
-  openxlsx::write.xlsx(annoted1, file = args[5])
-}
+write_tsv(annoted1, path = args[5])

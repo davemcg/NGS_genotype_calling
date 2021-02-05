@@ -234,7 +234,7 @@ elif config['inputFileType'].upper() in ['BAM', 'CRAM']:
 			esac
 			"""
 else:
-	rule align:
+	rule align_markdup:
 		input:
 			# config['lane_pair_delim'] is the string differentiating
 			# the forward from reverse
@@ -248,7 +248,7 @@ else:
 			bai = temp('lane_bam/{lane}.bam.bai')
 		params:
 			read_group = rg
-		threads: 36
+		threads: 56
 		shell:
 			"""
 			export TMPDIR=/lscratch/$SLURM_JOB_ID

@@ -6,34 +6,30 @@
 		"mem" : "8g",
 		"output"  : "00log/{rule}_{wildcards}.out",
 		"error" : "00log/{rule}_{wildcards}.err",
-		"extra" : "--gres=lscratch:20"
+		"extra" : ""
 	},
 	"deepvariant" :
 	{
-		"partition" : "quick",
-		"time" : "2:00:00",
-		"mem" : "16g",
-		"threads" : "4",
+		"partition" : "quick,norm",
+		"time" : "1:00:00",
+		"mem" : "8g",
 		"extra" : "--gres=lscratch:50"
 	},
 	"freebayes_phasing" :
 	{
 		"partition" : "quick",
-		"time" : "4:00:00",
-		"mem" : "64g",
-		"threads" : "16"
+		"time" : "1:00:00",
+		"mem" : "20g"
 	},
 	"freebayes" :
 	{
 		"partition" : "largemem",
 		"time" : "24:00:00",
-		"mem" : "720g",
-		"threads" : "36"
+		"mem" : "720g"
 	},
 	"merge_freebayes" :
 	{
-		"mem" : "64g",
-		"threads" : "8"
+		"mem" : "64g"
 	},
 	"coverage" :
 	{
@@ -42,8 +38,25 @@
 	},
 	"align" :
 	{
+		"time" : "1:00:00",
 		"mem" : "32g",
-		"threads" : "8"
+		"threads" : "8",
+		"extra" : "--gres=lscratch:50"
+	},
+	"realign" :
+	{
+		"mem" : "60g",
+		"extra" : "--gres=lscratch:100"
+	},
+	"manta" :
+	{
+		"time" : "1:00:00",
+		"threads" : "8",
+		"extra" : "--gres=lscratch:50"
+	},
+	"scramble" :
+	{
+		"mem" : "48g"
 	},
 	"align_hg19" :
 	{
@@ -60,7 +73,10 @@
 	"CoNVaDING_1" :
 	{
 		"time" : "2:00:00",
-		"mem" : "16g",
+		"extra" : "--gres=lscratch:50"
+	},
+	"picard_alignmentQC":
+	{
 		"extra" : "--gres=lscratch:50"
 	},
 	"picard_merge_bams" :
@@ -71,9 +87,9 @@
 	},
 	"merge_lane_bam" :
 	{
-		"partition" : "norm",
-		"time" : "6:00:00",
-		"mem" : "16G",
+		"partition" : "norm,quick",
+		"time" : "2:00:00",
+		"mem" : "24G",
 		"extra" : "--gres=lscratch:100"
 	},
 	"merge_lane_bam_hg19" :
@@ -143,8 +159,8 @@
 		"time" : "12:00:00"
 	},
 	"fastqc" : {
-		"partition" : "norm",
-		"time" : "6:00:00"
+		"partition" : "quick,norm",
+		"time" : "1:00:00"
 	},
 	"sort" : {
 		"partition" : "norm",

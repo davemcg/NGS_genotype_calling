@@ -1,4 +1,8 @@
 #!/bin/bash
+#SBATCH --cpus-per-task=20
+#SBATCH --mem=128g
+#SBATCH -p norm,quick
+#SBATCH --time=2:00:00
 
 #sinteractive --cpus-per-task=20 --mem=128g
 #finished one midi-run in less than 5 min.

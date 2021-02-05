@@ -52,11 +52,18 @@ if config['analysis_batch_name'] == 'YYYYMMDD':
 	currentDT = datetime.datetime.now()
 	config['analysis_batch_name'] = currentDT.strftime("%Y%m%d")
 
-def rg(wildcards):
-	# returns the read group given in the config['metadata_file']
-	lane_file = str(wildcards)
-	rg_out = str(LANEFILE_READGROUP[lane_file + config['lane_pair_delim'][0] + '.fastq.gz'][0])
-	return(rg_out)
+if config['inputFileType'].upper() in ['BAM', 'CRAM']:
+	def rg(wildcards):
+		# returns the read group given in the config['metadata_file']
+		lane_file = str(wildcards)
+		rg_out = str(LANEFILE_READGROUP[str(SAMPLE_LANEFILE[lane_file][0])]).replace("['", "").replace("']","")
+		return(rg_out)
+else:
+	def rg(wildcards):
+		# returns the read group given in the config['metadata_file']
+		lane_file = str(wildcards)
+		rg_out = str(LANEFILE_READGROUP[lane_file + config['lane_pair_delim'][0] + '.fastq.gz'][0])
+		return(rg_out)
 
 # import CREST hg19 regions, chr1 to chrY
 REGIONS_file = config['regions']
@@ -83,8 +90,9 @@ rule all:
 		# 'GATK_metrics/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
 		'fastqc/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
 		# expand('picardQC/{sample}.insert_size_metrics.txt', sample=list(SAMPLE_LANEFILE.keys())) if config['picardQC'] == 'TRUE' else 'dummy.txt',
-		'prioritization/freebayes.merge.done.txt' if config['freebayes_phasing'] == 'TRUE' else 'dummy.txt',
 		'deepvariant/deepvariantVcf.merge.done.txt' if config['deepvariant'] == 'TRUE' else 'dummy.txt',
+		'prioritization/dv_fb.merge.done.txt' if config['freebayes_phasing'] == 'TRUE' else 'dummy.txt',
+		expand('coverage/{sample}.coverage.xlsx', sample=list(SAMPLE_LANEFILE.keys())) if config['coverage'] == 'TRUE' else 'dummy.txt',
 		expand('manta/manta.{sample}.annotated.tsv', sample=list(SAMPLE_LANEFILE.keys())),
 		expand('scramble_anno/{sample}.scramble.xlsx', sample=list(SAMPLE_LANEFILE.keys())) if config['SCRAMble'] == 'TRUE' else 'dummy.txt'
 
@@ -106,64 +114,67 @@ if config['inputFileType'] == 'single_lane_fastq':
 			expand('fastq/{{lane}}{pair}.fastq.gz', pair = config['lane_pair_delim'])
 		output:
 			bam = temp('lane_bam/{lane}.bam'),
-			bai = temp('lane_bam/{lane}.bai'),
-			metrics = temp('lane_bam/{lane}.duplication_metrics.txt')
+			bai = temp('lane_bam/{lane}.bam.bai')
 		params:
 			read_group = rg
 		threads: 16
 		shell:
 			"""
+			export TMPDIR=/lscratch/$SLURM_JOB_ID
 			echo {params.read_group}
-			module load {config[bwa-mem2_version]}
-			module load {config[biobambam2_version]}
-			bwa-mem2 mem -t {threads} -K 100000000 -M -B 4 -O 6 -E 1 -R {params.read_group} \
-				{config[ref_genome]} {input} \
-				| bamsormadup SO=coordinate threads={threads} level=6 inputformat=sam \
-				tmpfile=/lscratch/$SLURM_JOB_ID/bamsormadup \
-				indexfilename={output.bai} M={output.metrics} > {output.bam}
+			module load {config[bwa-mem2_version]} {config[samblaster_version]} {config[sambamba_version]}
+			bwa-mem2 mem -t {threads} -K 100000000 -M -Y -B 4 -O 6 -E 1 -R {params.read_group} \
+				{config[bwa-mem2_ref]} {input} \
+			 	| samblaster -M --addMateTags --quiet \
+				| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t {threads} -o {output.bam} \
+					<(sambamba view -S -f bam -l 0 -t $SLURM_CPUS_PER_TASK /dev/stdin)
 			"""
 	localrules: cp_lane_bam
 	rule cp_lane_bam:
 		input:
 			bam = lambda wildcards: expand('lane_bam/{lane}.bam', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]]))),
-			bai = lambda wildcards: expand('lane_bam/{lane}.bai', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]]))),
-			metrics = lambda wildcards: expand('lane_bam/{lane}.duplication_metrics.txt', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]])))
+			bai = lambda wildcards: expand('lane_bam/{lane}.bam.bai', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]])))
 		output:
 			bam = temp('sample_bam/{sample}.markDup.bam'),
-			bai = temp('sample_bam/{sample}.markDup.bai'),
-			metrics = 'sample_bam/{sample}.duplication_metrics.txt'
+			bai = temp('sample_bam/{sample}.markDup.bai')
 		shell:
 			"""
 			cp -p -l {input.bam} {output.bam}
 			cp -p -l {input.bai} {output.bai}
-			cp -p -l {input.metrics} {output.metrics}
 			"""
-elif config['inputFileType'] == 'bam':
+elif config['inputFileType'].upper() in ['BAM', 'CRAM']:
 	rule realign:
 		input:
 			lambda wildcards: join('old_bam/', str(SAMPLE_LANEFILE[wildcards.sample][0]))
 		output:
 			bam = temp('sample_bam/{sample}.markDup.bam'),
-			bai = temp('sample_bam/{sample}.markDup.bai'),
-			metrics = 'sample_bam/{sample}.duplication_metrics'
+			bai = temp('sample_bam/{sample}.markDup.bai')
 		threads: 16
+		params:
+			read_group = rg
 		shell:
 			"""
-			module load {config[biobambam2_version]}
- 			module load {config[bwa-mem2_version]}
-			case "{input}" in
+			export TMPDIR=/lscratch/$SLURM_JOB_ID
+			module load {config[bazam_version]}
+			module load {config[bwa-mem2_version]} {config[samblaster_version]} {config[sambamba_version]}
+ 			case "{input}" in
 				*bam)
-					java -Xmx12g -jar ~/git/bazam/build/libs/bazam.jar -bam old_bam/{input} \
-					| bwa-mem2 mem -t {threads} -K 100000000 -M -B 4 -O 6 -E 1 -p {config[ref_genome]} - \
-					| bamsormadup SO=coordinate threads={threads} level=6 inputformat=sam \
-					tmpfile=/lscratch/$SLURM_JOB_ID/bamsormadup \
-					indexfilename={output.bai} M={output.metrics} > {output.bam}
+					java -Xmx12g -jar $BAZAMPATH/bazam.jar -bam {input} \
+					| bwa-mem2 mem -t {threads} -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[bwa-mem2_ref]} - \
+			 		| samblaster -M --addMateTags --quiet \
+					| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t {threads} -o {output.bam} \
+						<(sambamba view -S -f bam -l 0 -t $SLURM_CPUS_PER_TASK /dev/stdin)
+					mv {output.bam}.bai {output.bai}
+					#sambamba index -t {threads} {output.bam} {output.bai}
+					;;
 				*cram)
-					java -Xmx12g -Dsamjdk.reference_fasta={config[old_cram_ref]} -jar ~/git/bazam/build/libs/bazam.jar -bam old_bam/{input} \
-					| bwa-mem2 mem -t {threads} -K 100000000 -M -B 4 -O 6 -E 1 -p {config[ref_genome]} - \
-					| bamsormadup SO=coordinate threads={threads} level=6 inputformat=sam \
-					tmpfile=/lscratch/$SLURM_JOB_ID/bamsormadup \
-					indexfilename={output.bai} M={output.metrics} > {output.bam}
+					java -Xmx12g -Dsamjdk.reference_fasta={config[old_cram_ref]} -jar $BAZAMPATH/bazam.jar -bam {input} \
+					| bwa-mem2 mem -t {threads} -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[bwa-mem2_ref]} - \
+			 		| samblaster -M --addMateTags --quiet \
+					| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t {threads} -o {output.bam} \
+						<(sambamba view -S -f bam -l 0 -t $SLURM_CPUS_PER_TASK /dev/stdin)
+					mv {output.bam}.bai {output.bai}
+					;;
 			esac
 			"""
 else:
@@ -177,52 +188,54 @@ else:
 			# if you don't have a paired fastq set, give as ['']
 			expand('fastq/{{lane}}{pair}.fastq.gz', pair = config['lane_pair_delim'])
 		output:
-			temp('lane_bam/{lane}.bam')
+			bam = temp('lane_bam/{lane}.bam'),
+			bai = temp('lane_bam/{lane}.bam.bai')
 		params:
 			read_group = rg
 		threads: 16
 		shell:
 			"""
+			export TMPDIR=/lscratch/$SLURM_JOB_ID
 			echo {params.read_group}
-			module load {config[bwa-mem2_version]}
-			module load {config[samtools_version]}
-			bwa-mem2 mem -t {threads} -K 100000000 -M -B 4 -O 6 -E 1 -R {params.read_group} \
-				{config[ref_genome]} \
-				{input} | \
-				samtools view -1 - > \
-				{output}
+			module load {config[bwa-mem2_version]} {config[samblaster_version]} {config[sambamba_version]}
+			bwa-mem2 mem -t {threads} -K 100000000 -M -Y -B 4 -O 6 -E 1 -R {params.read_group} \
+				{config[bwa-mem2_ref]} {input} \
+			 	| samblaster -M --addMateTags --quiet \
+				| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t {threads} -o {output.bam} \
+					<(sambamba view -S -f bam -l 0 -t $SLURM_CPUS_PER_TASK /dev/stdin)
 			"""
 	rule merge_lane_bam:
 		input:
-			lambda wildcards: expand('lane_bam/{lane}.bam', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]])))
+			lambda wildcards: expand('lane_bam/{lane}.bam', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]]))),
+			lambda wildcards: expand('lane_bam/{lane}.bam.bai', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]])))
 		output:
 			merged_bam = temp('sample_bam/{sample}.merged.bam'),
-			merged_bai = temp('sample_bam/{sample}.merged.bai'),
+			merged_bai = temp('sample_bam/{sample}.merged.bam.bai'),
 			bam = temp('sample_bam/{sample}.markDup.bam'),
 			bai = temp('sample_bam/{sample}.markDup.bai'),
 			metrics = 'sample_bam/{sample}.duplication_metrics.txt'
 		threads: 16
 		shell:
 			"""
-			module load {config[picard_version]}
-			picard_i=""
-			for bam in {input}; do
-				picard_i+=" -I $bam"
-			done
-			java -Xmx32g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
-				MergeSamFiles \
-				-TMP_DIR /lscratch/$SLURM_JOB_ID \
-				$picard_i \
-				-O {output.merged_bam} \
-				--SORT_ORDER coordinate \
-				--CREATE_INDEX true
-			java -Xmx32g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
-				MarkDuplicates \
-				-TMP_DIR /lscratch/$SLURM_JOB_ID \
-				--INPUT {output.merged_bam} \
-				--OUTPUT {output.bam} \
-				--METRICS_FILE {output.metrics} \
-				--CREATE_INDEX true
+			module load {config[sambamba_version]} {config[picard_version]}
+			case "{input.bam}" in
+				*\ *)
+					sambamba merge -t {threads} {output.merged_bam} {input.bam}
+					java -Xmx16g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+						MarkDuplicates \
+						--INPUT {output.merged_bam} \
+						--OUTPUT {output.bam} \
+						--METRICS_FILE {output.metrics} \
+						--COMPRESSION_LEVEL 6 \
+						--CREATE_INDEX true \
+						--ASSUME_SORT_ORDER coordinate
+					;;
+				*)
+					touch {output.merged_bam} {output.merged_bai} {output.metrics}
+					cp -p -l {input.bam} {output.bam}
+					cp -p -l {input.bai} {output.bai}
+					;;
+			esac
 			"""
 
 # rule merge_lane_bam_hg19:
@@ -307,20 +320,22 @@ rule picard_alignmentQC:
 	threads: 2
 	shell:
 		"""
-		module load {config[picard_version]}
+		module load {config[picard_version]} {config[R_version]}
 		java -Xmx8g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
 			CollectInsertSizeMetrics \
-			INPUT={input.bam} \
-			O={output.insert_size_metrics} \
-		    H={output.insert_size_histogram} \
-		    M=0.5
+			-TMP_DIR /lscratch/$SLURM_JOB_ID \
+			--INPUT {input.bam} \
+			-O {output.insert_size_metrics} \
+		    -H {output.insert_size_histogram} \
+		    -M 0.5
 		java -Xmx8g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
 			CollectAlignmentSummaryMetrics \
-			INPUT={input.bam} \
-			R={config[ref_genome]} \
-			METRIC_ACCUMULATION_LEVEL=SAMPLE \
-			METRIC_ACCUMULATION_LEVEL=READ_GROUP \
-			O={output.alignment_metrics}
+			-TMP_DIR /lscratch/$SLURM_JOB_ID \
+			--INPUT {input.bam} \
+			-R {config[ref_genome]} \
+			--METRIC_ACCUMULATION_LEVEL SAMPLE \
+			--METRIC_ACCUMULATION_LEVEL READ_GROUP \
+			-O {output.alignment_metrics}
 		"""
 
 # rule picard_mark_dups_allchr:
@@ -343,6 +358,31 @@ rule picard_alignmentQC:
 # 			METRICS_FILE={output.metrics} \
 # 			CREATE_INDEX=true
 # 		"""
+
+localrules: coverage
+rule coverage:
+	input:
+		bam = 'sample_bam/{sample}/{sample}.markDup.bam',
+		bai = 'sample_bam/{sample}/{sample}.markDup.bai'
+	output:
+		thresholds = 'coverage/mosdepth/{sample}.thresholds.bed.gz',
+		xlsx = 'coverage/{sample}.coverage.xlsx'
+	threads: 8
+	shell:
+		"""
+		module load {config[mosdepth_version]}
+		module load {config[R_version]}
+		mosdepth -t {threads} --no-per-base --by {config[bed]} --use-median --mapq 1 --thresholds 10,20,30 \
+			{wildcards.sample} {input.bam}
+		mv {wildcards.sample}.thresholds.bed.gz* coverage/mosdepth/.
+		mv {wildcards.sample}.mosdepth* coverage/mosdepth/.
+		mv {wildcards.sample}.regions.bed.gz* coverage/mosdepth/.
+		zcat {output.thresholds} \
+			 | sed '1 s/^.*$/chr\tstart\tend\tgene\tcoverageTen\tcoverageTwenty\tcoverageThirty/' \
+			 > {output.thresholds}.tsv
+		Rscript ~/git/NGS_genotype_calling/NGS_generic_OGL/mosdepth_bed_coverage.R \
+			{output.thresholds}.tsv {config[OGL_Dx_research_genes]} {output.xlsx}
+		"""
 
 # 30% smaller!
 rule bam_to_cram:
@@ -384,7 +424,8 @@ rule scramble:
 		bai = 'sample_bam/{sample}.markDup.bai'
 	output:
 		cluster = temp('scramble/{sample}.cluster.txt'),
-		mei = 'scramble/{sample}.mei.txt',
+		mei = 'scramble/{sample}_MEIs.txt',
+		deletion = 'scramble/{sample}_PredictedDeletions.txt'
 	shell:
 		"""
 		module load {config[scramble_version]}
@@ -403,12 +444,14 @@ rule scramble:
 #localrules: scramble_annotation
 rule scramble_annotation:
 	input:
-		mei = 'scramble/{sample}.mei.txt'
+		mei = 'scramble/{sample}_MEIs.txt',
+		deletion = 'scramble/{sample}_PredictedDeletions.txt'
 	output:
 		avinput = temp('scramble_anno/{sample}.avinput'),
 		annovar = temp('scramble_anno/{sample}.hg19_multianno.txt'),
 		annovarR = temp('scramble_anno/{sample}.forR.txt'),
-		anno = 'scramble_anno/{sample}.scramble.xlsx'
+		anno = 'scramble_anno/{sample}.scramble.xlsx',
+		del_anno = 'scramble_anno/{sample}.scramble.del.tsv'
 	shell:
 		"""
 		module load {config[R_version]}
@@ -434,8 +477,15 @@ rule scramble_annotation:
 			awk -F"\t" 'BEGIN{{OFS="\t"}} NR==1 {{print "Func_refGene","Gene","Intronic","AA"}} NR>1 {{print $6,$7,$8,$10}}' {output.annovar} | paste {input.mei} - > {output.annovarR}
 			Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/scramble_anno.R {output.annovarR} {config[SCRAMBLEdb]} {config[OGL_Dx_research_genes]} {config[HGMDtranscript]} {output.anno} {wildcards.sample}
 		fi
+		if [[ $(wc -l {input.deletion} | cut -d " " -f 1) == 1 ]]
+		then
+			touch {output.del_anno}
+		else
+			module load {config[annotsv_version]}
+			tail -n +2 {input.deletion} | awk -F"\t" 'BEGIN{{OFS="\t"}} {{print $1,$2,$3,"DEL"}}' > {input.deletion}.bed
+			AnnotSV -SVinputFile {input.deletion}.bed -SVinputInfo 0 -svtBEDcol 4 -outputFile {output.del_anno}
+		fi
 		"""
-
 #Try this strategy,if not working well, consider split by chr as in the GATK.
 rule freebayes_phasing:
 	input:
@@ -528,29 +578,37 @@ rule deepvariant:
 		bai = 'sample_bam/{sample}.markDup.bai'
 	output:
 		vcf = 'deepvariant/vcf/{sample}.dv.vcf.gz',
-		gvcf = 'deepvariant/vcf/{sample}.dv.g.vcf.gz',
+		gvcf = 'deepvariant/gvcf/{sample}.dv.g.vcf.gz',
 		filteredvcf = temp('deepvariant/vcf/{sample}.dv.filtered.vcf.gz'),
 		filteretbi = temp('deepvariant/vcf/{sample}.dv.filtered.vcf.gz.tbi'),
-		phasedvcf = 'deepvariant/vcf/{sample}.dv.phased.vcf.gz'
+		phasedvcf = 'deepvariant/vcf/{sample}.dv.phased.vcf.gz',
+		phasedtbi = 'deepvariant/vcf/{sample}.dv.phased.vcf.gz.tbi'
+	threads: 32
 	shell:
 		"""
 		module load {config[deepvariant_version]}
-		run_deepvariant --model_type WES --num_shards 36 \
+		PROJECT_WD=$PWD
+		N_SHARDS="16"
+		mkdir -p /lscratch/$SLURM_JOB_ID/{wildcards.sample}
+		WORK_DIR=/lscratch/$SLURM_JOB_ID/{wildcards.sample}
+		cd $WORK_DIR
+		run_deepvariant --model_type WES --num_shards $N_SHARDS \
 			--ref {config[ref_genome]} \
 			--regions {config[padded_bed]} \
-			--reads {input.bam} \
-			--output_vcf {output.vcf} \
-			--output_gvcf {output.gvcf}
+			--reads $PROJECT_WD/{input.bam} \
+			--output_vcf $PROJECT_WD/{output.vcf} \
+			--output_gvcf $PROJECT_WD/{output.gvcf} \
+			--sample_name {wildcards.sample} \
+			--intermediate_results_dir $WORK_DIR \
+			--call_variants_extra_args="use_openvino=true"
+		cd $PROJECT_WD
 		module unload {config[deepvariant_version]}
 		module load {config[samtools_version]}
-		module load {config[vt_version]}
 		bcftools norm --multiallelics -any --output-type v {output.vcf} \
-			| vt decompose_blocksub -p -m -d 2 - \
 			| bcftools norm -d none --output-type v - \
-			| bcftools filter --include 'QUAL>0' --output-type z --output {output.filteredvcf}
+			| bcftools filter --include 'FILTER="PASS"' --output-type z --output {output.filteredvcf}
 		sleep 2
 		tabix -f -p vcf {output.filteredvcf}
-		module unload {config[vt_version]}
 		module load {config[whatshap_version]}
 		whatshap phase --reference {config[ref_genome]} --indels {output.filteredvcf} {input.bam} | bgzip -f > {output.phasedvcf}
 		tabix -f -p vcf {output.phasedvcf}
@@ -558,7 +616,8 @@ rule deepvariant:
 
 rule merge_deepvariant_vcf:
 	input:
-		vcf = expand('deepvariant/vcf/{sample}.dv.phased.vcf.gz', sample=list(SAMPLE_LANEFILE.keys()))
+		vcf = expand('deepvariant/vcf/{sample}.dv.phased.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
+		tbi = expand('deepvariant/vcf/{sample}.dv.phased.vcf.gz.tbi', sample=list(SAMPLE_LANEFILE.keys()))
 	output:
 		'deepvariant/deepvariantVcf.merge.done.txt'
 	threads: 8
@@ -569,13 +628,49 @@ rule merge_deepvariant_vcf:
 			*\ *)
 				bcftools merge --merge none --missing-to-ref --output-type z --threads {threads} {input.vcf} \
 				> deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
+				sleep 2
+				tabix -f -p vcf deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
 				;;
 			*)
-				cp {input.vcf} deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
+				cp -p -l {input.vcf} deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
+				cp -p -l {input.tbi} deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz.tbi
 				;;
 		esac
-		sleep 2
-		tabix -f -p vcf deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
+		touch {output}
+		"""
+
+localrules: merge_dv_fb_vcfs
+rule merge_dv_fb_vcfs:
+	input:
+		'deepvariant/deepvariantVcf.merge.done.txt',
+		'freebayes/freebayes.merge.done.txt'
+	output:
+		'prioritization/dv_fb.merge.done.txt'
+	threads: 8
+	shell:
+		"""
+		module load {config[samtools_version]}
+		WORK_DIR=/lscratch/$SLURM_JOB_ID
+		bcftools isec -p $WORK_DIR --collapse none -Ov \
+			deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz \
+			freebayes/{config[analysis_batch_name]}.freebayes.vcf.gz
+		rm $WORK_DIR/0003.vcf &
+		bcftools annotate --threads {threads} --set-id 'dv' -x FORMAT/VAF,FORMAT/PL \
+			--no-version $WORK_DIR/0000.vcf -Oz -o $WORK_DIR/dv.vcf.gz
+		rm $WORK_DIR/0000.vcf &
+		bcftools annotate --threads {threads} --set-id 'fb' -x INFO,FORMAT/RO,FORMAT/QR,FORMAT/AO,FORMAT/QA,FORMAT/GL \
+			--no-version $WORK_DIR/0001.vcf -Oz -o $WORK_DIR/fb.vcf.gz
+		rm $WORK_DIR/0001.vcf &
+		bcftools annotate --threads {threads} --set-id 'dvFb' -x FORMAT/VAF,FORMAT/PL \
+			--no-version $WORK_DIR/0002.vcf -Oz -o $WORK_DIR/dvFb.vcf.gz
+		rm $WORK_DIR/0002.vcf &
+		tabix -f -p vcf $WORK_DIR/dv.vcf.gz
+		tabix -f -p vcf $WORK_DIR/fb.vcf.gz
+		tabix -f -p vcf $WORK_DIR/dvFb.vcf.gz
+		bcftools concat --threads {threads} -a --rm-dups none --no-version \
+			$WORK_DIR/dvFb.vcf.gz $WORK_DIR/dv.vcf.gz $WORK_DIR/fb.vcf.gz \
+			-Oz -o prioritization/{config[analysis_batch_name]}.vcf.gz
+		tabix -f -p vcf prioritization/{config[analysis_batch_name]}.vcf.gz
 		touch {output}
 		"""
 
@@ -601,11 +696,19 @@ rule manta:
 	shell:
 		"""
 		module load {config[manta_version]}
-		manta/{wildcards.sample}/runWorkflow.py -m local -j {threads} -g $((SLURM_MEM_PER_NODE / 1024))
+		mkdir -p /lscratch/$SLURM_JOB_ID/manta/{wildcards.sample}
+		RUNDIR="/lscratch/$SLURM_JOB_ID/manta/{wildcards.sample}"
+		configManta.py --referenceFasta {config[ref_genome]} \
+			--exome --runDir $RUNDIR --bam {input.bam}
+		$RUNDIR/runWorkflow.py -m local -j {threads} -g $((SLURM_MEM_PER_NODE / 1024))
+		cp $RUNDIR/results/variants/diploidSV.vcf.gz manta/{wildcards.sample}.diploidSV.vcf.gz
+		cp $RUNDIR/results/variants/diploidSV.vcf.gz.tbi manta/{wildcards.sample}.diploidSV.vcf.gz.tbi
 		module load {config[annotsv_version]}
-		AnnotSV -SVinputFile manta/{wildcards.sample}/results/variants/diploidSV.vcf.gz \
-			-SVinputInfo 1 \
-			-outputFile manta/manta.{wildcards.sample}.annotated.tsv
+		AnnotSV -SVinputFile $RUNDIR/results/variants/diploidSV.vcf.gz \
+			-SVinputInfo 1 -genomeBuild GRCh37\
+			-outputDir $RUNDIR \
+			-outputFile $RUNDIR/manta.{wildcards.sample}.annotated.tsv
+		cp $RUNDIR/manta.{wildcards.sample}.annotated.tsv {output}
 		"""
 
 

@@ -1,4 +1,7 @@
 #!/bin/bash
+#SBATCH --gres=lscratch:50
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32g
 
 # to run snakemake as batch job
 # run in the data folder for this project, fastq files must be in the folder fastq.
@@ -10,7 +13,7 @@
 
 cp /data/OGL/resources/NGS_genotype_calling.git.log .
 mkdir -p 00log
-module load snakemake/5.7.4 || exit 1
+module load snakemake/5.24.1 || exit 1
 #current version 5.7.4
 sbcmd="sbatch --cpus-per-task={threads} \
 --mem={cluster.mem} \
@@ -27,7 +30,7 @@ if [ -e metadata_file.csv ];
 then
 	echo "metadata_file provided"
 else
-	for fastq1 in fastq/*.fastq.gz; do
+	for fastq1 in fastq/*.gz; do
 	filename=$(basename $fastq1)
 	header=$(zcat $fastq1 | head -1)
 	id=$(echo $header | cut -d: -f 3,4 | sed 's/\:/\./g')
@@ -35,13 +38,14 @@ else
 	echo "$sm,$filename,@RG\\\tID:$id"_"$sm\\\tSM:$sm\\\tLB:$lib"_"$sm\\\tPL:ILLUMINA" >> metadata_file.csv
 	done
 fi
-
+#if sample name has underscore, then sm=$(echo $filename | cut -d_ -f 1,2)
 #https://software.broadinstitute.org/gatk/documentation/article.php?id=6472
 
 #id=$(echo $header | cut -d: -f 3,4,10 | sed 's/\:/\./g') edited 8/27/19
 #echo "$sm,$filename,@RG\\\tID:$id\\\tSM:$sm\\\tLB:$lib"_"$sm\\\tPL:ILLUMINA" edited 8/27/19
 #removed R1_001 from for fastq1 in fastq/*R1_001.fastq.gz; 7/9/19
 #RG information: https://software.broadinstitute.org/gatk/documentation/article?id=6472
+#https://support.sentieon.com/appnotes/read_groups/
 #id added sample no field which is in position 10 in the fastq file; When working with another Instrument, check and see whether the id field will be unique.
 #pu is removed
 #pu=$(echo $header | cut -d: -f 3,4,10 | sed 's/\:/\./g');

@@ -6,7 +6,7 @@
 		"mem" : "8g",
 		"output"  : "00log/{rule}_{wildcards}.out",
 		"error" : "00log/{rule}_{wildcards}.err",
-		"extra" : "--gres=lscratch:20"
+		"extra" : ""
 	},
 	"deepvariant" :
 	{
@@ -34,6 +34,11 @@
 	{
 		"mem" : "64g",
 		"threads" : "8"
+	},
+	"merge_dv_fb_vcfs":
+	{
+		"mem" : "32g",
+		"extra" : "--gres=lscratch:100"
 	},
 	"split_cram_by_rg" :
 	{

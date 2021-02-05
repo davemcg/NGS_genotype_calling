@@ -84,21 +84,26 @@ for line in metadata:
 		SAMPLE_LANEFILE[sample] = old_lane_file
 	LANEFILE_READGROUP[lane_file] = [read_group]
 
+# for i in SAMPLE_LANEFILE:
+# 	print (i, SAMPLE_LANEFILE[i], len(SAMPLE_LANEFILE[i]))
+# for i in LANEFILE_READGROUP:
+# 	print (i, LANEFILE_READGROUP[i], len(LANEFILE_READGROUP[i]))
+
 if config['analysis_batch_name'] == 'YYYYMMDD':
 	currentDT = datetime.datetime.now()
 	config['analysis_batch_name'] = currentDT.strftime("%Y%m%d")
 
-if config['inputFileType'] == 'fastq':
+if config['inputFileType'].upper() in ['BAM', 'CRAM']:
 	def rg(wildcards):
 		# returns the read group given in the config['metadata_file']
 		lane_file = str(wildcards)
-		rg_out = str(LANEFILE_READGROUP[lane_file + config['lane_pair_delim'][0] + '.fastq.gz'][0])
+		rg_out = str(LANEFILE_READGROUP[str(SAMPLE_LANEFILE[lane_file][0])]).replace("['", "").replace("']","")
 		return(rg_out)
 else:
 	def rg(wildcards):
 		# returns the read group given in the config['metadata_file']
 		lane_file = str(wildcards)
-		rg_out = str(LANEFILE_READGROUP[lane_file + config['lane_pair_delim'][0] + '.fastq.gz'][0])
+		rg_out = str(LANEFILE_READGROUP[lane_file + config['lane_pair_delim'][0] + '.gz'][0])
 		return(rg_out)
 
 CHRS=["1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","X","Y","MT_contigs"]
@@ -116,14 +121,12 @@ rule all:
 		expand('cram/{sample}.cram', sample=list(SAMPLE_LANEFILE.keys())) if config['cram'] == 'TRUE' else expand('bam/{sample}.bam', sample=list(SAMPLE_LANEFILE.keys())),
 		# 'GATK_metrics/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
 		'fastqc/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
-		# expand('picardQC/{sample}.insert_size_metrics.txt', sample=list(SAMPLE_LANEFILE.keys())) if config['picardQC'] == 'TRUE' else 'dummy.txt',
-		'prioritization/freebayes.merge.done.txt' if config['freebayes_phasing'] == 'TRUE' else 'dummy.txt',
+		 expand('picardQC/{sample}.insert_size_metrics.txt', sample=list(SAMPLE_LANEFILE.keys())) if config['picardQC'] == 'TRUE' else 'dummy.txt',
 		'deepvariant/deepvariantVcf.merge.done.txt' if config['deepvariant'] == 'TRUE' else 'dummy.txt',
+		'prioritization/dv_fb.merge.done.txt' if config['freebayes_phasing'] == 'TRUE' else 'dummy.txt',
+		expand('coverage/{sample}.coverage.xlsx', sample=list(SAMPLE_LANEFILE.keys())) if config['coverage'] == 'TRUE' else 'dummy.txt',
 		expand('manta/manta.{sample}.annotated.tsv', sample=list(SAMPLE_LANEFILE.keys())) if config['manta'] == 'TRUE' else 'dummy.txt',
 		expand('scramble_anno/{sample}.scramble.xlsx', sample=list(SAMPLE_LANEFILE.keys())) if config['SCRAMble'] == 'TRUE' else 'dummy.txt'
-#		expand('freebayes/{sample}.freebayes.filtered.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())) if config['freebayes_individual'] == 'TRUE' else 'dummy.txt',
-#		'freebayes.vcf' if config['freebayes'] == 'TRUE' else 'dummy.txt'
-#freebayes_individual can consider gvcf files.
 
 localrules: dummy
 rule dummy:
@@ -136,37 +139,37 @@ rule dummy:
 		touch {output}
 		"""
 
-#rule bam_to_fastq:
-#	input:
-#		PATH + '{lane}.bam'
-#	output:
-#		forward = temp(PATH  + '{lane}_' + config['fastq_ending_for']),
-#		reverse = temp(PATH  + '{lane}_' + config['fastq_ending_rev'])
-#	threads: 2
-#	shell:
-#		"""
-#		module load {config[samtools_version]}
-#		mkdir -p /scratch/mcgaugheyd/$SLURM_JOB_ID/
-#		export REF_CACHE=/scratch/mcgaugheyd/$SLURM_JOB_ID/hts-refcache
-#		samtools collate -uOn 128 {wildcards.sample}.bam /scratch/mcgaugheyd/$SLURM_JOB_ID/TMP_{wildcards.sample} | \
-#			samtools fastq - -1 {output.forward} -2 {output.reverse}
-#		"""
+# rule bam_to_fastq:
+# 	input:
+# 		PATH + '{lane}.bam'
+# 	output:
+# 		forward = temp(PATH  + '{lane}_' + config['fastq_ending_for']),
+# 		reverse = temp(PATH  + '{lane}_' + config['fastq_ending_rev'])
+# 	threads: 2
+# 	shell:
+# 		"""
+# 		module load {config[samtools_version]}
+# 		mkdir -p /scratch/mcgaugheyd/$SLURM_JOB_ID/
+# 		export REF_CACHE=/scratch/mcgaugheyd/$SLURM_JOB_ID/hts-refcache
+# 		samtools collate -uOn 128 {wildcards.sample}.bam /scratch/mcgaugheyd/$SLURM_JOB_ID/TMP_{wildcards.sample} | \
+# 			samtools fastq - -1 {output.forward} -2 {output.reverse}
+# 		"""
 
 # conditinal input:
-#rule a:
+# rule a:
 #    input:
 #        name="some/file.txt" if config["condition"] else "other/file.txt"
 #    ...
 
-##may reduce to 36 threads: https://blog.dnanexus.com/2020-03-10-bwa-mem2-review/
-##tested bwa-mem2, sambamba or with biobambam2. Sambamba shown here is 1.5-2x faster.
+#may reduce to 36 threads: https://blog.dnanexus.com/2020-03-10-bwa-mem2-review/
+#tested bwa-mem2, sambamba or with biobambam2. Sambamba shown here is 1.5-2x faster.
 if config['inputFileType'] == 'single_lane_fastq':
 	rule align_markdup:
 		input:
 			expand('fastq/{{lane}}{pair}.fastq.gz', pair = config['lane_pair_delim'])
 		output:
 			bam = temp('lane_bam/{lane}.bam'),
-			bai = temp('lane_bam/{lane}.bai')
+			bai = temp('lane_bam/{lane}.bam.bai')
 		params:
 			read_group = rg
 		threads: 56
@@ -180,13 +183,13 @@ if config['inputFileType'] == 'single_lane_fastq':
 			 	| samblaster -M --addMateTags --quiet \
 				| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t {threads} -o {output.bam} \
 					<(sambamba view -S -f bam -l 0 -t $SLURM_CPUS_PER_TASK /dev/stdin)
-			sambamba index -t {threads} {output.bam}
+			#sambamba index -t {threads} {output.bam} {output.bai}
 			"""
 	localrules: cp_lane_bam
 	rule cp_lane_bam:
 		input:
 			bam = lambda wildcards: expand('lane_bam/{lane}.bam', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]]))),
-			bai = lambda wildcards: expand('lane_bam/{lane}.bai', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]])))
+			bai = lambda wildcards: expand('lane_bam/{lane}.bam.bai', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]])))
 		output:
 			bam = temp('sample_bam/{sample}.markDup.bam'),
 			bai = temp('sample_bam/{sample}.markDup.bai')
@@ -195,32 +198,39 @@ if config['inputFileType'] == 'single_lane_fastq':
 			cp -p -l {input.bam} {output.bam}
 			cp -p -l {input.bai} {output.bai}
 			"""
-elif config['inputFileType'] == 'bam':
+elif config['inputFileType'].upper() in ['BAM', 'CRAM']:
 	rule realign:
 		input:
 			lambda wildcards: join('old_bam/', str(SAMPLE_LANEFILE[wildcards.sample][0]))
 		output:
 			bam = temp('sample_bam/{sample}.markDup.bam'),
-			bai = temp('sample_bam/{sample}.markDup.bai'),
-			metrics = 'sample_bam/{sample}.duplication_metrics'
+			bai = temp('sample_bam/{sample}.markDup.bai')
 		threads: 36
+		params:
+			read_group = rg
 		shell:
 			"""
 			export TMPDIR=/lscratch/$SLURM_JOB_ID
-			module load {config[bazam_version]} {config[bwa-mem2_version]} {config[biobambam2_version]}
+			module load {config[bazam_version]}
+			module load {config[bwa-mem2_version]} {config[samblaster_version]} {config[sambamba_version]}
  			case "{input}" in
 				*bam)
 					java -Xmx12g -jar $BAZAMPATH/bazam.jar -bam {input} \
-					| bwa-mem2 mem -t {threads} -K 100000000 -M -B 4 -O 6 -E 1 -p {config[bwa-mem2_ref]} - \
-					| bamsormadup SO=coordinate threads={threads} level=6 inputformat=sam \
-					tmpfile=/lscratch/$SLURM_JOB_ID/bamsormadup \
-					indexfilename={output.bai} M={output.metrics} > {output.bam}
+					| bwa-mem2 mem -t {threads} -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[bwa-mem2_ref]} - \
+			 		| samblaster -M --addMateTags --quiet \
+					| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t {threads} -o {output.bam} \
+						<(sambamba view -S -f bam -l 0 -t $SLURM_CPUS_PER_TASK /dev/stdin)
+					mv {output.bam}.bai {output.bai}
+					#sambamba index -t {threads} {output.bam} {output.bai}
+					;;
 				*cram)
 					java -Xmx12g -Dsamjdk.reference_fasta={config[old_cram_ref]} -jar $BAZAMPATH/bazam.jar -bam {input} \
-					| bwa-mem2 mem -t {threads} -K 100000000 -M -B 4 -O 6 -E 1 -p {config[bwa-mem2_ref]} - \
-					| bamsormadup SO=coordinate threads={threads} level=6 inputformat=sam \
-					tmpfile=/lscratch/$SLURM_JOB_ID/bamsormadup \
-					indexfilename={output.bai} M={output.metrics} > {output.bam}
+					| bwa-mem2 mem -t {threads} -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[bwa-mem2_ref]} - \
+			 		| samblaster -M --addMateTags --quiet \
+					| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t {threads} -o {output.bam} \
+						<(sambamba view -S -f bam -l 0 -t $SLURM_CPUS_PER_TASK /dev/stdin)
+					mv {output.bam}.bai {output.bai}
+					;;
 			esac
 			"""
 else:
@@ -232,54 +242,56 @@ else:
 			# sample17_R1_001.fastq.gz and sample17_R2_001.fastq.gz
 			# for a set of paired end fastq
 			# if you don't have a paired fastq set, give as ['']
-			expand('fastq/{{lane}}{pair}.fastq.gz', pair = config['lane_pair_delim'])
+			expand('fastq/{{lane}}{pair}.gz', pair = config['lane_pair_delim'])
 		output:
-			temp('lane_bam/{lane}.bam')
+			bam = temp('lane_bam/{lane}.bam'),
+			bai = temp('lane_bam/{lane}.bam.bai')
 		params:
 			read_group = rg
 		threads: 36
 		shell:
 			"""
+			export TMPDIR=/lscratch/$SLURM_JOB_ID
 			echo {params.read_group}
-			module load {config[bwa-mem2_version]}
-			module load {config[samtools_version]}
-			bwa-mem2 mem -t {threads} -K 100000000 -M -B 4 -O 6 -E 1 -R {params.read_group} \
-				{config[ref_genome]} \
-				{input} | \
-				samtools view -1 - > \
-				{output}
+			module load {config[bwa-mem2_version]} {config[samblaster_version]} {config[sambamba_version]}
+			bwa-mem2 mem -t {threads} -K 100000000 -M -Y -B 4 -O 6 -E 1 -R {params.read_group} \
+				{config[bwa-mem2_ref]} {input} \
+			 	| samblaster -M --addMateTags --quiet \
+				| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t {threads} -o {output.bam} \
+					<(sambamba view -S -f bam -l 0 -t $SLURM_CPUS_PER_TASK /dev/stdin)
 			"""
 	rule merge_lane_bam:
 		input:
-			lambda wildcards: expand('lane_bam/{lane}.bam', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]])))
+			bam = lambda wildcards: expand('lane_bam/{lane}.bam', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]]))),
+			bai = lambda wildcards: expand('lane_bam/{lane}.bam.bai', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]])))
 		output:
 			merged_bam = temp('sample_bam/{sample}.merged.bam'),
-			merged_bai = temp('sample_bam/{sample}.merged.bai'),
+			merged_bai = temp('sample_bam/{sample}.merged.bam.bai'),
 			bam = temp('sample_bam/{sample}.markDup.bam'),
 			bai = temp('sample_bam/{sample}.markDup.bai'),
 			metrics = 'sample_bam/{sample}.duplication_metrics.txt'
 		threads: 16
 		shell:
 			"""
-			module load {config[picard_version]}
-			picard_i=""
-			for bam in {input}; do
-				picard_i+=" -I $bam"
-			done
-			java -Xmx32g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
-				MergeSamFiles \
-				-TMP_DIR /lscratch/$SLURM_JOB_ID \
-				$picard_i \
-				-O {output.merged_bam} \
-				--SORT_ORDER coordinate \
-				--CREATE_INDEX true
-			java -Xmx32g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
-				MarkDuplicates \
-				-TMP_DIR /lscratch/$SLURM_JOB_ID \
-				--INPUT {output.merged_bam} \
-				--OUTPUT {output.bam} \
-				--METRICS_FILE {output.metrics} \
-				--CREATE_INDEX true
+			module load {config[sambamba_version]} {config[picard_version]}
+			case "{input.bam}" in
+				*\ *)
+					sambamba merge -t {threads} {output.merged_bam} {input.bam}
+					java -Xmx16g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+						MarkDuplicates \
+						--INPUT {output.merged_bam} \
+						--OUTPUT {output.bam} \
+						--METRICS_FILE {output.metrics} \
+						--COMPRESSION_LEVEL 6 \
+						--CREATE_INDEX true \
+						--ASSUME_SORT_ORDER coordinate
+					;;
+				*)
+					touch {output.merged_bam} {output.merged_bai} {output.metrics}
+					cp -p -l {input.bam} {output.bam}
+					cp -p -l {input.bai} {output.bai}
+					;;
+			esac
 			"""
 #samblaster --addMateTags for SV calling later? samblaster also MarkDuplicates
 #The following bwa-mem2 and biobambam2 worked, but one WGS sample did not get processed well (28 threads < 25g mememory used, <9 hours);
@@ -324,7 +336,7 @@ rule multiqc_fastqc:
 		module load multiqc
 		multiqc -f -o {output} fastqc/
 		"""
-
+#finished <10 min for one sample job.
 rule picard_alignmentQC:
 #insert size and alignment metrics
 	input:
@@ -337,20 +349,47 @@ rule picard_alignmentQC:
 	threads: 2
 	shell:
 		"""
-		module load {config[picard_version]}
-		java -Xmx8g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+		module load {config[picard_version]} {config[R_version]}
+		java -Xmx32g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
 			CollectInsertSizeMetrics \
-			INPUT={input.bam} \
-			O={output.insert_size_metrics} \
-		    H={output.insert_size_histogram} \
-		    M=0.5
-		java -Xmx8g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
+			-TMP_DIR /lscratch/$SLURM_JOB_ID \
+			--INPUT {input.bam} \
+			-O {output.insert_size_metrics} \
+		    -H {output.insert_size_histogram} \
+		    -M 0.5
+		java -Xmx32g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
 			CollectAlignmentSummaryMetrics \
-			INPUT={input.bam} \
-			R={config[ref_genome]} \
-			METRIC_ACCUMULATION_LEVEL=SAMPLE \
-			METRIC_ACCUMULATION_LEVEL=READ_GROUP \
-			O={output.alignment_metrics}
+			-TMP_DIR /lscratch/$SLURM_JOB_ID \
+			--INPUT {input.bam} \
+			-R {config[ref_genome]} \
+			--METRIC_ACCUMULATION_LEVEL SAMPLE \
+			--METRIC_ACCUMULATION_LEVEL READ_GROUP \
+			-O {output.alignment_metrics}
+		"""
+
+localrules: coverage
+rule coverage:
+	input:
+		bam = 'sample_bam/{sample}.markDup.bam',
+		bai = 'sample_bam/{sample}.markDup.bai'
+	output:
+		thresholds = 'coverage/mosdepth/{sample}.thresholds.bed.gz',
+		xlsx = 'coverage/{sample}.coverage.xlsx'
+	threads: 8
+	shell:
+		"""
+		module load {config[mosdepth_version]}
+		module load {config[R_version]}
+		mosdepth -t {threads} --no-per-base --by {config[bed]} --use-median --mapq 1 --thresholds 10,20,30 \
+			{wildcards.sample} {input.bam}
+		mv {wildcards.sample}.thresholds.bed.gz* coverage/mosdepth/.
+		mv {wildcards.sample}.mosdepth* coverage/mosdepth/.
+		mv {wildcards.sample}.regions.bed.gz* coverage/mosdepth/.
+		zcat {output.thresholds} \
+			 | sed '1 s/^.*$/chr\tstart\tend\tgene\tcoverageTen\tcoverageTwenty\tcoverageThirty/' \
+			 > {output.thresholds}.tsv
+		Rscript ~/git/NGS_genotype_calling/NGS_generic_OGL/mosdepth_bed_coverage.R \
+			{output.thresholds}.tsv {config[OGL_Dx_research_genes]} {output.xlsx}
 		"""
 
 # 30% smaller!
@@ -385,6 +424,7 @@ rule keep_bam:
 		cp -p -l {input.bai} {output.bai}
 		"""
 
+#1h40min 22g max mem
 rule deepvariantS1:
 	input:
 		bam = 'sample_bam/{sample}.markDup.bam',
@@ -422,13 +462,13 @@ rule deepvariantS1:
 		cp ${{DV_OUTPUT_DIR}}/{wildcards.sample}.examples.* ${{PROJECT}}/examples
 		cp ${{DV_OUTPUT_DIR}}/{wildcards.sample}.gvcf.* ${{PROJECT}}/gvcf_tfrecords || exit 1
 		"""
-
+#45min; changed threads from 24 to 14 on 12/17/20, since p100 & v100 gpu has 56 cpus and 4 gpus per node. CPUs only used briefly during runs
 rule deepvariantS2:
 	input:
 		'deepvariant/{sample}/examples'
 	output:
 		temp('deepvariant/{sample}/call_variants/{sample}.call_variants_output.tfrecord.gz')
-	threads: 24
+	threads: 14
 	shell:
 		"""
 		module load {config[deepvariant_version]}
@@ -453,21 +493,21 @@ rule deepvariantS2:
     		--examples "${{EXAMPLES}}" \
     		--checkpoint "${{MODEL}}" \
 		) 2>&1 | tee "${{LOG}}/{wildcards.sample}.call_variants.log"
-		echo "Done." || exit 1
-		cp ${{CALL_VARIANTS_OUTPUT}} ${{PROJECT}}/call_variants || exit 1
+		echo "Done." || exit 2
+		cp ${{CALL_VARIANTS_OUTPUT}} ${{PROJECT}}/call_variants || exit 3
 		"""
 
+#90min
 rule deepvariantS3:
 	input:
+		examples = 'deepvariant/{sample}/examples',
+		gvcf_tfrecords = 'deepvariant/{sample}/gvcf_tfrecords',
 		tfrecord = 'deepvariant/{sample}/call_variants/{sample}.call_variants_output.tfrecord.gz',
 		bam = 'sample_bam/{sample}.markDup.bam',
 		bai = 'sample_bam/{sample}.markDup.bai'
 	output:
-		vcf = 'deepvariant/{sample}.vcf.gz',
-		gvcf = 'deepvariant/{sample}.g.vcf.gz',
-		filteredvcf = temp('deepvariant/vcf/{sample}.dv.filtered.vcf.gz'),
-		filteretbi = temp('deepvariant/vcf/{sample}.dv.filtered.vcf.gz.tbi'),
-		phasedvcf = 'deepvariant/phasedvcf/{sample}.dv.phased.vcf.gz'
+		vcf = 'deepvariant/vcf/{sample}.vcf.gz',
+		gvcf = 'deepvariant/gvcf/{sample}.g.vcf.gz'
 	shell:
 		"""
 		module load {config[deepvariant_version]} parallel
@@ -496,23 +536,59 @@ rule deepvariantS3:
       		--nonvariant_site_tfrecord_path "${{GVCF_TFRECORDS}}" \
       		--gvcf_outfile "${{OUTPUT_GVCF}}" \
 		) 2>&1 | tee "${{LOG}}/{wildcards.sample}.postprocess_variants.log" || exit 1
-		cp ${{OUTPUT_VCF}}* ${{OUTPUT_GVCF}}* ${{DV_OUTPUT_DIR}}/*.html deepvariant || exit 1
-		module unload {config[deepvariant_version]}
-		module load {config[samtools_version]}
-		bcftools norm --multiallelics -any --output-type v {output.vcf} \
-			| bcftools norm -d none --output-type v - \
-			| bcftools filter --include 'QUAL>0' --output-type z --output {output.filteredvcf}
-		sleep 2
-		tabix -f -p vcf {output.filteredvcf}
-		module load {config[whatshap_version]}
-		whatshap phase --reference {config[ref_genome]} --indels {output.filteredvcf} {input.bam} | bgzip -f > {output.phasedvcf}
+		cp ${{OUTPUT_VCF}}* ${{DV_OUTPUT_DIR}}/*.html deepvariant/vcf || exit 2
+		cp ${{OUTPUT_GVCF}}* deepvariant/gvcf || exit 2
+		"""
+#took 55min & 43G mem.
+rule dv_whatshap:
+	input:
+		vcf = 'deepvariant/vcf/{sample}.vcf.gz',
+		bam = 'sample_bam/{sample}.markDup.bam',
+		bai = 'sample_bam/{sample}.markDup.bai'
+	output:
+		phasedvcf = 'deepvariant/vcf/{sample}.dv.phased.vcf.gz',
+		phasedtbi = 'deepvariant/vcf/{sample}.dv.phased.vcf.gz.tbi'
+	threads: 26
+	shell:
+		"""
+		module load {config[samtools_version]} {config[whatshap_version]} parallel
+		WORK_DIR="/lscratch/${{SLURM_JOB_ID}}"
+		FILTEREDVCF="/lscratch/$SLURM_JOB_ID/{wildcards.sample}.dv.filtered.vcf.gz"
+		rm -rf $WORK_DIR/*
+		bcftools filter --include 'FILTER="PASS"' --output-type v {input.vcf} \
+			| bcftools norm --multiallelics -any --output-type v - \
+			| bcftools norm --check-ref s --fasta-ref {config[ref_genome]} --output-type v - \
+			| bcftools norm -d none --output-type z --output $FILTEREDVCF
+		tabix -f -p vcf $FILTEREDVCF && echo "Filtered vcf index created" || exit 3
+		CONTIGFILE="/data/OGL/resources/whatshap/vcf.contig.filename.GRCh37.txt"
+		cp {config[ref_genome]} {config[ref_genome]}.fai {input.bam} {input.bai} $WORK_DIR \
+			&& echo "Ref and bam files copied to lscratch"  || exit 4
+		mkdir -p /lscratch/$SLURM_JOB_ID/filtered
+		mkdir -p /lscratch/$SLURM_JOB_ID/filtered
+		mkdir -p /lscratch/$SLURM_JOB_ID/phased
+		( cat $CONTIGFILE | parallel -C "\t" -j 21 "bcftools filter -r {{1}} --output-type z $FILTEREDVCF > $WORK_DIR/filtered/{{2}}.filtered.vcf.gz" ) && echo "Filtered vcf split to chr" || exit 5
+		( cat $CONTIGFILE | parallel -C "\t" -j 21 "tabix -f -p vcf $WORK_DIR/filtered/{{2}}.filtered.vcf.gz" ) && echo "Chr vcf index created" || exit 6
+		( cat $CONTIGFILE | parallel -C "\t" -j 21 --tmpdir $WORK_DIR --eta --halt 2 --line-buffer \
+		 	--tag "whatshap phase --reference $WORK_DIR/$(basename {config[ref_genome]}) \
+			--indels --ignore-read-groups $WORK_DIR/filtered/{{2}}.filtered.vcf.gz $WORK_DIR/{wildcards.sample}.markDup.bam \
+			| bgzip -f > $WORK_DIR/phased/{{2}}.phased.vcf.gz" \
+		) && echo "whatshap on chr completed" || exit 7
+		( cat $CONTIGFILE | parallel -C "\t" -j 21 "tabix -f -p vcf $WORK_DIR/phased/{{2}}.phased.vcf.gz" ) && echo "Phased-chr vcf index created" || exit 8
+		PHASEDCHRFILE=""
+		cut -f 2 $CONTIGFILE > $WORK_DIR/temp.chr.txt
+		while read line; do PHASEDCHRFILE+=" /lscratch/${{SLURM_JOB_ID}}/phased/$line.phased.vcf.gz"; done < $WORK_DIR/temp.chr.txt
+		echo "chr files are $PHASEDCHRFILE"
+		bcftools concat --threads {threads} --output-type z $PHASEDCHRFILE > {output.phasedvcf} || exit 8
 		tabix -f -p vcf {output.phasedvcf}
 		"""
 #deepvariant separates MNPs, thus no need to use decompose_blocksub.
-
+#deepvariant normalizes most indels, but not all, thus bcftools norm needed
+#deepvariant does not inlucde duplicate variant, thus no need to use -d none, but codes included anyway.
+#samtools 1.11: bcftools filter --include 'FILTER="PASS"'
 rule merge_deepvariantVcf:
 	input:
-		vcf = expand('deepvariant/phasedvcf/{sample}.dv.phased.vcf.gz', sample=list(SAMPLE_LANEFILE.keys()))
+		vcf = expand('deepvariant/vcf/{sample}.dv.phased.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
+		tbi = expand('deepvariant/vcf/{sample}.dv.phased.vcf.gz.tbi', sample=list(SAMPLE_LANEFILE.keys()))
 	output:
 		'deepvariant/deepvariantVcf.merge.done.txt'
 	threads: 16
@@ -523,25 +599,26 @@ rule merge_deepvariantVcf:
 			*\ *)
 				bcftools merge --merge none --missing-to-ref --output-type z --threads {threads} {input.vcf} \
 				> deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
+				sleep 2
+				tabix -f -p vcf deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
 				;;
 			*)
-				cp {input.vcf} deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
+				cp -p -l {input.vcf} deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
+				cp -p -l {input.tbi} deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz.tbi
 				;;
 		esac
-		sleep 2
-		tabix -f -p vcf deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
 		touch {output}
 		"""
 
-#if too slow, then seperate by chr as above.
-#localrules: scramble
+#2hours for MEI only, used 1.4g mememory.
+#including deletion takes > 12h for some and ~32g mem, thus need parallel or split runs.
 rule scramble:
 	input:
 		bam = 'sample_bam/{sample}.markDup.bam',
 		bai = 'sample_bam/{sample}.markDup.bai'
 	output:
 		cluster = temp('scramble/{sample}.cluster.txt'),
-		mei = 'scramble/{sample}.mei.txt',
+		mei = 'scramble/{sample}_MEIs.txt'
 	shell:
 		"""
 		module load {config[scramble_version]}
@@ -553,14 +630,16 @@ rule scramble:
 			--mei-refs /app/cluster_analysis/resources/MEI_consensus_seqs.fa \
 			--ref {config[ref_genome]} \
 			--eval-meis \
-			--eval-dels \
 			--no-vcf
 		"""
+#		dels =  'scramble/{sample}_PredictedDeletions.txt'
+#			--eval-dels \ removed because deletion calling take s long time and other tools already check deletion.
 #--bind /gpfs,/spin1,/data,/lscratch,/scratch,/fdb
-#localrules: scramble_annotation
+#finished in seconds, <100Mb memory
+localrules: scramble_annotation
 rule scramble_annotation:
 	input:
-		mei = 'scramble/{sample}.mei.txt'
+		mei = 'scramble/{sample}_MEIs.txt'
 	output:
 		avinput = temp('scramble_anno/{sample}.avinput'),
 		annovar = temp('scramble_anno/{sample}.hg19_multianno.txt'),
@@ -593,53 +672,51 @@ rule scramble_annotation:
 		fi
 		"""
 
-#Try this strategy,if not working well, consider split by chr as in the GATK.
-localrules: configManta
-rule configManta:
+#<30min, 3gb max mem
+rule manta:
 	input:
  		bam = 'sample_bam/{sample}.markDup.bam',
  		bai = 'sample_bam/{sample}.markDup.bai'
-	output:
-		'manta/{sample}/runWorkflow.py'
-	shell:
-		"""
-		module load {config[manta_version]}
-		configManta.py --referenceFasta {config[ref_genome]} --exome --runDir manta/{wildcards.sample} --bam {input.bam}
-		"""
-
-rule manta:
-	input:
-		'manta/{sample}/runWorkflow.py'
 	output:
 		'manta/manta.{sample}.annotated.tsv'
 	threads: 32
 	shell:
 		"""
 		module load {config[manta_version]}
-		manta/{wildcards.sample}/runWorkflow.py -m local -j {threads} -g $((SLURM_MEM_PER_NODE / 1024))
+		mkdir -p /lscratch/$SLURM_JOB_ID/manta/{wildcards.sample}
+		RUNDIR="/lscratch/$SLURM_JOB_ID/manta/{wildcards.sample}"
+		configManta.py --referenceFasta {config[ref_genome]} \
+			--exome --runDir $RUNDIR --bam {input.bam}
+		$RUNDIR/runWorkflow.py -m local -j {threads} -g $((SLURM_MEM_PER_NODE / 1024))
+		cp $RUNDIR/results/variants/diploidSV.vcf.gz manta/{wildcards.sample}.diploidSV.vcf.gz
+		cp $RUNDIR/results/variants/diploidSV.vcf.gz.tbi manta/{wildcards.sample}.diploidSV.vcf.gz.tbi
 		module load {config[annotsv_version]}
-		AnnotSV -SVinputFile manta/{wildcards.sample}/results/variants/diploidSV.vcf.gz \
-			-SVinputInfo 1 \
-			-outputFile manta/manta.{wildcards.sample}.annotated.tsv
+		AnnotSV -SVinputFile $RUNDIR/results/variants/diploidSV.vcf.gz \
+			-SVinputInfo 1 -genomeBuild GRCh37\
+			-outputDir $RUNDIR \
+			-outputFile $RUNDIR/manta.{wildcards.sample}.annotated.tsv
+		cp $RUNDIR/manta.{wildcards.sample}.annotated.tsv {output}
 		"""
-
+#manta takes ~30min if working fine, 32 threads and 3G mem.
 #SV, use 16 threads and 64 g
-rule sve:
-	input:
-		bam = 'sample_bam/{sample}.bam',
-		bai = 'sample_bam/{sample}.bai',
-		bai2 = 'sample_bam/{sample}.bam.bai'
-	output:
-		vcf = 'sve/{sample}/{sample}_S4.vcf'
-	shell:
-		"""
-		module load sve/0.1.0
-		for method in breakdancer breakseq cnvnator delly lumpy cnmops; do
-		 	sve call -r {config[ref_genome]} -o sve/{wildcards.sample} \
-			-t 16 -M 4 -g hg19 -a $method {input.bam}; done
-		"""
+# rule sve:
+# 	input:
+# 		bam = 'sample_bam/{sample}.bam',
+# 		bai = 'sample_bam/{sample}.bai'
+# 	output:
+# 		bai = 'sample_bam/{sample}.bam.bai',
+# 		vcf = 'sve/{sample}/{sample}_S4.vcf'
+# 	shell:
+# 		"""
+# 		module load sve/0.1.0 parallel
+# 		cp {input.bai} {output.bai}
+# 		parallel -j 6 --tmpdir /lscratch/$SLURM_JOB_ID "sve call -r /data/OGL/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta -o sve/CTNS.217 -t 4 -M 4 -g hg19 -a {} bam/CTNS.217.bam" ::: breakdancer breakseq cnvnator delly lumpy cnmops
+# 		for method in breakdancer breakseq cnvnator delly lumpy cnmops; do
+# 		 	sve call -r {config[ref_genome]} -o sve/{wildcards.sample} \
+# 			-t 16 -M 4 -g hg19 -a $method {input.bam}; done
+# 		"""
 
-
+#<40min, 9g max mem
 rule split_bam_by_chr:
 	input:
 		bam = 'sample_bam/{sample}.markDup.bam',
@@ -648,7 +725,7 @@ rule split_bam_by_chr:
 		bam = temp('sample_bam/chr_split/{sample}/{sample}__{chr}.bam'),
 		bai = temp('sample_bam/chr_split/{sample}/{sample}__{chr}.bai'),
 		metrics = temp('sample_bam/chr_split/{sample}/{sample}__{chr}.markdup.metrics.txt')
-	threads: 2
+	threads: 4
 	shell:
 		"""
 		module load {config[samtools_version]} {config[biobambam2_version]}
@@ -664,6 +741,7 @@ rule split_bam_by_chr:
 			indexfilename={output.bai} M={output.metrics} > {output.bam}
 		fi
 		"""
+#70min for longest run chr2, 16G max used.
 rule freebayes_phasing:
 	input:
 		bam = 'sample_bam/chr_split/{sample}/{sample}__{chr}.bam',
@@ -712,14 +790,13 @@ rule freebayes_phasing:
 # -g "GQ > 1"
 #			| sed -e "s|1/.|0/1|" -e "s|./1|0/1|" \
 
+#<5min and used < 32MB memory
 rule cat_fbvcfs:
 	input:
 		vcf = chr_fbVCF_to_single_fbVCF,
-		filteredvcf = chr_fbVCF_to_single_fbVCF_filtered,
 		phasedvcf = chr_fbVCF_to_single_fbVCF_phased
 	output:
 		vcf = 'freebayes/{sample}.vcf.gz',
-		filteredvcf = 'freebayes/{sample}.filtered.vcf.gz',
 		phasedvcf = 'freebayes/{sample}.phased.vcf.gz'
 	threads: 8
 	shell:
@@ -727,17 +804,17 @@ rule cat_fbvcfs:
 		module load {config[samtools_version]}
 		bcftools concat --threads {threads} --output-type z {input.vcf} > {output.vcf}
 		tabix -f -p vcf {output.vcf}
-		bcftools concat --threads {threads} --output-type z {input.filteredvcf} > {output.filteredvcf}
-		tabix -f -p vcf {output.filteredvcf}
 		bcftools concat --threads {threads} --output-type z {input.phasedvcf} > {output.phasedvcf}
 		tabix -f -p vcf {output.phasedvcf}
 		"""
+		# bcftools concat --threads {threads} --output-type z {input.filteredvcf} > {output.filteredvcf}
+		# tabix -f -p vcf {output.filteredvcf}
 
 rule merge_freebayes:
 	input:
 		vcf = expand('freebayes/{sample}.phased.vcf.gz', sample=list(SAMPLE_LANEFILE.keys()))
 	output:
-		'prioritization/freebayes.merge.done.txt'
+		'freebayes/freebayes.merge.done.txt'
 	threads: 16
 	shell:
 		"""
@@ -757,6 +834,41 @@ rule merge_freebayes:
 		"""
 		# bcftools merge --merge none --output-type z --threads {threads} {input.vcf} \
 		#  	> prioritization/{config[analysis_batch_name]}.freebayes.vcf.gz
+
+rule merge_dv_fb_vcfs:
+	input:
+		'deepvariant/deepvariantVcf.merge.done.txt',
+		'freebayes/freebayes.merge.done.txt'
+	output:
+		'prioritization/dv_fb.merge.done.txt'
+	threads: 16
+	shell:
+		"""
+		module load {config[samtools_version]}
+		WORK_DIR=/lscratch/$SLURM_JOB_ID
+		bcftools isec -p $WORK_DIR --collapse none -Ov \
+			deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz \
+			freebayes/{config[analysis_batch_name]}.freebayes.vcf.gz
+		rm $WORK_DIR/0003.vcf &
+		bcftools annotate --threads {threads} --set-id 'dv' -x FORMAT/VAF,FORMAT/PL \
+			--no-version $WORK_DIR/0000.vcf -Oz -o $WORK_DIR/dv.vcf.gz
+		rm $WORK_DIR/0000.vcf &
+		bcftools annotate --threads {threads} --set-id 'fb' -x INFO,FORMAT/RO,FORMAT/QR,FORMAT/AO,FORMAT/QA,FORMAT/GL \
+			--no-version $WORK_DIR/0001.vcf -Oz -o $WORK_DIR/fb.vcf.gz
+		rm $WORK_DIR/0001.vcf &
+		bcftools annotate --threads {threads} --set-id 'dvFb' -x FORMAT/VAF,FORMAT/PL \
+			--no-version $WORK_DIR/0002.vcf -Oz -o $WORK_DIR/dvFb.vcf.gz
+		rm $WORK_DIR/0002.vcf &
+		tabix -f -p vcf $WORK_DIR/dv.vcf.gz
+		tabix -f -p vcf $WORK_DIR/fb.vcf.gz
+		tabix -f -p vcf $WORK_DIR/dvFb.vcf.gz
+		bcftools concat --threads {threads} -a --rm-dups none --no-version \
+			$WORK_DIR/dvFb.vcf.gz $WORK_DIR/dv.vcf.gz $WORK_DIR/fb.vcf.gz \
+			-Oz -o prioritization/{config[analysis_batch_name]}.vcf.gz
+		tabix -f -p vcf prioritization/{config[analysis_batch_name]}.vcf.gz
+		touch {output}
+		"""
+
 
 #sort necessary before mark_dup? it was sorted during the merge lane_bam step.
 rule picard_clean_sam:

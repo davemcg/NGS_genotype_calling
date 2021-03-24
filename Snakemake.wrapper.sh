@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --gres=lscratch:50
+#SBATCH --gres=lscratch:100
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32g
 
@@ -57,16 +57,16 @@ case "${ngstype^^}" in
 		-pr --local-cores 2 --jobs 1999 \
 		--cluster-config /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/panel.cluster.json \
 		--cluster "$sbcmd"  --latency-wait 120 --rerun-incomplete \
-		-k --restart-times 0 \
+		-k --restart-times 1 \
 		--resources parallel=4 \
 		--configfile $1 $4
 		;;
-	"EXOME")
+	"EXOME"|"WES")
 		snakemake -s /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/exome.Snakefile \
 		-pr --local-cores 2 --jobs 1999 \
 		--cluster-config /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/exome.cluster.json \
 		--cluster "$sbcmd"  --latency-wait 120 --rerun-incomplete \
-		-k --restart-times 0 \
+		-k --restart-times 1 \
 		--resources parallel=4 \
 		--configfile $1 $4
 		;;
@@ -75,7 +75,7 @@ case "${ngstype^^}" in
 		-pr --local-cores 2 --jobs 1999 \
 		--cluster-config /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/cluster.json \
 		--cluster "$sbcmd"  --latency-wait 120 --rerun-incomplete \
-		-k --restart-times 0 \
+		-k --restart-times 1 \
 		--resources parallel=4 \
 		--configfile $1 $4
 		;;

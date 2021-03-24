@@ -15,6 +15,7 @@ args <- commandArgs(trailingOnly=TRUE)
 readDepth <- fread(args[1], header=T) %>% mutate(targetSize = end - start) 
 #panelGene <- read_tsv(args[2], col_names = TRUE, col_types = cols(.default = col_character())) %>% select(gene, panel_class)
 panelGene <- read_xlsx(args[2], sheet = "analysis", na = c("NA", "", "None", ".")) %>% select(gene, panel_class)
+region_summary <- fread(args[3], header=T)
 
 RDtype <- left_join(readDepth, panelGene, by = c("gene")) %>% replace_na(list(panel_class="Other"))
 RDtype$panel_class = factor(RDtype$panel_class, levels = c("Dx", "Candidate", "Other"))
@@ -31,5 +32,5 @@ lessTen <- RDtype %>% filter(coverageTen < targetSize) %>% arrange(panel_class)
 lessTwenty <- RDtype %>% filter(coverageTwenty < targetSize) %>% arrange(panel_class)
 lessThirty <- RDtype %>% filter(coverageThirty < targetSize) %>% arrange(panel_class)
 
-openxlsx::write.xlsx(list("PercentCoverage" = percentage, "less10Xregion" = lessTen, "less20Xregion" = lessTwenty, "less30Xregion" = lessThirty), file = args[3])
+openxlsx::write.xlsx(list("region_summary" = region_summary, "PercentCoverage" = percentage, "less10Xregion" = lessTen, "less20Xregion" = lessTwenty, "less30Xregion" = lessThirty), file = args[4])
 

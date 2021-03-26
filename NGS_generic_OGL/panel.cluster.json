@@ -1,0 +1,177 @@
+{
+	"__default__" :
+	{
+		"partition" : "quick",
+		"time" : "4:00:00",
+		"mem" : "8g",
+		"output"  : "00log/{rule}_{wildcards}.out",
+		"error" : "00log/{rule}_{wildcards}.err",
+		"extra" : "--gres=lscratch:50"
+	},
+	"deepvariant" :
+	{
+		"partition" : "quick,norm",
+		"time" : "1:00:00",
+		"mem" : "8g",
+		"extra" : "--gres=lscratch:50"
+	},
+	"freebayes_phasing" :
+	{
+		"partition" : "quick",
+		"time" : "1:00:00",
+		"mem" : "20g"
+	},
+	"freebayes" :
+	{
+		"partition" : "largemem",
+		"time" : "24:00:00",
+		"mem" : "720g"
+	},
+	"merge_freebayes" :
+	{
+		"mem" : "64g"
+	},
+	"coverage" :
+	{
+		"mem" : "32g",
+		"threads" : "8"
+	},
+	"align" :
+	{
+		"time" : "1:00:00",
+		"mem" : "32g",
+		"threads" : "8",
+		"extra" : "--gres=lscratch:50"
+	},
+	"realign" :
+	{
+		"mem" : "60g",
+		"extra" : "--gres=lscratch:100"
+	},
+	"manta" :
+	{
+		"time" : "1:00:00",
+		"threads" : "8",
+		"extra" : "--gres=lscratch:50"
+	},
+	"scramble" :
+	{
+		"mem" : "48g"
+	},
+	"align_hg19" :
+	{
+		"mem" : "16g",
+		"threads" : "8"
+	},
+	"CRESTbyChr" :
+	{
+		"partition" : "quick",
+		"time" : "4:00:00",
+		"mem" : "64g",
+		"extra" : "--cpus-per-task=8"
+	},
+	"CoNVaDING_1" :
+	{
+		"time" : "2:00:00",
+		"extra" : "--gres=lscratch:50"
+	},
+	"picard_alignmentQC":
+	{
+		"extra" : "--gres=lscratch:50"
+	},
+	"picard_merge_bams" :
+	{
+		"partition" : "norm",
+		"time" : "6:00:00",
+		"mem" : "16G"
+	},
+	"merge_lane_bam" :
+	{
+		"partition" : "norm,quick",
+		"time" : "2:00:00",
+		"mem" : "24G",
+		"extra" : "--gres=lscratch:100"
+	},
+	"merge_lane_bam_hg19" :
+	{
+		"partition" : "norm",
+		"time" : "6:00:00",
+		"mem" : "16G",
+		"extra" : "--gres=lscratch:100"
+	},
+	"merge_RG_bams_back_together" :
+	{
+		"partition" : "norm",
+		"time" : "24:00:00",
+		"mem" : "64g",
+		"extra" : "--gres=lscratch:300"
+	},
+	"picard_clean_sam" : {
+		"mem" : "64g",
+		"extra" : "--gres=lscratch:100"
+	},
+	"picard_fix_mate_information" : {
+		"mem" : "64g"
+	},
+	"picard_mark_dups" : {
+		"mem" : "64g",
+		"threads" : "2"
+	},
+	"picard_mark_dups_hg19" : {
+		"mem" : "20g"
+	},
+	"picard_bam_index" : {
+		"mem" : "64g"
+	},
+	"picard_merge_gvcfs" : {
+		"mem" : "16g"
+	},
+	"gatk_base_recalibrator" : {
+		"partition" : "norm",
+		"mem" : "16g",
+		"time" : "6:00:00"
+	},
+	"gatk_base_recalibrator2" : {
+		"partition" : "norm",
+		"mem" : "16g",
+		"time" : "6:00:00"
+	},
+	"gatk_print_reads" : {
+		"partition" : "norm",
+		"mem" : "16g",
+		"time" : "6:00:00"
+	},
+	"gatk_haplotype_caller" : {
+		"partition" : "norm",
+		"mem" : "12g",
+		"time" : "6:00:00"
+	},
+	"globus_bam_transfer_from_Arges" : {
+		"partition" : "norm",
+		"time" : "24:00:00"
+	},
+	"globus_cram_transfer_from_Arges" : {
+		"partition" : "norm",
+		"time" : "48:00:00"
+	},
+	"split_original_cram_by_rg" : {
+		"partition" : "norm",
+		"time" : "12:00:00"
+	},
+	"fastqc" : {
+		"partition" : "quick,norm",
+		"time" : "1:00:00"
+	},
+	"sort" : {
+		"partition" : "norm",
+		"time" : "12:00:00"
+	},
+	"multiqc_gatk" : {
+		"mem" : "32g"
+	},
+	"bam_to_cram" : {
+		"extra" : "--gres=lscratch:100",
+		"partition" : "quick",
+		"time" : "4:00:00"
+	}
+}

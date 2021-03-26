@@ -1,10 +1,15 @@
 # Workflows to process raw sequence into VCF
 - Forked over from https://github.com/davemcg/biowulf2-bin
+a. fastq files have to be in the fastq folder. Bam support is not ready yet.
+b. cp config_generic.yaml or config_panel.yaml to project folder.
+c. panel or exome: sbatch --cpus-per-task=8 --mem=32g --time=12:0:0 config library panel/exome
+  wgs: does not use localrules much, does not need specify cpus or mem
+d. Run git log | head -n 5 > /data/OGL/resources/NGS_genotype_calling.git.log after git commit. This file will be copied to project folder in SnakeWrapper.
 
 # For NISC exomes/WGS
 - Refer to readme.md in NISC_workflow/
 
-# Overview
+#Overview
 1. (Re)Align with bwa-mem against 1000G GRCh37 with decoy
 - NGS_generic_workflow/run_bwa-mem_hg37d5_fromBam.sh (if starting from a bam)
 - NGS_generic_workflow/run_bwa-mem_hg37d5.sh (if starting from fastq)
@@ -20,3 +25,5 @@
 4. Annotate variants
 - New repository: https://github.com/davemcg/variant_prioritization
 
+# Visualization
+![](panel.genotype.calling.svg)

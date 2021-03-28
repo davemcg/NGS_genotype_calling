@@ -83,6 +83,7 @@ for line in metadata:
 		old_lane_file.append(lane_file)
 		SAMPLE_LANEFILE[sample] = old_lane_file
 	LANEFILE_READGROUP[lane_file] = [read_group]
+metadata.close()
 
 # for i in SAMPLE_LANEFILE:
 # 	print (i, SAMPLE_LANEFILE[i], len(SAMPLE_LANEFILE[i]))
@@ -241,7 +242,7 @@ elif config['inputFileType'].upper() in ['BAM', 'CRAM']:
 		output:
 			bam = 'sample_bam/{sample}.markDup.bam',
 			bai = 'sample_bam/{sample}.markDup.bai'
-		threads: 36
+		threads: 56
 		params:
 			read_group = rg
 		shell:
@@ -249,51 +250,57 @@ elif config['inputFileType'].upper() in ['BAM', 'CRAM']:
 			export TMPDIR=/lscratch/$SLURM_JOB_ID
 			module load {config[bazam_version]}
 			module load {config[bwa-mem2_version]} {config[samblaster_version]} {config[sambamba_version]}
+			BAMFILE={input}
+			if [ -e {input}.bai ] || [ -e ${{BAMFILE%.bam}}.bai ]; then
+				echo "index present"
+			else
+				sambamba index -t $(({threads}-2)) {input}
+			fi
  			case "{input}" in
 				*bam)
 					if [[ "{config[markDup]}" == "TRUE" ]]; then
-						java -Xmx12g -jar $BAZAMPATH/bazam.jar -bam {input} \
-						| bwa-mem2 mem -t {threads} -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[bwa-mem2_ref]} - \
+						java -Xmx16g -jar $BAZAMPATH/bazam.jar -bam {input} \
+						| bwa-mem2 mem -t $(({threads}/2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[bwa-mem2_ref]} - \
 				 		| samblaster -M --addMateTags --quiet \
-						| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t {threads} -o {output.bam} \
-							<(sambamba view -S -f bam -l 0 -t $SLURM_CPUS_PER_TASK /dev/stdin)
+						| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads}/2)) -o {output.bam} \
+							<(sambamba view -S -f bam -l 0 -t $(({threads}/2)) /dev/stdin)
+						mv {output.bam}.bai {output.bai}
 					else
-						java -Xmx12g -jar $BAZAMPATH/bazam.jar -bam {input} \
-						| bwa-mem2 mem -t {threads} -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[bwa-mem2_ref]} - \
+						java -Xmx16g -jar $BAZAMPATH/bazam.jar -bam {input} \
+						| bwa-mem2 mem -t $(({threads}/2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[bwa-mem2_ref]} - \
 				 		| samblaster -M --acceptDupMarks --addMateTags --quiet \
-						| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t {threads} -o /lscratch/$SLURM_JOB_ID/{wildcards.lane}.bam \
-							<(sambamba view -S -f bam -l 0 -t $SLURM_CPUS_PER_TASK /dev/stdin)
+						| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads}/2)) -o /lscratch/$SLURM_JOB_ID/{wildcards.sample}.bam \
+							<(sambamba view -S -f bam -l 0 -t $(({threads}/2)) /dev/stdin)
 						module load {config[biobambam2_version]}
 						bammarkduplicatesopt markthreads={threads} level=6 \
 							tmpfile=/lscratch/$SLURM_JOB_ID/{wildcards.sample} \
-							I=/lscratch/$SLURM_JOB_ID/{wildcards.lane}.bam \
+							I=/lscratch/$SLURM_JOB_ID/{wildcards.sample}.bam \
 							O={output.bam} \
 							index=1 indexfilename={output.bai}
 					fi
-					mv {output.bam}.bai {output.bai}
 					#sambamba index -t {threads} {output.bam} {output.bai}
 					;;
 				*cram)
 					if [[ "{config[markDup]}" == "TRUE" ]]; then
-						java -Xmx12g -Dsamjdk.reference_fasta={config[old_cram_ref]} -jar $BAZAMPATH/bazam.jar -bam {input} \
-						| bwa-mem2 mem -t {threads} -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[bwa-mem2_ref]} - \
+						java -Xmx16g -Dsamjdk.reference_fasta={config[old_cram_ref]} -jar $BAZAMPATH/bazam.jar -bam {input} \
+						| bwa-mem2 mem -t $(({threads}/2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[bwa-mem2_ref]} - \
 				 		| samblaster -M --addMateTags --quiet \
-						| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t {threads} -o {output.bam} \
-							<(sambamba view -S -f bam -l 0 -t $SLURM_CPUS_PER_TASK /dev/stdin)
+						| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads}/2)) -o {output.bam} \
+							<(sambamba view -S -f bam -l 0 -t $(({threads}/2)) /dev/stdin)
+						mv {output.bam}.bai {output.bai}
 					else
-						java -Xmx12g -Dsamjdk.reference_fasta={config[old_cram_ref]} -jar $BAZAMPATH/bazam.jar -bam {input} \
-						| bwa-mem2 mem -t {threads} -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[bwa-mem2_ref]} - \
+						java -Xmx16g -Dsamjdk.reference_fasta={config[old_cram_ref]} -jar $BAZAMPATH/bazam.jar -bam {input} \
+						| bwa-mem2 mem -t $(({threads}/2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[bwa-mem2_ref]} - \
 				 		| samblaster -M --acceptDupMarks --addMateTags --quiet \
-						| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t {threads} -o /lscratch/$SLURM_JOB_ID/{wildcards.lane}.bam \
-							<(sambamba view -S -f bam -l 0 -t $SLURM_CPUS_PER_TASK /dev/stdin)
+						| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads}/2)) -o /lscratch/$SLURM_JOB_ID/{wildcards.sample}.bam \
+							<(sambamba view -S -f bam -l 0 -t $(({threads}/2)) /dev/stdin)
 						module load {config[biobambam2_version]}
 						bammarkduplicatesopt markthreads={threads} level=6 \
 							tmpfile=/lscratch/$SLURM_JOB_ID/{wildcards.sample} \
-							I=/lscratch/$SLURM_JOB_ID/{wildcards.lane}.bam \
+							I=/lscratch/$SLURM_JOB_ID/{wildcards.sample}.bam \
 							O={output.bam} \
 							index=1 indexfilename={output.bai}
 					fi
-					mv {output.bam}.bai {output.bai}
 					;;
 			esac
 			"""
@@ -480,7 +487,7 @@ rule coverage:
 localrules: mean_coverage
 rule mean_coverage:
 	input:
-		expand('coverage/mosdepth/{sample}.mosdepth.summary.txt', sample=list(SAMPLE_LANEFILE.keys()))
+		expand('coverage/mosdepth/{sample}.md.mosdepth.summary.txt', sample=list(SAMPLE_LANEFILE.keys()))
 	output:
 		'coverage/mean.coverage.done.txt'
 	shell:

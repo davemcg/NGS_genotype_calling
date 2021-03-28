@@ -59,7 +59,7 @@ annoted1 <- left_join(annoted, panelGene, by = c("Gene" = "gene")) %>%
   arrange(classification, desc(eyeGene), desc(Clipped_Reads_In_Cluster))
 
 if (dim(annoted1)[1] == 0) {
-  write_tsv(annoted1, path = args[5])
+  print("###no scramble mei candidate after filtering with scramble db###")
 } else {
   openxlsx::write.xlsx(annoted1, file = args[5])
 }

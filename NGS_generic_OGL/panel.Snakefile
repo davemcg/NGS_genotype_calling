@@ -986,6 +986,10 @@ rule scramble_annotation:
 			awk -F"\t" 'BEGIN{{OFS="\t"}} NR==1 {{print "Func_refGene","Gene","Intronic","AA"}} NR>1 {{print $6,$7,$8,$10}}' scramble_anno/{wildcards.sample}."$ver"_multianno.txt | paste {input.mei} - > {output.annovarR}
 			rm scramble_anno/{wildcards.sample}."$ver"_multianno.txt
 			Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/scramble_anno.R {output.annovarR} {config[SCRAMBLEdb]} {config[OGL_Dx_research_genes]} {config[HGMDtranscript]} {output.anno} {wildcards.sample}
+			if [ -e {output.anno} ];
+			then echo "candidate present"
+			else touch {output.anno}
+			fi
 		fi
 		if [[ $(wc -l {input.deletion} | cut -d " " -f 1) == 1 ]]
 		then
@@ -1025,7 +1029,12 @@ rule manta:
 			-SVinputInfo 1 -genomeBuild {config[genomeBuild]} \
 			-outputDir $RUNDIR \
 			-outputFile $RUNDIR/manta.{wildcards.sample}.annotated.tsv
-		cp $RUNDIR/manta.{wildcards.sample}.annotated.tsv {output}
+		if [ -e $RUNDIR/manta.{wildcards.sample}.annotated.tsv ];
+		then
+			cp $RUNDIR/manta.{wildcards.sample}.annotated.tsv {output}
+		else
+			touch {output}
+		fi
 		"""
 #AnnotSV can pick sample from a multi-sample vcf file by using ?? test to find out the sample operation
 #if [[ {config[genomeBuild]} == "GRCh38" ]]; then

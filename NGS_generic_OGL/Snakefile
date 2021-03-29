@@ -217,6 +217,7 @@ if config['inputFileType'] == 'single_lane_fastq':
 						tmpfile=/lscratch/$SLURM_JOB_ID/{wildcards.sample} \
 						I=/lscratch/$SLURM_JOB_ID/{wildcards.lane}.bam \
 						O={output.bam} \
+						M={output.bam}.markDup.metrics.txt \
 						index=1 indexfilename={output.bai}
 					;;
 			esac
@@ -266,18 +267,17 @@ elif config['inputFileType'].upper() in ['BAM', 'CRAM']:
 							<(sambamba view -S -f bam -l 0 -t $(({threads}/2)) /dev/stdin)
 						mv {output.bam}.bai {output.bai}
 					else
-						java -Xmx12g -jar $BAZAMPATH/bazam.jar -bam {input} -r1 /lscratch/$SLURM_JOB_ID/{wildcards.sample}.r1.fastq.gz -r2 /lscratch/$SLURM_JOB_ID/{wildcards.sample}.r2.fastq.gz
-						bwa-mem2 mem -t $(({threads}-4)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -R {params.read_group} {config[bwa-mem2_ref]} \
-							/lscratch/$SLURM_JOB_ID/{wildcards.sample}.r1.fastq.gz /lscratch/$SLURM_JOB_ID/{wildcards.sample}.r2.fastq.gz \
-				 			| samblaster -M --acceptDupMarks --addMateTags --quiet \
+						java -Xmx12g -jar $BAZAMPATH/bazam.jar -bam {input} \
+							| bwa-mem2 mem -t $(({threads}-4)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[bwa-mem2_ref]} \
+							| samblaster -M --acceptDupMarks --addMateTags --quiet \
 							| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads}-4)) -o /lscratch/$SLURM_JOB_ID/{wildcards.sample}.bam \
 								<(sambamba view -S -f bam -l 0 -t $(({threads}-4)) /dev/stdin)
-						rm /lscratch/$SLURM_JOB_ID/{wildcards.sample}.r*.fastq.gz
 						module load {config[biobambam2_version]}
 						bammarkduplicatesopt markthreads={threads} level=6 \
 							tmpfile=/lscratch/$SLURM_JOB_ID/{wildcards.sample} \
 							I=/lscratch/$SLURM_JOB_ID/{wildcards.sample}.bam \
 							O={output.bam} \
+							M={output.bam}.markDup.metrics.txt \
 							index=1 indexfilename={output.bai}
 					fi
 					#sambamba index -t {threads} {output.bam} {output.bai}
@@ -301,6 +301,7 @@ elif config['inputFileType'].upper() in ['BAM', 'CRAM']:
 							tmpfile=/lscratch/$SLURM_JOB_ID/{wildcards.sample} \
 							I=/lscratch/$SLURM_JOB_ID/{wildcards.sample}.bam \
 							O={output.bam} \
+							M={output.bam}.markDup.metrics.txt \
 							index=1 indexfilename={output.bai}
 					fi
 					;;
@@ -353,12 +354,14 @@ else:
 							tmpfile=/lscratch/$SLURM_JOB_ID/{wildcards.sample} \
 							I=/lscratch/$SLURM_JOB_ID/{wildcards.sample}.bam \
 							O={output.bam} \
+							M={output.bam}.markDup.metrics.txt \
 							index=1 indexfilename={output.bai}
 					else
 						bammarkduplicatesopt markthreads={threads} level=6 \
 							tmpfile=/lscratch/$SLURM_JOB_ID/{wildcards.sample} \
 							I=/lscratch/$SLURM_JOB_ID/{wildcards.sample}.bam \
 							O={output.bam} \
+							M={output.bam}.markDup.metrics.txt \
 							index=1 indexfilename={output.bai}
 					fi
 					;;
@@ -368,12 +371,14 @@ else:
 							tmpfile=/lscratch/$SLURM_JOB_ID/{wildcards.sample} \
 							I={input.bam} \
 							O={output.bam} \
+							M={output.bam}.markDup.metrics.txt \
 							index=1 indexfilename={output.bai}
 					else
 						bammarkduplicatesopt markthreads={threads} level=6 \
 							tmpfile=/lscratch/$SLURM_JOB_ID/{wildcards.sample} \
 							I={input.bam} \
 							O={output.bam} \
+							M={output.bam}.markDup.metrics.txt \
 							index=1 indexfilename={output.bai}
 					fi
 					;;

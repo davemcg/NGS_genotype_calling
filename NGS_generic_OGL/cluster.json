@@ -99,8 +99,8 @@
 	"realign" :
 	{
 		"partition" : "norm",
-		"time" : "6:00:00",
-		"mem" : "200g",
+		"time" : "10:00:00",
+		"mem" : "100g",
 		"extra" : "--gres=lscratch:200"
 	},
 	"align" :
@@ -132,8 +132,8 @@
 	},
 	"merge_lane_bam" :
 	{
-		"partition" : "norm,quick",
-		"time" : "4:00:00",
+		"partition" : "norm",
+		"time" : "12:00:00",
 		"mem" : "16G",
 		"threads": "16",
 		"extra" : "--gres=lscratch:200"

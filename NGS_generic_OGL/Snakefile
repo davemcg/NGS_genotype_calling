@@ -259,18 +259,20 @@ elif config['inputFileType'].upper() in ['BAM', 'CRAM']:
  			case "{input}" in
 				*bam)
 					if [[ "{config[markDup]}" == "TRUE" ]]; then
-						java -Xmx16g -jar $BAZAMPATH/bazam.jar -bam {input} \
+						java -Xmx12g -jar $BAZAMPATH/bazam.jar -bam {input} \
 						| bwa-mem2 mem -t $(({threads}/2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[bwa-mem2_ref]} - \
 				 		| samblaster -M --addMateTags --quiet \
 						| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads}/2)) -o {output.bam} \
 							<(sambamba view -S -f bam -l 0 -t $(({threads}/2)) /dev/stdin)
 						mv {output.bam}.bai {output.bai}
 					else
-						java -Xmx16g -jar $BAZAMPATH/bazam.jar -bam {input} \
-						| bwa-mem2 mem -t $(({threads}/2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[bwa-mem2_ref]} - \
-				 		| samblaster -M --acceptDupMarks --addMateTags --quiet \
-						| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads}/2)) -o /lscratch/$SLURM_JOB_ID/{wildcards.sample}.bam \
-							<(sambamba view -S -f bam -l 0 -t $(({threads}/2)) /dev/stdin)
+						java -Xmx12g -jar $BAZAMPATH/bazam.jar -bam {input} -r1 /lscratch/$SLURM_JOB_ID/{wildcards.sample}.r1.fastq.gz -r2 /lscratch/$SLURM_JOB_ID/{wildcards.sample}.r2.fastq.gz
+						bwa-mem2 mem -t $(({threads}-4)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -R {params.read_group} {config[bwa-mem2_ref]} \
+							/lscratch/$SLURM_JOB_ID/{wildcards.sample}.r1.fastq.gz /lscratch/$SLURM_JOB_ID/{wildcards.sample}.r2.fastq.gz \
+				 			| samblaster -M --acceptDupMarks --addMateTags --quiet \
+							| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads}-4)) -o /lscratch/$SLURM_JOB_ID/{wildcards.sample}.bam \
+								<(sambamba view -S -f bam -l 0 -t $(({threads}-4)) /dev/stdin)
+						rm /lscratch/$SLURM_JOB_ID/{wildcards.sample}.r*.fastq.gz
 						module load {config[biobambam2_version]}
 						bammarkduplicatesopt markthreads={threads} level=6 \
 							tmpfile=/lscratch/$SLURM_JOB_ID/{wildcards.sample} \
@@ -844,23 +846,24 @@ rule split_bam_by_chr:
 	output:
 		bam = temp('sample_bam/chr_split/{sample}/{sample}__{chr}.bam'),
 		bai = temp('sample_bam/chr_split/{sample}/{sample}__{chr}.bai'),
-		metrics = temp('sample_bam/chr_split/{sample}/{sample}__{chr}.markdup.metrics.txt')
+		#metrics = temp('sample_bam/chr_split/{sample}/{sample}__{chr}.markdup.metrics.txt')
 	threads: 4
 	shell:
 		"""
-		module load {config[samtools_version]} {config[biobambam2_version]}
+		module load {config[samtools_version]} {config[sambamba_version]}
 		if [[ {wildcards.chr} != "MT_contigs" ]]; then
-			samtools view -h --threads {threads} --output-fmt SAM {input.bam} {wildcards.chr} \
-			| bamsormadup SO=coordinate threads={threads} level=6 inputformat=sam \
-			tmpfile=/lscratch/$SLURM_JOB_ID/bamsormadup \
-			indexfilename={output.bai} M={output.metrics} > {output.bam}
+			samtools view -h --threads {threads} --output-fmt BAM {input.bam} {wildcards.chr} > {output.bam}
+			sambamba index -t {threads} {output.bam} {output.bai}
 		else
-			samtools view -h --threads {threads} --output-fmt SAM {input.bam} {MT_CONTIGS} \
-			| bamsormadup SO=coordinate threads={threads} level=6 inputformat=sam \
-			tmpfile=/lscratch/$SLURM_JOB_ID/bamsormadup \
-			indexfilename={output.bai} M={output.metrics} > {output.bam}
+			samtools view -h --threads {threads} --output-fmt BAM {input.bam} {MT_CONTIGS} > {output.bam}
+			sambamba index -t {threads} {output.bam} {output.bai}
 		fi
 		"""
+#3/28/21 removed because problem with biobambam2, maybe due to new version. markdup and sort seems not necessary because it's done previously.
+# samtools view -h --threads {threads} --output-fmt SAM {input.bam} {wildcards.chr} \
+# | bamsormadup SO=coordinate threads={threads} level=6 inputformat=sam \
+# tmpfile=/lscratch/$SLURM_JOB_ID/bamsormadup \
+# index=1 indexfilename={output.bai} M={output.metrics} > {output.bam}
 #70min for longest run chr2, 16G max used.
 rule freebayes_phasing:
 	input:
@@ -991,12 +994,14 @@ rule merge_dv_fb_vcfs:
 		tabix -f -p vcf prioritization/{config[analysis_batch_name]}.vcf.gz
 		if [[ {config[genomeBuild]} == "GRCh38" ]]; then
 			module load {config[crossmap_version]}
+			hg19refM=/data/OGL/resources/1000G_phase2_GRCh37/human_g1k_v37_decoyM.fasta
 			hg19ref=/data/OGL/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta
 			crossmap vcf /data/OGL/resources/ucsc/hg38ToHg19.over.chain.gz \
 				prioritization/{config[analysis_batch_name]}.vcf.gz \
-				$hg19ref \
+				$hg19refM \
 				$WORK_DIR/GRCh37.vcf
-			sed -e 's/^chr//' -e 's/<ID=chr/<ID=/' $WORK_DIR/GRCh37.vcf \
+			sed -e 's/^chrM/MT/' -e 's/<ID=chrM/<ID=MT/' $WORK_DIR/GRCh37.vcf \
+				| sed -e 's/^chr//' -e 's/<ID=chr/<ID=/' - \
 			 	| bcftools norm --check-ref s --fasta-ref $hg19ref --output-type v - \
 				| bcftools norm -d none --output-type v - \
 				| bcftools sort -m 32G -T $WORK_DIR -Oz -o prioritization/{config[analysis_batch_name]}.GRCh37.vcf.gz

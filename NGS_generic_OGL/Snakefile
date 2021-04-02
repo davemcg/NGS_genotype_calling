@@ -505,7 +505,7 @@ rule mean_coverage:
 			filename=$(basename $file)
 			sm=$(echo $filename | sed 's/.md.mosdepth.summary.txt//')
 			tail -n 1 $file | cut -f 2,4 | sed 's/^/'"$sm"'\t/' >> coverage/{config[analysis_batch_name]}.mean.region.coverage.summary.tsv
-			tail -n 2 $file | head -n 1 | cut -f 2,4 | sed 's/^/'"$sm"'\t/' >> coverage/{config[analysis_batch_name]}.mean.region.coverage.summary.tsv
+			tail -n 2 $file | head -n 1 | cut -f 2,4 | sed 's/^/'"$sm"'\t/' >> coverage/{config[analysis_batch_name]}.mean.genome.coverage.summary.tsv
  		done
 		touch {output}
 		"""
@@ -763,7 +763,6 @@ rule scramble_annotation:
 		mei = 'scramble/{sample}_MEIs.txt'
 	output:
 		avinput = temp('scramble_anno/{sample}.avinput'),
-		annovar = temp('scramble_anno/{sample}.hg19_multianno.txt'),
 		annovarR = temp('scramble_anno/{sample}.forR.txt'),
 		anno = 'scramble_anno/{sample}.scramble.xlsx'
 	shell:

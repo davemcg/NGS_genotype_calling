@@ -777,7 +777,6 @@ rule scramble_annotation:
 		if [[ $(wc -l {input.mei} | cut -d " " -f 1) == 1 ]]
 		then
 			touch {output.avinput}
-			touch {output.annovar}
 			touch {output.annovarR}
 			touch {output.anno}
 		else
@@ -979,13 +978,13 @@ rule merge_dv_fb_vcfs:
 			deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz \
 			freebayes/{config[analysis_batch_name]}.freebayes.vcf.gz
 		rm $WORK_DIR/0003.vcf
-		bcftools annotate --threads {threads} --set-id 'dv-%CHROM\-%POS\-%REF\-%ALT' -x FORMAT/VAF,FORMAT/PL \
+		bcftools annotate --threads {threads} --set-id 'dv_%CHROM\:%POS%REF\>%ALT' -x FORMAT/VAF,FORMAT/PL \
 			--no-version $WORK_DIR/0000.vcf -Oz -o $WORK_DIR/dv.vcf.gz
 		rm $WORK_DIR/0000.vcf
-		bcftools annotate --threads {threads} --set-id 'fb-%CHROM\-%POS\-%REF\-%ALT' -x INFO,FORMAT/RO,FORMAT/QR,FORMAT/AO,FORMAT/QA,FORMAT/GL \
+		bcftools annotate --threads {threads} --set-id 'fb_%CHROM\:%POS%REF\>%ALT' -x INFO,FORMAT/RO,FORMAT/QR,FORMAT/AO,FORMAT/QA,FORMAT/GL \
 			--no-version $WORK_DIR/0001.vcf -Oz -o $WORK_DIR/fb.vcf.gz
 		rm $WORK_DIR/0001.vcf
-		bcftools annotate --threads {threads} --set-id 'dvFb-%CHROM\-%POS\-%REF\-%ALT' -x FORMAT/VAF,FORMAT/PL \
+		bcftools annotate --threads {threads} --set-id 'dvFb_%CHROM\:%POS%REF\>%ALT' -x FORMAT/VAF,FORMAT/PL \
 			--no-version $WORK_DIR/0002.vcf -Oz -o $WORK_DIR/dvFb.vcf.gz
 		rm $WORK_DIR/0002.vcf
 		tabix -f -p vcf $WORK_DIR/dv.vcf.gz

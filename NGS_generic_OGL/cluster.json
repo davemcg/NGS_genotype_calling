@@ -68,7 +68,7 @@
 	"freebayes_phasing" :
 	{
 		"partition" : "quick",
-		"time" : "2:00:00",
+		"time" : "4:00:00",
 		"mem" : "32g",
 		"threads" : "32",
 		"extra" : "--gres=lscratch:100"

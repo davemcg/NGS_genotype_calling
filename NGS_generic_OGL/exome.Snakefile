@@ -540,11 +540,11 @@ rule freebayes_phasing:
 		bam = 'sample_bam/{sample}.markDup.bam',
 		bai = 'sample_bam/{sample}.markDup.bai'
 	output:
-		vcf = 'freebayes/{sample}.vcf.gz',
-		filteredvcf = temp('freebayes/{sample}.filtered.vcf.gz'),
-		tbi = temp('freebayes/{sample}.filtered.vcf.gz.tbi'),
-		phasedvcf = 'freebayes/{sample}.phased.vcf.gz',
-		phasedvcf_tbi = 'freebayes/{sample}.phased.vcf.gz.tbi'
+		vcf = 'freebayes/vcf/{sample}.vcf.gz',
+		filteredvcf = temp('freebayes/vcf/{sample}.filtered.vcf.gz'),
+		tbi = temp('freebayes/vcf/{sample}.filtered.vcf.gz.tbi'),
+		phasedvcf = 'freebayes/vcf/{sample}.phased.vcf.gz',
+		phasedvcf_tbi = 'freebayes/vcf/{sample}.phased.vcf.gz.tbi'
 	threads: 18
 	shell:
 		"""
@@ -586,8 +586,8 @@ rule freebayes_phasing:
 
 rule merge_freebayes:
 	input:
-		vcf = expand('freebayes/{sample}.phased.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
-		tbi = expand('freebayes/{sample}.phased.vcf.gz.tbi', sample=list(SAMPLE_LANEFILE.keys()))
+		vcf = expand('freebayes/vcf/{sample}.phased.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
+		tbi = expand('freebayes/vcf/{sample}.phased.vcf.gz.tbi', sample=list(SAMPLE_LANEFILE.keys()))
 	output:
 		'freebayes/freebayes.merge.done.txt'
 	threads: 8

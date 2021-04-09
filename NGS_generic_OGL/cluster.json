@@ -20,23 +20,23 @@
 	{
 		"partition" : "gpu",
 		"extra" : "--constraint='gpup100' --gres=lscratch:100,gpu:1",
-		"time" : "2:00:00",
+		"time" : "3:00:00",
 		"mem" : "8g"
 	},
 	"deepvariantS3" :
 	{
 		"partition" : "norm,quick",
 		"extra" : "--gres=lscratch:100",
-		"time" : "2:30:00",
+		"time" : "3:00:00",
 		"mem" : "32g"
 	},
 	"dv_whatshap" :
 	{
 		"partition" : "norm,quick",
 		"extra" : "--gres=lscratch:200",
-		"time" : "2:00:00",
+		"time" : "3:00:00",
 		"threads" : "26",
-		"mem" : "64g"
+		"mem" : "72g"
 	},
 	"sve" :
 	{
@@ -49,7 +49,7 @@
 	"split_bam_by_chr" :
 	{
 		"extra" : "--gres=lscratch:100",
-		"mem" : "16g",
+		"mem" : "4g",
 		"threads" : "4"
 	},
 	"split_cram_by_rg" :
@@ -85,8 +85,10 @@
 	},
 	"merge_dv_fb_vcfs":
 	{
-		"mem" : "32g",
-		"extra" : "--gres=lscratch:100"
+		"partition" : "norm",
+		"time" : "6:00:00",
+		"mem" : "64g",
+		"extra" : "--gres=lscratch:200"
 	},
 	"align_markdup" :
 	{
@@ -105,16 +107,16 @@
 	},
 	"align" :
 	{
-		"partition" : "norm,quick",
-		"time" : "4:00:00",
+		"partition" : "norm",
+		"time" : "5:00:00",
 		"mem" : "100g",
 		"threads" : "56",
 		"extra" : "--gres=lscratch:400"
 	},
 	"manta" :
 	{
-		"partition" : "norm,quick",
-		"time" : "2:00:00",
+		"partition" : "norm",
+		"time" : "6:00:00",
 		"mem" : "32g",
 		"threads" : "32",
 		"extra" : "--gres=lscratch:50"
@@ -132,8 +134,8 @@
 	},
 	"merge_lane_bam" :
 	{
-		"partition" : "norm",
-		"time" : "16:00:00",
+		"partition" : "norm,quick",
+		"time" : "4:00:00",
 		"mem" : "16G",
 		"threads": "16",
 		"extra" : "--gres=lscratch:200"
@@ -169,8 +171,7 @@
 		"mem" : "16g"
 	},
 	"cat_fbvcfs" : {
-		"mem" : "16g",
-		"threads" : "8"
+		"mem" : "8g"
 	},
 	"gatk_base_recalibrator" : {
 		"partition" : "norm",

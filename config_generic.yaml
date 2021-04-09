@@ -6,7 +6,7 @@ inputFileType: 'fastq' # single_lane_fastq, fastq, bam or cram.
 bed: '/data/OGL/resources/bed/OGLv1.GRCh38.sorted.bed' # bed file is used for coverage of eyeGene
 padded_bed: '/data/OGL/resources/bed/xgenV2_OGLv1.500padded.bed' #for deepvariant variant calling in exome & panel
 real_bed: 'FALSE' # TRUE or FALSE, if a real bed is provided, use the bed above for freebayes filtering. If not real_bed, then the bed above is used for deepvariant, but not for freebayes filtering.
-markDup: 'TRUE' # TRUE, FALSE, or OpticDup; Only used in wgs snakemake.
+markDup: 'TRUE' # TRUE, FALSE, or OpticDup; Only used in wgs snakemake.#wgs if TRUE or OpticDup, then need to set merge_lane_bam to 16:0:0 hours.
 cram: 'FALSE' # TRUE to convert bam to cram, values other than TRUE will not convert. #Keep bam for panel and exome if addtional analyses are anticipated
 #recal_bam: 'FALSE' #TRUE to merge chr bams to single sample recalibrated bam
 multiqc: 'TRUE' # will run only if TrueSeq

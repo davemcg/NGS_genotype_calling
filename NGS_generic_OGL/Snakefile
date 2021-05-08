@@ -684,10 +684,10 @@ rule dv_whatshap:
 		WORK_DIR="/lscratch/${{SLURM_JOB_ID}}"
 		FILTEREDVCF="/lscratch/$SLURM_JOB_ID/{wildcards.sample}.dv.filtered.vcf.gz"
 		rm -rf $WORK_DIR/*
-		bcftools filter --include 'FILTER="PASS"' --output-type v {input.vcf} \
-			| bcftools norm --multiallelics -any --output-type v - \
-			| bcftools norm --check-ref s --fasta-ref {config[ref_genome]} --output-type v - \
-			| bcftools norm -d none --output-type z --output $FILTEREDVCF
+		bcftools filter --include 'FILTER="PASS"' --output-type u {input.vcf} \
+			| bcftools norm --multiallelics -any --output-type u - \
+			| bcftools norm --check-ref s --fasta-ref {config[ref_genome]} --output-type u - \
+			| bcftools norm --threads $(({threads}-6)) -d exact --output-type z --output $FILTEREDVCF
 		tabix -f -p vcf $FILTEREDVCF && echo "Filtered vcf index created" || exit 3
 		CONTIGFILE="/data/OGL/resources/whatshap/vcf.contig.filename.{config[genomeBuild]}.txt"
 		cp {config[ref_genome]} {config[ref_genome]}.fai {input.bam} {input.bai} $WORK_DIR \
@@ -695,12 +695,12 @@ rule dv_whatshap:
 		mkdir -p /lscratch/$SLURM_JOB_ID/filtered
 		mkdir -p /lscratch/$SLURM_JOB_ID/filtered
 		mkdir -p /lscratch/$SLURM_JOB_ID/phased
-		( cat $CONTIGFILE | parallel -C "\t" -j 21 "bcftools filter -r {{1}} --output-type z $FILTEREDVCF > $WORK_DIR/filtered/{{2}}.filtered.vcf.gz" ) && echo "Filtered vcf split to chr" || exit 5
+		( cat $CONTIGFILE | parallel -C "\t" -j 21 "bcftools filter --threads $(({threads}-6)) -r {{1}} --output-type z $FILTEREDVCF -o $WORK_DIR/filtered/{{2}}.filtered.vcf.gz" ) && echo "Filtered vcf split to chr" || exit 5
 		( cat $CONTIGFILE | parallel -C "\t" -j 21 "tabix -f -p vcf $WORK_DIR/filtered/{{2}}.filtered.vcf.gz" ) && echo "Chr vcf index created" || exit 6
 		( cat $CONTIGFILE | parallel -C "\t" -j 21 --tmpdir $WORK_DIR --eta --halt 2 --line-buffer \
 		 	--tag "whatshap phase --reference $WORK_DIR/$(basename {config[ref_genome]}) \
 			--indels --ignore-read-groups $WORK_DIR/filtered/{{2}}.filtered.vcf.gz $WORK_DIR/{wildcards.sample}.markDup.bam \
-			| bgzip -f > $WORK_DIR/phased/{{2}}.phased.vcf.gz" \
+			| bgzip -f --threads $(({threads}-10)) > $WORK_DIR/phased/{{2}}.phased.vcf.gz" \
 		) && echo "whatshap on chr completed" || exit 7
 		( cat $CONTIGFILE | parallel -C "\t" -j 21 "tabix -f -p vcf $WORK_DIR/phased/{{2}}.phased.vcf.gz" ) && echo "Phased-chr vcf index created" || exit 8
 		PHASEDCHRFILE=""
@@ -899,9 +899,8 @@ rule freebayes_phasing:
 			--min-mapping-quality 1 --genotype-qualities --strict-vcf --use-mapping-quality \
 			| bcftools norm --multiallelics -any --output-type v - \
 			| vt decompose_blocksub -p -m -d 2 - \
-			| bcftools norm --check-ref s --fasta-ref {config[ref_genome]} --output-type v - \
-			| bcftools norm -d none --output-type v - \
-			| bgzip -f > {output.vcf}
+			| bcftools norm --check-ref s --fasta-ref {config[ref_genome]} --output-type u - \
+			| bcftools norm -d exact --output-type z - -o {output.vcf}
 		sleep 2
 		tabix -f -p vcf {output.vcf}
 		vcffilter -f "QUAL > 15 & QA / AO > 15 & SAF > 0 & SAR > 0 & RPR > 0 & RPL > 0 & AO > 2 & DP > 3" {output.vcf} | bgzip -f > {output.filteredvcf}
@@ -1012,9 +1011,9 @@ rule merge_dv_fb_vcfs:
 				$WORK_DIR/GRCh37.vcf
 			sed -e 's/^chrM/MT/' -e 's/<ID=chrM/<ID=MT/' $WORK_DIR/GRCh37.vcf \
 				| sed -e 's/^chr//' -e 's/<ID=chr/<ID=/' - \
-			 	| bcftools norm --check-ref s --fasta-ref $hg19ref --output-type v - \
-				| bcftools norm -d none --output-type v - \
-				| bcftools sort -m 32G -T $WORK_DIR -Oz -o prioritization/{config[analysis_batch_name]}.GRCh37.vcf.gz
+			 	| bcftools norm --check-ref s --fasta-ref $hg19ref --output-type u - \
+				| bcftools sort -m 60G -T $WORK_DIR -Ou - \
+				| bcftools norm --threads $(({threads}-4)) -d exact --output-type z - -o prioritization/{config[analysis_batch_name]}.GRCh37.vcf.gz
 			tabix -f -p vcf prioritization/{config[analysis_batch_name]}.GRCh37.vcf.gz
 		fi
 		touch {output}

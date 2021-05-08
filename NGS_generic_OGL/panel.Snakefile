@@ -663,7 +663,7 @@ rule deepvariant:
 		module unload {config[deepvariant_version]}
 		module load {config[samtools_version]}
 		bcftools norm --multiallelics -any --output-type v {output.vcf} \
-			| bcftools norm -d none --output-type v - \
+			| bcftools norm -d exact --output-type v - \
 			| bcftools filter --include 'FILTER="PASS" & FORMAT/AD[0:1]>2' --output-type z --output {output.filteredvcf}
 		sleep 2
 		tabix -f -p vcf {output.filteredvcf}
@@ -737,7 +737,7 @@ rule glnexus:
 		"""
 		module load {config[glnexus_version]}
 		module load {config[samtools_version]}
-		glnexus --config DeepVariant_unfiltered --bed {config[padded_bed]} \
+		glnexus --dir /lscratch/$SLURM_JOB_ID/glnexus --config DeepVariant_unfiltered --bed {config[padded_bed]} \
 			--threads {threads} \
 			{input.vcf} \
 			| bcftools view - | bgzip -c > deepvariant/{config[analysis_batch_name]}.glnexus.vcf.gz
@@ -780,7 +780,7 @@ rule freebayes_phasing:
 			| bcftools norm --multiallelics -any --output-type v - \
 			| vt decompose_blocksub -p -m -d 2 - \
 			| bcftools norm --check-ref s --fasta-ref {config[ref_genome]} --output-type v - \
-			| bcftools norm -d none --output-type v - \
+			| bcftools norm -d exact --output-type v - \
 			| vcffilter -f "( QUAL > 15 & QA / AO > 15 & SAF > 0 & SAR > 0 & RPR > 0 & RPL > 0 & AO > 2 & DP > 3 ) | ( QUAL > 30 & QA / AO > 25 & ( SAF = 0 | SAR = 0 | RPR = 0 | RPL = 0 ) & AO > 2 & DP > 3 )" \
 			| bgzip -f > {output.filteredvcf}
 		sleep 2
@@ -793,7 +793,7 @@ rule freebayes_phasing:
 		tabix -f -p vcf {output.phasedvcf}
 		"""
 #added --regions-file 1/29/2021
-# bcftools norm -d none means remove duplicates if they are identical (keep the first instance)
+# bcftools norm -d exact means remove duplicates if they are identical (keep the first instance)
 #vt decompose_blocksub -a separated inframe insertion to fs. thus do not use.
 # --gvcf: after gvcf,I tried to pipe it to vcffilter, which removed the reference regions | vcffilter -f "QUAL > 1"
 #freebayes -f /data/OGVFB/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta --gvcf --limit-coverage 1000 --min-coverage 4 sample_bam/14_NA12878.markDup.bam > 14_NA12878.test.gvcf
@@ -905,7 +905,7 @@ rule merge_dv_fb_vcfs:
 				$WORK_DIR/GRCh37.vcf
 			sed -e 's/^chr//' -e 's/<ID=chr/<ID=/' $WORK_DIR/GRCh37.vcf \
 			 	| bcftools norm --check-ref s --fasta-ref $hg19ref --output-type v - \
-				| bcftools norm -d none --output-type v - \
+				| bcftools norm -d exact --output-type v - \
 				| bcftools sort -m 32G -T $WORK_DIR -Oz -o prioritization/{config[analysis_batch_name]}.GRCh37.vcf.gz
 			tabix -f -p vcf prioritization/{config[analysis_batch_name]}.GRCh37.vcf.gz
 		fi

@@ -38,7 +38,7 @@ biobambam2_version: 'biobambam2/2.0.179-release-20201228191456'
 samblaster_version: 'samblaster/0.1.25'
 sambamba_version: 'sambamba/0.8.0'
 annovar_version: 'annovar/2019-10-24'
-crossmap_version: 'crossmap/0.5.1'
+crossmap_version: 'crossmap/0.5.4'
 #ref_genome: '/fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37_decoy.fasta'
 old_cram_ref: '/data/OGL/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta'
 bwa-mem2_ref: '/data/OGL/resources/1000G_phase2_GRCh37/bwa-mem2/human_g1k_v37_decoy.fasta' #/fdb/bwa-mem2/hg38new/genome.fa This is the same fasta linked to igenomes

@@ -160,6 +160,7 @@ if config['inputFileType'] == 'single_lane_fastq':
 			cp -p -l {input.bai} {output.bai}
 			"""
 elif config['inputFileType'].upper() in ['BAM', 'CRAM']:
+	localrules: realign
 	rule realign:
 		input:
 			lambda wildcards: join('old_bam/', str(SAMPLE_LANEFILE[wildcards.sample][0]))
@@ -172,16 +173,16 @@ elif config['inputFileType'].upper() in ['BAM', 'CRAM']:
 		shell:
 			"""
 			export TMPDIR=/lscratch/$SLURM_JOB_ID
-			module load {config[bazam_version]}
-			module load {config[bwa-mem2_version]} {config[samblaster_version]} {config[sambamba_version]}
+			module load {config[bazam_version]} {config[bwa-mem2_version]} {config[samblaster_version]} {config[sambamba_version]}
 			BAMFILE={input}
-			if [ -e {input}.bai ] || [ -e ${{BAMFILE%.bam}}.bai ]; then
+			if [ -e {input}.bai ] || [ -e ${{BAMFILE%.bam}}.bai ] || [ -e {input}.crai ] || [ -e ${{BAMFILE%.cram}}.bai ] ; then
 				echo "index present"
 			else
 				sambamba index -t $(({threads}-2)) {input}
 			fi
- 			case "{input}" in
+			case "{input}" in
 				*bam)
+					echo "bam branch"
 					java -Xmx16g -jar $BAZAMPATH/bazam.jar -bam {input} \
 					| bwa-mem2 mem -t $(({threads}/2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[bwa-mem2_ref]} - \
 			 		| samblaster -M --addMateTags --quiet \
@@ -190,6 +191,7 @@ elif config['inputFileType'].upper() in ['BAM', 'CRAM']:
 					mv {output.bam}.bai {output.bai}
 					;;
 				*cram)
+					echo "cram branch"
 					java -Xmx16g -Dsamjdk.reference_fasta={config[old_cram_ref]} -jar $BAZAMPATH/bazam.jar -bam {input} \
 					| bwa-mem2 mem -t $(({threads}/2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[bwa-mem2_ref]} - \
 			 		| samblaster -M --addMateTags --quiet \

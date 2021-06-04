@@ -160,7 +160,6 @@ if config['inputFileType'] == 'single_lane_fastq':
 			cp -p -l {input.bai} {output.bai}
 			"""
 elif config['inputFileType'].upper() in ['BAM', 'CRAM']:
-	localrules: realign
 	rule realign:
 		input:
 			lambda wildcards: join('old_bam/', str(SAMPLE_LANEFILE[wildcards.sample][0]))
@@ -182,7 +181,6 @@ elif config['inputFileType'].upper() in ['BAM', 'CRAM']:
 			fi
 			case "{input}" in
 				*bam)
-					echo "bam branch"
 					java -Xmx16g -jar $BAZAMPATH/bazam.jar -bam {input} \
 					| bwa-mem2 mem -t $(({threads}/2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[bwa-mem2_ref]} - \
 			 		| samblaster -M --addMateTags --quiet \
@@ -191,7 +189,6 @@ elif config['inputFileType'].upper() in ['BAM', 'CRAM']:
 					mv {output.bam}.bai {output.bai}
 					;;
 				*cram)
-					echo "cram branch"
 					java -Xmx16g -Dsamjdk.reference_fasta={config[old_cram_ref]} -jar $BAZAMPATH/bazam.jar -bam {input} \
 					| bwa-mem2 mem -t $(({threads}/2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[bwa-mem2_ref]} - \
 			 		| samblaster -M --addMateTags --quiet \

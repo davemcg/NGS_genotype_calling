@@ -825,14 +825,14 @@ rule manta:
  		bai = 'sample_bam/{sample}.markDup.bai'
 	output:
 		'manta/manta.{sample}.annotated.tsv'
-	threads: 32
+	threads: 56
 	shell:
 		"""
 		module load {config[manta_version]}
 		mkdir -p /lscratch/$SLURM_JOB_ID/manta/{wildcards.sample}
 		RUNDIR="/lscratch/$SLURM_JOB_ID/manta/{wildcards.sample}"
 		configManta.py --referenceFasta {config[ref_genome]} \
-			--exome --runDir $RUNDIR --bam {input.bam}
+			--runDir $RUNDIR --bam {input.bam}
 		$RUNDIR/runWorkflow.py -m local -j {threads} -g $((SLURM_MEM_PER_NODE / 1024))
 		cp $RUNDIR/results/variants/diploidSV.vcf.gz manta/{wildcards.sample}.diploidSV.vcf.gz
 		cp $RUNDIR/results/variants/diploidSV.vcf.gz.tbi manta/{wildcards.sample}.diploidSV.vcf.gz.tbi

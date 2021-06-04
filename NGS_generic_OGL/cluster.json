@@ -27,16 +27,16 @@
 	{
 		"partition" : "norm,quick",
 		"extra" : "--gres=lscratch:100",
-		"time" : "3:00:00",
+		"time" : "4:00:00",
 		"mem" : "32g"
 	},
 	"dv_whatshap" :
 	{
-		"partition" : "norm,quick",
+		"partition" : "norm",
 		"extra" : "--gres=lscratch:200",
-		"time" : "3:00:00",
+		"time" : "6:00:00",
 		"threads" : "26",
-		"mem" : "72g"
+		"mem" : "96g"
 	},
 	"sve" :
 	{
@@ -69,7 +69,7 @@
 	{
 		"partition" : "quick",
 		"time" : "4:00:00",
-		"mem" : "32g",
+		"mem" : "96g",
 		"threads" : "32",
 		"extra" : "--gres=lscratch:100"
 	},
@@ -115,10 +115,9 @@
 	},
 	"manta" :
 	{
-		"partition" : "norm",
-		"time" : "6:00:00",
+		"partition" : "quick,norm",
+		"time" : "4:00:00",
 		"mem" : "32g",
-		"threads" : "32",
 		"extra" : "--gres=lscratch:50"
 	},
 	"scramble" :
@@ -163,7 +162,7 @@
 	"picard_alignmentQC" :
 	{
 		"partition" : "norm",
-		"time" : "6:00:00",
+		"time" : "10:00:00",
 		"mem" : "32g",
 		"extra" : "--gres=lscratch:20"
 	},

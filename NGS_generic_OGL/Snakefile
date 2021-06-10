@@ -510,6 +510,7 @@ rule coverage:
 		tail -n 1 {output.summary} | cut -f 2,4 | sed 's/^/{wildcards.sample}\t/' >> {output.region_summary}
 		Rscript ~/git/NGS_genotype_calling/NGS_generic_OGL/mosdepth_bed_coverage.R \
 			{output.thresholds}.tsv {config[OGL_Dx_research_genes]} {output.region_summary} {output.xlsx}
+		rm {output.thresholds}.tsv
 		"""
 
 localrules: mean_coverage

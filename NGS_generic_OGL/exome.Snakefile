@@ -395,9 +395,11 @@ rule coverage:
 		"""
 		module load {config[mosdepth_version]}
 		module load {config[R_version]}
+		cd coverage/mosdepth
 		mosdepth -t {threads} --no-per-base --by {config[bed]} --use-median --mapq 0 --fast-mode --thresholds 10,20,30 \
-			{wildcards.sample}.md {input.bam}
-		mv {wildcards.sample}.md.* coverage/mosdepth/.
+			{wildcards.sample}.md ../../{input.bam}
+		cd ../..
+		#mv {wildcards.sample}.md.* coverage/mosdepth/.
 		zcat {output.thresholds} \
 			 | sed '1 s/^.*$/chr\tstart\tend\tgene\tcoverageTen\tcoverageTwenty\tcoverageThirty/' \
 			 > {output.thresholds}.tsv

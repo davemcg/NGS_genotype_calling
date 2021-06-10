@@ -209,6 +209,12 @@ elif config['inputFileType'].upper() in ['BAM', 'CRAM']:
 			echo {params.read_group}
 			module load {config[bazam_version]}
 			module load {config[bwa-mem2_version]} {config[samblaster_version]} {config[sambamba_version]}
+			BAMFILE={input}
+			if [ -e {input}.bai ] || [ -e ${{BAMFILE%.bam}}.bai ] || [ -e {input}.crai ] || [ -e ${{BAMFILE%.cram}}.bai ] ; then
+				echo "index present"
+			else
+				sambamba index -t $(({threads}-2)) {input}
+			fi
  			case "{input}" in
 				*bam)
 					java -Xmx12g -jar $BAZAMPATH/bazam.jar -bam {input} \
@@ -402,9 +408,11 @@ rule coverage:
 		"""
 		module load {config[mosdepth_version]}
 		module load {config[R_version]}
+		cd coverage/mosdepth
 		mosdepth -t {threads} --no-per-base --by {config[bed]} --use-median --mapq 0 --fast-mode --thresholds 10,20,30 \
-			{wildcards.sample}.md {input.bam}
-		mv {wildcards.sample}.md.* coverage/mosdepth/.
+			{wildcards.sample}.md ../../{input.bam}
+		cd ../..
+		#mv {wildcards.sample}.md.* coverage/mosdepth/.
 		zcat {output.thresholds} \
 			 | sed '1 s/^.*$/chr\tstart\tend\tgene\tcoverageTen\tcoverageTwenty\tcoverageThirty/' \
 			 > {output.thresholds}.tsv

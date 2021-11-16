@@ -7,7 +7,7 @@
 
 #lscratch 200g failed - used /scratch below instead.
 outputVcf=$1 # i.e. novogen133.glnexus.vcf.gz
-module load glnexus/1.2.7 samtools/1.11
+module load glnexus/1.2.7 samtools/1.13
 mkdir -p glnexus
 time glnexus --dir /lscratch/$SLURM_JOB_ID/glnexus --config DeepVariantWGS --threads 56 --mem-gbytes 800 deepvariant/gvcf/*.g.vcf.gz | bcftools view - | bgzip -c > glnexus/$outputVcf
 #--threads 56 - -Oz -o glnexus1/$outputVcf

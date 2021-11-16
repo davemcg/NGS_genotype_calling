@@ -12,7 +12,7 @@
 	{
 		"partition" : "norm",
 		"time" : "6:00:00",
-		"mem" : "20g",
+		"mem" : "32g",
 		"extra" : "--gres=lscratch:50"
 	},
 	"freebayes" :
@@ -48,6 +48,8 @@
 	},
 	"scramble" :
 	{
+		"partition" : "norm",
+		"time" : "8:00:00",
 		"mem" : "48g"
 	},
 	"split_cram_by_rg" :

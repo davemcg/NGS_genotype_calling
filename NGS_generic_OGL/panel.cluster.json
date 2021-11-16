@@ -21,6 +21,12 @@
 		"time" : "1:00:00",
 		"mem" : "20g"
 	},
+	"glnexus" :
+	{
+		"partition" : "quick",
+		"time" : "1:00:00",
+		"mem" : "32g"
+	},
 	"freebayes" :
 	{
 		"partition" : "largemem",

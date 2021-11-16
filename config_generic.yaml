@@ -6,7 +6,7 @@ inputFileType: 'fastq' # single_lane_fastq, fastq, bam or cram.
 bed: '/data/OGL/resources/bed/OGLv1.GRCh38.sorted.bed' # bed file is used for coverage of eyeGene
 padded_bed: '/data/OGL/resources/bed/xgenV2_OGLv1.500padded.bed' #for deepvariant variant calling in exome & panel
 real_bed: 'FALSE' # TRUE or FALSE, if a real bed is provided, use the bed above for freebayes filtering. If not real_bed, then the bed above is used for deepvariant, but not for freebayes filtering.
-markDup: 'TRUE' # TRUE, FALSE, or OpticDup; Use FALSE for wgs snakemake. OpticDup does not work.
+markDup: 'TRUE' # TRUE, FALSE
 cram: 'FALSE' # TRUE to convert bam to cram, values other than TRUE will not convert. #Keep bam for panel and exome if addtional analyses are anticipated
 #recal_bam: 'FALSE' #TRUE to merge chr bams to single sample recalibrated bam
 multiqc: 'TRUE' # will run only if TrueSeq
@@ -36,13 +36,13 @@ bwa_version: 'bwa/0.7.17'
 bwa-mem2_version: 'bwa-mem2/2.2.1'
 biobambam2_version: 'biobambam2/2.0.179-release-20201228191456'
 samblaster_version: 'samblaster/0.1.25'
-sambamba_version: 'sambamba/0.8.0'
+sambamba_version: 'sambamba/0.8.1'
 annovar_version: 'annovar/2019-10-24'
 crossmap_version: 'crossmap/0.5.4'
 #ref_genome: '/fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37_decoy.fasta'
 old_cram_ref: '/data/OGL/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta'
-bwa-mem2_ref: '/data/OGL/resources/1000G_phase2_GRCh37/bwa-mem2/human_g1k_v37_decoy.fasta' #/fdb/bwa-mem2/hg38new/genome.fa This is the same fasta linked to igenomes
-ref_genome: '/data/OGL/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta' #/fdb/igenomes/Homo_sapiens/NCBI/GRCh38Decoy/Sequence/WholeGenomeFasta/genome.fa
+bwa-mem2_ref: '/data/OGL/resources/genomes/NCBI/GRCh38Decoy/genome.fa' #GRCh37 is hard-coded in the Snakefile
+ref_genome: '/data/OGL/resources/genomes/NCBI/GRCh38Decoy/genome.fa' ##GRCh37 is hard-coded in the Snakefile
 1000g_indels: '/fdb/GATK_resource_bundle/b37-2.8/1000G_phase1.indels.b37.vcf'
 mills_gold_indels: '/fdb/GATK_resource_bundle/b37-2.8/Mills_and_1000G_gold_standard.indels.b37.vcf'
 dbsnp_var: '/fdb/GATK_resource_bundle/b37-2.8/dbsnp_138.b37.excluding_sites_after_129.vcf'
@@ -66,5 +66,5 @@ scramble_version: 'scramble/1.0.1-32893ef'
 mosdepth_version: 'mosdepth/0.2.8'
 bedtools_version: 'bedtools/2.29.0'
 OGL_Dx_research_genes: '/data/OGL/resources/OGLpanelGeneDxORcandidate.xlsx'
-whatshap_version: 'whatshap/0.18'
+whatshap_version: 'whatshap/1.1'
 HGMDtranscript: '/data/OGL/resources/HGMD/HGMDtranscript.txt'

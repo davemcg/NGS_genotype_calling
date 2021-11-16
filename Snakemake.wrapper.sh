@@ -3,9 +3,11 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32g
 
+
+# If panel, install Normality package and CoNVaDING, try perldoc -lm Statistics::Normality, to find the installation location, and add "use lib '/usr/local/Perl/5.24.3/lib/perl5/site_perl/5.24.3';" on line 12 (without double quotes) before "use Statistics::Normality 'shapiro_wilk_test';" Somehow, jobs by snakemake/6.0.5 did not identify the route without this extra line.
 # to run snakemake as batch job
 # run in the data folder for this project, fastq files must be in the folder fastq.
-# sbatch --cpus-per-task=8 --mem=32g --time=12:0:0 ~/git/NGS_genotype_calling/Snakemake.wrapper.sh config_panel.yaml OGL733v1 panel
+# sbatch --time=12:0:0 ~/git/NGS_genotype_calling/Snakemake.wrapper.sh config_panel.yaml OGL733v1 panel
 # $2: Libary Information, such as OGLv1
 # $3: If typing in "panel", the panel.Snakefile and panel.cluster.json will be run. If "exome", then exome snakefile/exome.json will be used. Anything else including empty will run the WGS pipeline. The config file is the $1.
 # $4: --notemp --dryrun --unlock or empty
@@ -66,7 +68,7 @@ case "${ngstype^^}" in
 		-pr --local-cores 2 --jobs 1999 \
 		--cluster-config /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/exome.cluster.json \
 		--cluster "$sbcmd"  --latency-wait 120 --rerun-incomplete \
-		-k --restart-times 1 \
+		-k --restart-times 0 \
 		--resources parallel=4 \
 		--configfile $1 $4
 		;;
@@ -85,23 +87,3 @@ esac
 # --dryrun
 # --unlock
 # --dag
-
-
-# if [[ "${ngstype^^}" =~ ^(PANEL|EXOME)$ ]];
-# then
-	# snakemake -s /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/panel.Snakefile \
-	# -pr --local-cores 2 --jobs 1999 \
-	# --cluster-config /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/panel.cluster.json \
-	# --cluster "$sbcmd"  --latency-wait 120 --rerun-incomplete \
-	# -k --restart-times 4 \
-	# --resources parallel=4 \
-	# --configfile $1
-# else
-	# snakemake -s /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/Snakefile \
-	# -pr --local-cores 2 --jobs 1999 \
-	# --cluster-config /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/cluster.json \
-	# --cluster "$sbcmd"  --latency-wait 120 --rerun-incomplete \
-	# -k --restart-times 4 \
-	# --resources parallel=4 \
-	# --configfile $1
-# fi

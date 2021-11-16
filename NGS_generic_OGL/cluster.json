@@ -100,10 +100,10 @@
 	},
 	"realign" :
 	{
-		"partition" : "norm",
-		"time" : "20:00:00",
+		"partition" : "norm,unlimited",
+		"time" : "16:00:00",
 		"mem" : "100g",
-		"extra" : "--gres=lscratch:200"
+		"extra" : "--gres=lscratch:400"
 	},
 	"align" :
 	{
@@ -122,8 +122,8 @@
 	},
 	"scramble" :
 	{
-		"partition" : "norm,quick",
-		"time" : "4:00:00"
+		"partition" : "norm",
+		"time" : "6:00:00"
 	},
 	"picard_merge_bams" :
 	{

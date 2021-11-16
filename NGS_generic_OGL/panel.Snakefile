@@ -88,8 +88,6 @@ if config['genomeBuild'].upper() in ['GRCH37', 'HG19']:
 	CHRS=["1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","X","Y","MT_contigs"]
 	MT_CONTIGS = "MT GL000207.1 GL000226.1 GL000229.1 GL000231.1 GL000210.1 GL000239.1 GL000235.1 GL000201.1 GL000247.1 GL000245.1 GL000197.1 GL000203.1 GL000246.1 GL000249.1 GL000196.1 GL000248.1 GL000244.1 GL000238.1 GL000202.1 GL000234.1 GL000232.1 GL000206.1 GL000240.1 GL000236.1 GL000241.1 GL000243.1 GL000242.1 GL000230.1 GL000237.1 GL000233.1 GL000204.1 GL000198.1 GL000208.1 GL000191.1 GL000227.1 GL000228.1 GL000214.1 GL000221.1 GL000209.1 GL000218.1 GL000220.1 GL000213.1 GL000211.1 GL000199.1 GL000217.1 GL000216.1 GL000215.1 GL000205.1 GL000219.1 GL000224.1 GL000223.1 GL000195.1 GL000212.1 GL000222.1 GL000200.1 GL000193.1 GL000194.1 GL000225.1 GL000192.1 NC_007605"
 elif config['genomeBuild'].upper() in ['GRCH38', 'HG38']:
-	config['ref_genome'] = '/data/OGL/resources/genomes/GRCh38/GRCh38Decoy2.fa'
-	config['bwa-mem2_ref'] = '/data/OGL/resources/genomes/GRCh38/bwa-mem2/GRCh38Decoy2.fa'
 	config['SCRAMBLEdb'] = '/data/OGL/resources/SCRAMBLEvariantClassification.GRCh38.xlsx'
 	CHRS=["chr1","chr2","chr3","chr4","chr5","chr6","chr7","chr8","chr9","chr10","chr11","chr12","chr13","chr14","chr15","chr16","chr17","chr18","chr19","chr20","chr21","chr22","chrX","chrY","MT_contigs"]
 	MT_CONTIGS = "chrM chr1_KI270706v1_random chr1_KI270707v1_random chr1_KI270708v1_random chr1_KI270709v1_random chr1_KI270710v1_random chr1_KI270711v1_random chr1_KI270712v1_random chr1_KI270713v1_random chr1_KI270714v1_random chr2_KI270715v1_random chr2_KI270716v1_random chr3_GL000221v1_random chr4_GL000008v2_random chr5_GL000208v1_random chr9_KI270717v1_random chr9_KI270718v1_random chr9_KI270719v1_random chr9_KI270720v1_random chr11_KI270721v1_random chr14_GL000009v2_random chr14_GL000225v1_random chr14_KI270722v1_random chr14_GL000194v1_random chr14_KI270723v1_random chr14_KI270724v1_random chr14_KI270725v1_random chr14_KI270726v1_random chr15_KI270727v1_random chr16_KI270728v1_random chr17_GL000205v2_random chr17_KI270729v1_random chr17_KI270730v1_random chr22_KI270731v1_random chr22_KI270732v1_random chr22_KI270733v1_random chr22_KI270734v1_random chr22_KI270735v1_random chr22_KI270736v1_random chr22_KI270737v1_random chr22_KI270738v1_random chr22_KI270739v1_random chrY_KI270740v1_random chrUn_KI270302v1 chrUn_KI270304v1 chrUn_KI270303v1 chrUn_KI270305v1 chrUn_KI270322v1 chrUn_KI270320v1 chrUn_KI270310v1 chrUn_KI270316v1 chrUn_KI270315v1 chrUn_KI270312v1 chrUn_KI270311v1 chrUn_KI270317v1 chrUn_KI270412v1 chrUn_KI270411v1 chrUn_KI270414v1 chrUn_KI270419v1 chrUn_KI270418v1 chrUn_KI270420v1 chrUn_KI270424v1 chrUn_KI270417v1 chrUn_KI270422v1 chrUn_KI270423v1 chrUn_KI270425v1 chrUn_KI270429v1 chrUn_KI270442v1 chrUn_KI270466v1 chrUn_KI270465v1 chrUn_KI270467v1 chrUn_KI270435v1 chrUn_KI270438v1 chrUn_KI270468v1 chrUn_KI270510v1 chrUn_KI270509v1 chrUn_KI270518v1 chrUn_KI270508v1 chrUn_KI270516v1 chrUn_KI270512v1 chrUn_KI270519v1 chrUn_KI270522v1 chrUn_KI270511v1 chrUn_KI270515v1 chrUn_KI270507v1 chrUn_KI270517v1 chrUn_KI270529v1 chrUn_KI270528v1 chrUn_KI270530v1 chrUn_KI270539v1 chrUn_KI270538v1 chrUn_KI270544v1 chrUn_KI270548v1 chrUn_KI270583v1 chrUn_KI270587v1 chrUn_KI270580v1 chrUn_KI270581v1 chrUn_KI270579v1 chrUn_KI270589v1 chrUn_KI270590v1 chrUn_KI270584v1 chrUn_KI270582v1 chrUn_KI270588v1 chrUn_KI270593v1 chrUn_KI270591v1 chrUn_KI270330v1 chrUn_KI270329v1 chrUn_KI270334v1 chrUn_KI270333v1 chrUn_KI270335v1 chrUn_KI270338v1 chrUn_KI270340v1 chrUn_KI270336v1 chrUn_KI270337v1 chrUn_KI270363v1 chrUn_KI270364v1 chrUn_KI270362v1 chrUn_KI270366v1 chrUn_KI270378v1 chrUn_KI270379v1 chrUn_KI270389v1 chrUn_KI270390v1 chrUn_KI270387v1 chrUn_KI270395v1 chrUn_KI270396v1 chrUn_KI270388v1 chrUn_KI270394v1 chrUn_KI270386v1 chrUn_KI270391v1 chrUn_KI270383v1 chrUn_KI270393v1 chrUn_KI270384v1 chrUn_KI270392v1 chrUn_KI270381v1 chrUn_KI270385v1 chrUn_KI270382v1 chrUn_KI270376v1 chrUn_KI270374v1 chrUn_KI270372v1 chrUn_KI270373v1 chrUn_KI270375v1 chrUn_KI270371v1 chrUn_KI270448v1 chrUn_KI270521v1 chrUn_GL000195v1 chrUn_GL000219v1 chrUn_GL000220v1 chrUn_GL000224v1 chrUn_KI270741v1 chrUn_GL000226v1 chrUn_GL000213v1 chrUn_KI270743v1 chrUn_KI270744v1 chrUn_KI270745v1 chrUn_KI270746v1 chrUn_KI270747v1 chrUn_KI270748v1 chrUn_KI270749v1 chrUn_KI270750v1 chrUn_KI270751v1 chrUn_KI270752v1 chrUn_KI270753v1 chrUn_KI270754v1 chrUn_KI270755v1 chrUn_KI270756v1 chrUn_KI270757v1 chrUn_GL000214v1 chrUn_KI270742v1 chrUn_GL000216v2 chrUn_GL000218v1 chrEBV"
@@ -159,6 +157,7 @@ rule dummy:
 
 #decided to use sbatch directly
 # align with bwa mem
+#sambamba default compression level is 6
 
 if config['cutadapt'] == 'TRUE':
 	rule trim_adatpor:
@@ -210,7 +209,7 @@ elif config['inputFileType'].upper() in ['BAM', 'CRAM']:
 			module load {config[bazam_version]}
 			module load {config[bwa-mem2_version]} {config[samblaster_version]} {config[sambamba_version]}
 			BAMFILE={input}
-			if [ -e {input}.bai ] || [ -e ${{BAMFILE%.bam}}.bai ] || [ -e {input}.crai ] || [ -e ${{BAMFILE%.cram}}.bai ] ; then
+			if [ -e {input}.bai ] || [ -e ${{BAMFILE%.bam}}.bai ] || [ -e {input}.crai ] || [ -e ${{BAMFILE%.cram}}.crai ] ; then
 				echo "index present"
 			else
 				sambamba index -t $(({threads}-2)) {input}
@@ -734,25 +733,47 @@ rule merge_deepvariant_vcf:
 		touch {output}
 		"""
 
-localrules: glnexus
 rule glnexus:
 	input:
-		vcf = expand('deepvariant/gvcf/{sample}.dv.g.vcf.gz', sample=list(SAMPLE_LANEFILE.keys()))
-	#	tbi = expand('freebayes/{sample}.phased.vcf.gz.tbi', sample=list(SAMPLE_LANEFILE.keys()))
+		vcf = expand('deepvariant/gvcf/{sample}.dv.g.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
+		bam = expand('sample_bam/{sample}.markDup.bam', sample=list(SAMPLE_LANEFILE.keys())),
+		bai = expand('sample_bam/{sample}.markDup.bai', sample=list(SAMPLE_LANEFILE.keys()))
 	output:
 		'deepvariant/deepvariant.gvcf.merge.done.txt'
-	threads: 8
+	threads: 24
 	shell:
 		"""
-		module load {config[glnexus_version]}
-		module load {config[samtools_version]}
-		glnexus --dir /lscratch/$SLURM_JOB_ID/glnexus --config DeepVariant_unfiltered --bed {config[padded_bed]} \
+		module load {config[glnexus_version]} {config[samtools_version]} {config[whatshap_version]} parallel
+		WORK_DIR="/lscratch/${{SLURM_JOB_ID}}"
+		glnexus --dir /lscratch/$SLURM_JOB_ID/glnexus --config DeepVariantWES --bed {config[padded_bed]} \
 			--threads {threads} \
 			{input.vcf} \
-			| bcftools view - | bgzip -c > deepvariant/{config[analysis_batch_name]}.glnexus.vcf.gz
-		tabix -f -p vcf deepvariant/{config[analysis_batch_name]}.deepvariant.vcf.gz
+			| bcftools norm --multiallelics -any --output-type u --no-version \
+			| bcftools norm --check-ref s --fasta-ref {config[ref_genome]} --output-type u --no-version - \
+			| bcftools +fill-tags - -Ou -- -t AC,AC_Hemi,AC_Hom,AC_Het,AN,AF \
+			| bcftools annotate --threads {threads} --set-id 'dv_%CHROM\:%POS%REF\>%ALT' --no-version - -Oz -o $WORK_DIR/glnexus.vcf.gz
+		tabix -f -p vcf $WORK_DIR/glnexus.vcf.gz
+		head -n 19 /data/OGL/resources/whatshap/vcf.contig.filename.{config[genomeBuild]}.txt > $WORK_DIR/contig.txt
+		CONTIGFILE="$WORK_DIR/contig.txt"
+		mkdir -p /lscratch/$SLURM_JOB_ID/chr
+		mkdir -p /lscratch/$SLURM_JOB_ID/phased
+		cat $CONTIGFILE | parallel -C "\t" -j 19 "bcftools filter -r {{1}} --output-type z $WORK_DIR/glnexus.vcf.gz -o $WORK_DIR/chr/{{2}}.vcf.gz"
+		cat $CONTIGFILE | parallel -C "\t" -j 19 "tabix -f -p vcf $WORK_DIR/chr/{{2}}.vcf.gz"
+		cat $CONTIGFILE | parallel -C "\t" -j 19 --tmpdir $WORK_DIR --eta --halt 2 --line-buffer \
+		 	--tag "whatshap phase --reference {config[ref_genome]} \
+			--indels $WORK_DIR/chr/{{2}}.vcf.gz {input.bam} \
+			| bgzip -f > $WORK_DIR/phased/{{2}}.phased.vcf.gz"
+		cat $CONTIGFILE | parallel -C "\t" -j 19 "tabix -f -p vcf $WORK_DIR/phased/{{2}}.phased.vcf.gz"
+		PHASEDCHRFILE=""
+		cut -f 2 $CONTIGFILE > $WORK_DIR/temp.chr.txt
+		while read line; do PHASEDCHRFILE+=" /lscratch/${{SLURM_JOB_ID}}/phased/$line.phased.vcf.gz"; done < $WORK_DIR/temp.chr.txt
+		echo "chr files are $PHASEDCHRFILE"
+		bcftools concat --threads {threads} --output-type z $PHASEDCHRFILE > deepvariant/{config[analysis_batch_name]}.glnexus.phased.vcf.gz
+		tabix -f -p vcf deepvariant/{config[analysis_batch_name]}.glnexus.phased.vcf.gz
 		touch {output}
 		"""
+
+
 #try phasing gvcf files after providing ped files
 #get all gvcf files together and use glnexus to combine samples.
 #configuration of DeepVariantWES removed 139 orf15 variant.
@@ -875,7 +896,7 @@ rule merge_freebayes:
 localrules: merge_dv_fb_vcfs
 rule merge_dv_fb_vcfs:
 	input:
-		'deepvariant/deepvariantVcf.merge.done.txt',
+		'deepvariant/deepvariant.gvcf.merge.done.txt',
 		'freebayes/freebayes.merge.done.txt'
 	output:
 		'prioritization/dv_fb.merge.done.txt'
@@ -885,7 +906,7 @@ rule merge_dv_fb_vcfs:
 		module load {config[samtools_version]}
 		WORK_DIR=/lscratch/$SLURM_JOB_ID
 		bcftools isec -p $WORK_DIR --collapse none -Ov \
-			deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz \
+			deepvariant/{config[analysis_batch_name]}.glnexus.phased.vcf.gz \
 			freebayes/{config[analysis_batch_name]}.freebayes.vcf.gz
 		rm $WORK_DIR/0003.vcf &
 		bcftools annotate --threads {threads} --set-id 'dv_%CHROM\:%POS%REF\>%ALT' -x FORMAT/VAF,FORMAT/PL \

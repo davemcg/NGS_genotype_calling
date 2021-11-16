@@ -15,7 +15,7 @@ abnormalChr_filename <- args[5]
 
 ChrMeanRD <- read.delim(CoNVaDING, sep = "\t", header = TRUE, colClasses = c("factor","integer","integer","factor","numeric","numeric","numeric","numeric",
                                   "numeric","numeric","numeric") ) %>%
-  group_by(CHR) %>%
+  group_by(CHR) %>% mutate(CHR = sub("chr", "", CHR)) %>% 
   summarize(avg_of_normalized_autosomal=mean(NORMALIZED_AUTOSOMAL))
 
 ChrMeanRD$CHR <- factor(ChrMeanRD$CHR, levels=c(paste(1:22,sep=""),"X", "Y"))

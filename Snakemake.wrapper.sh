@@ -15,7 +15,8 @@
 
 cp /data/OGL/resources/NGS_genotype_calling.git.log .
 mkdir -p 00log
-module load snakemake/6.0.5 || exit 1
+module load snakemake/6.8.2 || exit 1
+#previous version 6.0.5 2/18/2022
 #previous version 5.7.4/5.24.1
 sbcmd="sbatch --cpus-per-task={threads} \
 --mem={cluster.mem} \
@@ -59,7 +60,7 @@ case "${ngstype^^}" in
 		-pr --local-cores 2 --jobs 1999 \
 		--cluster-config /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/panel.cluster.json \
 		--cluster "$sbcmd"  --latency-wait 120 --rerun-incomplete \
-		-k --restart-times 1 \
+		-k --restart-times 0 \
 		--resources parallel=4 \
 		--configfile $1 $4
 		;;

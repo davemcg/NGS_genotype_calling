@@ -75,11 +75,11 @@ else:
 
 
 # import CREST hg19 regions
-REGIONS_file = config['regions']
-if '/home/$USER' in REGIONS_file:
-	REGIONS_file = os.environ['HOME'] + REGIONS_file.split('$USER')[-1]
-REGIONS = open(REGIONS_file).readlines()
-REGIONS = [r.strip() for r in REGIONS]
+#REGIONS_file = config['regions']
+#if '/home/$USER' in REGIONS_file:
+#	REGIONS_file = os.environ['HOME'] + REGIONS_file.split('$USER')[-1]
+#REGIONS = open(REGIONS_file).readlines()
+#REGIONS = [r.strip() for r in REGIONS]
 
 if config['genomeBuild'].upper() in ['GRCH37', 'HG19']:
 	config['ref_genome'] = '/data/OGL/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta'
@@ -100,8 +100,8 @@ else:
 
 wildcard_constraints:
 	sample='|'.join(list(SAMPLE_LANEFILE.keys())),
-	lane = '|'.join(list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in [y for sub in list(SAMPLE_LANEFILE.values()) for y in sub]]))),
-	region = '|'.join(REGIONS)
+	lane = '|'.join(list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in [y for sub in list(SAMPLE_LANEFILE.values()) for y in sub]])))
+#	region = '|'.join(REGIONS)
 
 rule all:
 	input:
@@ -110,14 +110,13 @@ rule all:
 		'fastqc/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
 		expand('picardQC/{sample}.insert_size_metrics.txt', sample=list(SAMPLE_LANEFILE.keys())) if config['picardQC'] == 'TRUE' else 'dummy.txt',
 		'CoNVaDING/progress2.done' if config['CoNVaDING'] == 'TRUE' else 'dummy.txt',
-		'deepvariant/deepvariantVcf.merge.done.txt' if config['deepvariant'] == 'TRUE' else 'dummy.txt',
-		'deepvariant/deepvariantGVcf.merge.done.txt' if config['deepvariantGVCFmerge'] == 'TRUE' else 'dummy.txt',
+		#'deepvariant/deepvariantVcf.merge.done.txt' if config['deepvariant'] == 'TRUE' else 'dummy.txt',
 		'prioritization/dv_fb.merge.done.txt' if config['freebayes_phasing'] == 'TRUE' else 'dummy.txt',
 		'coverage/mean.coverage.done.txt' if config['coverage'] == 'TRUE' else 'dummy.txt',
-		expand('cram/{sample}.cram', sample=list(SAMPLE_LANEFILE.keys())) if config['cram'] == 'TRUE' else expand('bam/{sample}.bam', sample=list(SAMPLE_LANEFILE.keys())),
+		expand('bam/{sample}.cram', sample=list(SAMPLE_LANEFILE.keys())) if config['cram'] == 'TRUE' else expand('bam/{sample}.bam', sample=list(SAMPLE_LANEFILE.keys())),
 		expand('scramble_anno/{sample}.scramble.xlsx', sample=list(SAMPLE_LANEFILE.keys())) if config['SCRAMble'] == 'TRUE' else 'dummy.txt',
-		expand('manta/manta.{sample}.annotated.tsv', sample=list(SAMPLE_LANEFILE.keys()))
-
+		expand('manta/manta.{sample}.annotated.tsv', sample=list(SAMPLE_LANEFILE.keys())),
+		'bcmlocus/combine.bcmlocus.done.txt' #expand('bcmlocus/{sample}.bcmlocus.txt', sample=list(SAMPLE_LANEFILE.keys()))
 
 localrules: dummy
 rule dummy:
@@ -278,28 +277,33 @@ rule merge_lane_bam:
 	threads: 8
 	shell:
 		"""
-		module load {config[sambamba_version]} {config[biobambam2_version]}
-		mkdir -p sample_bam/markDupMetrics
+		module load {config[sambamba_version]}
 		case "{input.bam}" in
 			*\ *)
 				sambamba merge -t {threads} /lscratch/$SLURM_JOB_ID/{wildcards.sample}.bam {input.bam}
-				bammarkduplicates markthreads={threads} level=6 verbose=0 \
-					M=sample_bam/markDupMetrics/{wildcards.sample}.markDup.methrics.tsv \
-					tmpfile=/lscratch/$SLURM_JOB_ID/{wildcards.sample} \
-					I=/lscratch/$SLURM_JOB_ID/{wildcards.sample}.bam \
-					O={output.bam} \
-					index=1 indexfilename={output.bai}
+				sambamba markdup -t {threads} -l 6 \
+					--tmpdir=/lscratch/$SLURM_JOB_ID/{wildcards.sample} \
+					/lscratch/$SLURM_JOB_ID/{wildcards.sample}.bam \
+					{output.bam}
+				mv {output.bam}.bai {output.bai}
 				;;
 			*)
-				bammarkduplicates markthreads={threads} level=6 verbose=0 \
-					M=sample_bam/markDupMetrics/{wildcards.sample}.markDup.methrics.tsv \
-					tmpfile=/lscratch/$SLURM_JOB_ID/{wildcards.sample} \
-					I={input.bam} \
-					O={output.bam} \
-					index=1 indexfilename={output.bai}
+				sambamba markdup -t {threads} -l 6 \
+					--tmpdir=/lscratch/$SLURM_JOB_ID/{wildcards.sample} \
+					{input.bam} \
+					{output.bam}
+				mv {output.bam}.bai {output.bai}
 				;;
 		esac
 		"""
+#{config[biobambam2_version]}
+#			mkdir -p sample_bam/markDupMetrics
+# 			bammarkduplicates markthreads={threads} level=6 verbose=0 \
+# 					M=sample_bam/markDupMetrics/{wildcards.sample}.markDup.methrics.tsv \
+# 					tmpfile=/lscratch/$SLURM_JOB_ID/{wildcards.sample} \
+# 					I=/lscratch/$SLURM_JOB_ID/{wildcards.sample}.bam \
+# 					O={output.bam} \
+# 					index=1 indexfilename={output.bai}
 		#	merge:				--SORT_ORDER coordinate \
 		#					--CREATE_INDEX true
 #no pipe for picard MergeSamFiles; markduplicates requires indexed bam files.Default picard MarkDuplicates compression_level is 5
@@ -373,7 +377,8 @@ rule picard_alignmentQC:
 	threads: 4
 	shell:
 		"""
-		module load {config[picard_version]} {config[R_version]}
+		if [[ $(module list 2>&1 | grep "R/" | wc -l) < 1 ]]; then module load {config[R_version]}; fi
+		if [[ $(module list 2>&1 | grep "picard" | wc -l) < 1 ]]; then module load {config[picard_version]}; fi
 		java -Xmx8g -XX:+UseG1GC -XX:ParallelGCThreads={threads} -jar $PICARD_JAR \
 			CollectInsertSizeMetrics \
 			-TMP_DIR /lscratch/$SLURM_JOB_ID \
@@ -405,8 +410,8 @@ rule coverage:
 	threads: 8
 	shell:
 		"""
-		module load {config[mosdepth_version]}
-		module load {config[R_version]}
+		if [[ $(module list 2>&1 | grep "mosdepth" | wc -l) < 1 ]]; then module load {config[mosdepth_version]}; fi
+		if [[ $(module list 2>&1 | grep "R/" | wc -l) < 1 ]]; then module load {config[R_version]}; fi
 		cd coverage/mosdepth
 		mosdepth -t {threads} --no-per-base --by {config[bed]} --use-median --mapq 0 --fast-mode --thresholds 10,20,30 \
 			{wildcards.sample}.md ../../{input.bam}
@@ -441,22 +446,29 @@ rule mean_coverage:
 		"""
 
 # 30% smaller!
+localrules: bam_to_cram
 rule bam_to_cram:
 	input:
 		bam = 'sample_bam/{sample}/{sample}.markDup.bam',
 		bai = 'sample_bam/{sample}/{sample}.markDup.bai'
 	output:
-		cram = 'cram/{sample}.cram',
-		crai = 'cram/{sample}.crai'
+		cram = 'bam/{sample}.cram',
+		crai = 'bam/{sample}.crai'
 	threads:
-		8
+		4
 	shell:
 		"""
 		module load {config[samtools_version]}
-		samtools view -T {config[ref_genome]} --threads {threads} -C -o {output.cram} {input.bam}
-		samtools index {output.cram} {output.crai}
+		samtools view -T {config[ref_genome]} --threads {threads} --output-fmt cram,store_md=1,store_nm=1 -o {output.cram} {input.bam}
+		samtools index -@ {threads} {output.cram} {output.crai}
 		"""
-#samtools sort -O bam -l 0 --threads {threads} -T /lscratch/$SLURM_JOB_ID {input.bam} | \
+
+# samtools view -O cram,store_md=1,store_nm=1 -o aln.cram aln.bam
+# samtools view --input-fmt cram,decode_md=0 -o aln.new.bam aln.cram
+#old: samtools sort -O bam -l 0 --threads {threads} -T /lscratch/$SLURM_JOB_ID {input.bam} | \
+#		samtools view -T {config[ref_genome]} --threads {threads} -C -o {output.cram} -
+# or # samtools view -T {config[ref_genome]} --threads {threads} -C -o {output.cram} {input.bam}
+
 
 localrules: keep_bam
 rule keep_bam:
@@ -717,7 +729,7 @@ rule merge_deepvariant_vcf:
 	threads: 8
 	shell:
 		"""
-		module load {config[samtools_version]}
+		if [[ $(module list 2>&1 | grep "samtools" | wc -l) < 1 ]]; then module load {config[samtools_version]}; fi
 		case "{input.vcf}" in
 			*\ *)
 				bcftools merge --merge none --missing-to-ref --output-type z --threads {threads} {input.vcf} \
@@ -736,8 +748,8 @@ rule merge_deepvariant_vcf:
 rule glnexus:
 	input:
 		vcf = expand('deepvariant/gvcf/{sample}.dv.g.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
-		bam = expand('sample_bam/{sample}.markDup.bam', sample=list(SAMPLE_LANEFILE.keys())),
-		bai = expand('sample_bam/{sample}.markDup.bai', sample=list(SAMPLE_LANEFILE.keys()))
+		bam = expand('sample_bam/{sample}/{sample}.markDup.bam', sample=list(SAMPLE_LANEFILE.keys())),
+		bai = expand('sample_bam/{sample}/{sample}.markDup.bai', sample=list(SAMPLE_LANEFILE.keys()))
 	output:
 		'deepvariant/deepvariant.gvcf.merge.done.txt'
 	threads: 24
@@ -750,7 +762,7 @@ rule glnexus:
 			{input.vcf} \
 			| bcftools norm --multiallelics -any --output-type u --no-version \
 			| bcftools norm --check-ref s --fasta-ref {config[ref_genome]} --output-type u --no-version - \
-			| bcftools +fill-tags - -Ou -- -t AC,AC_Hemi,AC_Hom,AC_Het,AN,AF \
+			| bcftools +fill-tags - -Ou -- -t AC,AC_Hom,AC_Het,AN,AF \
 			| bcftools annotate --threads {threads} --set-id 'dv_%CHROM\:%POS%REF\>%ALT' --no-version - -Oz -o $WORK_DIR/glnexus.vcf.gz
 		tabix -f -p vcf $WORK_DIR/glnexus.vcf.gz
 		head -n 19 /data/OGL/resources/whatshap/vcf.contig.filename.{config[genomeBuild]}.txt > $WORK_DIR/contig.txt
@@ -773,7 +785,7 @@ rule glnexus:
 		touch {output}
 		"""
 
-
+#AC_Hemi removed because samtools 1.13 set it as 0 for chrX 12/23/21
 #try phasing gvcf files after providing ped files
 #get all gvcf files together and use glnexus to combine samples.
 #configuration of DeepVariantWES removed 139 orf15 variant.
@@ -838,6 +850,7 @@ rule freebayes_phasing:
 # SAF > 0 & SAR > 0 reads on both strands, Number of alternate observations on the forward/reverse strand, remove this one for panel/exome data, use AO > 2 instead.
 # RPR > 1 & RPL > 1 at least two reads “balanced” to each side of the site
 
+
 localrules: merge_freebayes
 rule merge_freebayes:
 	input:
@@ -848,7 +861,7 @@ rule merge_freebayes:
 	threads: 8
 	shell:
 		"""
-		module load {config[samtools_version]}
+		if [[ $(module list 2>&1 | grep "samtools" | wc -l) < 1 ]]; then module load {config[samtools_version]}; fi
 		case "{input.vcf}" in
 			*\ *)
 				bcftools merge --merge none --missing-to-ref --output-type z --threads {threads} {input.vcf} \
@@ -863,6 +876,7 @@ rule merge_freebayes:
 		esac
 		touch {output}
 		"""
+#bcftools merge: freebayes INFO/QA minimum value among all samples is retained in the INFO.
 
 # rule freebayes:
 # 	input:
@@ -903,19 +917,20 @@ rule merge_dv_fb_vcfs:
 	threads: 8
 	shell:
 		"""
-		module load {config[samtools_version]}
+		if [[ $(module list 2>&1 | grep "samtools" | wc -l) < 1 ]]; then module load {config[samtools_version]}; fi
 		WORK_DIR=/lscratch/$SLURM_JOB_ID
 		bcftools isec -p $WORK_DIR --collapse none -Ov \
 			deepvariant/{config[analysis_batch_name]}.glnexus.phased.vcf.gz \
 			freebayes/{config[analysis_batch_name]}.freebayes.vcf.gz
 		rm $WORK_DIR/0003.vcf &
-		bcftools annotate --threads {threads} --set-id 'dv_%CHROM\:%POS%REF\>%ALT' -x FORMAT/VAF,FORMAT/PL \
+		bcftools annotate --threads {threads} --set-id 'dv_%CHROM\:%POS%REF\>%ALT' \
 			--no-version $WORK_DIR/0000.vcf -Oz -o $WORK_DIR/dv.vcf.gz
 		rm $WORK_DIR/0000.vcf &
-		bcftools annotate --threads {threads} --set-id 'fb_%CHROM\:%POS%REF\>%ALT' -x INFO,FORMAT/RO,FORMAT/QR,FORMAT/AO,FORMAT/QA,FORMAT/GL \
-			--no-version $WORK_DIR/0001.vcf -Oz -o $WORK_DIR/fb.vcf.gz
+		bcftools annotate --threads {threads} --set-id 'fb_%CHROM\:%POS%REF\>%ALT' -x ^INFO/QA,FORMAT/RO,FORMAT/QR,FORMAT/AO,FORMAT/QA,FORMAT/GL \
+			--no-version $WORK_DIR/0001.vcf -Ou - \
+			| bcftools +fill-tags - -Oz -o $WORK_DIR/fb.vcf.gz -- -t AC,AC_Hom,AC_Het,AN,AF
 		rm $WORK_DIR/0001.vcf &
-		bcftools annotate --threads {threads} --set-id 'dvFb_%CHROM\:%POS%REF\>%ALT' -x FORMAT/VAF,FORMAT/PL \
+		bcftools annotate --threads {threads} --set-id 'dvFb_%CHROM\:%POS%REF\>%ALT' \
 			--no-version $WORK_DIR/0002.vcf -Oz -o $WORK_DIR/dvFb.vcf.gz
 		rm $WORK_DIR/0002.vcf &
 		tabix -f -p vcf $WORK_DIR/dv.vcf.gz
@@ -935,13 +950,14 @@ rule merge_dv_fb_vcfs:
 				$WORK_DIR/GRCh37.vcf
 			sed -e 's/^chr//' -e 's/<ID=chr/<ID=/' $WORK_DIR/GRCh37.vcf \
 			 	| bcftools norm --check-ref s --fasta-ref $hg19ref --output-type u - \
-				| bcftools sort -m 26G -T $WORK_DIR -Ou - \
+				| bcftools sort -m 26G -T $WORK_DIR/samtools -Ou - \
 				| bcftools norm --threads $(({threads}-4)) -d exact --output-type z - -o prioritization/{config[analysis_batch_name]}.GRCh37.vcf.gz
 			tabix -f -p vcf prioritization/{config[analysis_batch_name]}.GRCh37.vcf.gz
 		fi
 		touch {output}
 		"""
-
+#glnexus 0/0 genotypes could have DP GQ values less than 10 12/24/21
+#bcftools +fill-tags AC_Hemi does not work in samtools/1.13
 # bcftools concat --threads {threads} -a --rm-dups none --no-version \
 # 	deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz \
 # 	freebayes/{config[analysis_batch_name]}.freebayes.vcf.gz \
@@ -977,7 +993,7 @@ rule scramble:
 # makeblastdb -in human_g1k_v37_decoy.fasta -input_type fasta  -dbtype nucl
 #--bind /gpfs,/spin1,/data,/lscratch,/scratch,/fdb
 
-#localrules: scramble_annotation
+localrules: scramble_annotation
 rule scramble_annotation:
 	input:
 		mei = 'scramble/{sample}_MEIs.txt',
@@ -989,8 +1005,8 @@ rule scramble_annotation:
 		del_anno = 'scramble_anno/{sample}.scramble.del.tsv'
 	shell:
 		"""
-		module load {config[R_version]}
-		module load {config[annovar_version]}
+		if [[ $(module list 2>&1 | grep "R/" | wc -l) < 1 ]]; then module load {config[R_version]}; fi
+		if [[ $(module list 2>&1 | grep "annovar" | wc -l) < 1 ]]; then module load {config[annovar_version]}; fi
 		if [[ {config[genomeBuild]} == "GRCh38" ]]; then
 			ver=hg38
 		else
@@ -1025,7 +1041,7 @@ rule scramble_annotation:
 		then
 			touch {output.del_anno}
 		else
-			module load {config[annotsv_version]}
+			if [[ $(module list 2>&1 | grep "annotsv" | wc -l) < 1 ]]; then module load {config[annotsv_version]}; fi
 			tail -n +2 {input.deletion} | awk -F"\t" 'BEGIN{{OFS="\t"}} {{print $1,$2,$3,"DEL"}}' > {input.deletion}.bed
 			AnnotSV -genomeBuild {config[genomeBuild]} -SVinputFile {input.deletion}.bed -SVinputInfo 0 -svtBEDcol 4 -outputFile {output.del_anno}
 		fi
@@ -1066,6 +1082,7 @@ rule manta:
 			touch {output}
 		fi
 		"""
+
 #AnnotSV can pick sample from a multi-sample vcf file by using ?? test to find out the sample operation
 #if [[ {config[genomeBuild]} == "GRCh38" ]]; then
 # 	module load {config[crossmap_version]}
@@ -1112,6 +1129,70 @@ rule manta:
 # 		touch {output}
 # 		"""
 #threads 8; mem=32g as in the list
+
+localrules: bcm_locus
+rule bcm_locus:
+	input:
+		bam = 'sample_bam/{sample}/{sample}.markDup.bam',
+		bai = 'sample_bam/{sample}/{sample}.markDup.bai'
+	output:
+		vcf = temp('bcmlocus/{sample}.vcf'),
+		avinput = temp('bcmlocus/{sample}.avinput'),
+		annovarOut = temp('bcmlocus/{sample}.avinput.hg38_multianno.txt'),
+		bcm_out = 'bcmlocus/{sample}.bcmlocus.tsv'
+	shell:
+		"""
+		check=$(module list 2>&1 | grep "samtools" | wc -l)
+		if [[ $check < 1 ]]; then module load {config[samtools_version]}; fi
+		check=$(module list 2>&1 | grep "freebayes" | wc -l)
+		if [[ $check < 1 ]]; then module load {config[freebayes_version]}; fi
+		check=$(module list 2>&1 | grep "annovar" | wc -l)
+		if [[ $check < 1 ]]; then module load {config[annovar_version]}; fi
+		freebayes -f {config[ref_genome]} --max-complex-gap 90 -p 6 -C 3 -F 0.05 \
+			--genotype-qualities --strict-vcf --use-mapping-quality \
+			--targets /data/OGL/resources/bed/OPN1LWe2e5.bed \
+			{input.bam} \
+			| bcftools norm --multiallelics -any --output-type u - \
+			| bcftools annotate --set-id '%CHROM\:%POS%REF\>%ALT' -x ^INFO/AF --output-type u --no-version \
+			| bcftools norm --check-ref s --fasta-ref {config[ref_genome]} --output-type u --no-version - \
+			| bcftools norm -d exact --output-type v - \
+			> {output.vcf}
+		convert2annovar.pl -format vcf4old {output.vcf} -includeinfo --outfile {output.avinput}
+		table_annovar.pl {output.avinput} \
+			$ANNOVAR_DATA/hg38 \
+			-buildver hg38 \
+			-remove \
+			-out {output.avinput} \
+			--protocol refGeneWithVer \
+			-operation g \
+			--argument '-hgvs' \
+			--polish -nastring . \
+			--thread 1 \
+			--otherinfo
+		sed -i "1 s/Otherinfo1\tOtherinfo2\tOtherinfo3\tOtherinfo4\tOtherinfo5\tOtherinfo6\tOtherinfo7\tOtherinfo8\tOtherinfo9\tOtherinfo10/CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tGT_FIELDS/" {output.annovarOut}
+		check=$(module list 2>&1 | grep "R/" | wc -l)
+		if [[ $check < 1 ]]; then module load {config[R_version]}; fi
+		Rscript ~/git/NGS_genotype_calling/NGS_generic_OGL/bcmlocus.R \
+			/data/OGL/resources/bcmlocus.xlsx \
+			{wildcards.sample} {output.annovarOut} {output.bcm_out}
+		"""
+## Next step: get CN information
+
+localrules: combine_bcmlocus
+rule combine_bcmlocus:
+	input:
+		expand('bcmlocus/{sample}.bcmlocus.tsv', sample=list(SAMPLE_LANEFILE.keys()))
+	output:
+		'bcmlocus/combine.bcmlocus.done.txt'
+	shell:
+		"""
+		echo -e "CHROM\tPOS\tID\tREF\tALT\tQUAL\tFunc.refGeneWithVer\tGene.refGeneWithVer\tGeneDetail.refGeneWithVer\tExonicFunc.refGeneWithVer\tAAChange.refGeneWithVer\tHGVSp\tAnnotation\tFunction\tACMG_Class\tNote\tSample\tINFO\tFORMAT\tGT_FIELDS" > bcmlocus/{config[analysis_batch_name]}.bcmlocus.all.tsv
+		for file in {input}; do
+			tail -n 1 $file >> bcmlocus/{config[analysis_batch_name]}.bcmlocus.all.tsv
+ 		done
+		touch {output}
+		"""
+
 rule gatk_realigner_target:
 # identify regions which need realignment
 	input:

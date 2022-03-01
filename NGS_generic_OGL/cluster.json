@@ -38,6 +38,13 @@
 		"threads" : "26",
 		"mem" : "96g"
 	},
+	"glnexus" :
+	{
+		"partition" : "largemem",
+		"time" : "9:00:00",
+		"mem" : "720g",
+		"extra" : "--gres=lscratch:400"
+	},
 	"sve" :
 	{
 		"partition" : "norm",

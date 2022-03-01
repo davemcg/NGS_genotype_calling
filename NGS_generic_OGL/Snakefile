@@ -131,13 +131,14 @@ wildcard_constraints:
 rule all:
 	input:
 		expand('gvcfs/{sample}.g.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())) if config['GATKgvcf'] == 'TRUE' else 'dummy.txt',
-		expand('cram/{sample}.cram', sample=list(SAMPLE_LANEFILE.keys())) if config['cram'] == 'TRUE' else expand('bam/{sample}.bam', sample=list(SAMPLE_LANEFILE.keys())),
+		expand('bam/{sample}.cram', sample=list(SAMPLE_LANEFILE.keys())) if config['cram'] == 'TRUE' else expand('bam/{sample}.bam', sample=list(SAMPLE_LANEFILE.keys())),
 		# 'GATK_metrics/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
 		'fastqc/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
 		 expand('picardQC/{sample}.insert_size_metrics.txt', sample=list(SAMPLE_LANEFILE.keys())) if config['picardQC'] == 'TRUE' else 'dummy.txt',
 		'deepvariant/deepvariantVcf.merge.done.txt' if config['deepvariant'] == 'TRUE' else 'dummy.txt',
 		'prioritization/dv_fb.merge.done.txt' if config['freebayes_phasing'] == 'TRUE' else 'dummy.txt',
 		'coverage/mean.coverage.done.txt' if config['coverage'] == 'TRUE' else 'dummy.txt',
+		'mutserve/haplocheck.done.txt',
 		expand('manta/manta.{sample}.annotated.tsv', sample=list(SAMPLE_LANEFILE.keys())) if config['manta'] == 'TRUE' else 'dummy.txt',
 		expand('scramble_anno/{sample}.scramble.xlsx', sample=list(SAMPLE_LANEFILE.keys())) if config['SCRAMble'] == 'TRUE' else 'dummy.txt',
 		expand('AutoMap/{sample}/{sample}.HomRegions.annot.tsv', sample=list(SAMPLE_LANEFILE.keys()))
@@ -503,8 +504,8 @@ rule bam_to_cram:
 		bam = 'sample_bam/{sample}.markDup.bam',
 		bai = 'sample_bam/{sample}.markDup.bai'
 	output:
-		cram = 'cram/{sample}.cram',
-		crai = 'cram/{sample}.crai'
+		cram = 'bam/{sample}.cram',
+		crai = 'bam/{sample}.crai'
 	threads:
 		8
 	shell:
@@ -719,6 +720,30 @@ rule merge_deepvariantVcf:
 		touch {output}
 		"""
 
+rule glnexus:
+	input:
+		vcf = expand('deepvariant/gvcf/{sample}.dv.g.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
+		bam = expand('sample_bam/{sample}.markDup.bam', sample=list(SAMPLE_LANEFILE.keys())),
+		bai = expand('sample_bam/{sample}.markDup.bai', sample=list(SAMPLE_LANEFILE.keys()))
+	output:
+		'deepvariant/deepvariant.gvcf.merge.done.txt'
+	threads: 72
+	shell:
+		"""
+		module load {config[glnexus_version]} {config[samtools_version]}
+		WORK_DIR="/lscratch/${{SLURM_JOB_ID}}"
+		glnexus --dir /lscratch/$SLURM_JOB_ID/glnexus --config DeepVariant \
+			--threads $(({threads} - 8)) --mem-gbytes 512 \
+			{input.vcf} \
+			| bcftools norm --multiallelics -any --output-type u --no-version \
+			| bcftools norm --check-ref s --fasta-ref {config[ref_genome]} --output-type u --no-version - \
+			| bcftools +fill-tags - -Ou -- -t AC,AC_Hom,AC_Het,AN,AF \
+			| bcftools annotate --threads $(({threads} - 8)) --set-id 'dv_%CHROM\:%POS%REF\>%ALT' --no-version - -Oz -o deepvariant/{config[analysis_batch_name]}.glnexus.vcf.gz
+		tabix -f -p vcf deepvariant/{config[analysis_batch_name]}.glnexus.vcf.gz
+		touch {output}
+		"""
+
+
 #2hours for MEI only, used 1.4g mememory.
 #including deletion takes > 12h for some and ~32g mem, thus need parallel or split runs.
 rule scramble:
@@ -829,6 +854,51 @@ rule manta:
 # 			-t 16 -M 4 -g hg19 -a $method {input.bam}; done
 # 		"""
 
+localrules: muteserve
+rule muteserve:
+	input:
+		bam = 'sample_bam/{sample}.markDup.bam',
+		bai = 'sample_bam/{sample}.markDup.bai'
+	output:
+		vcf = 'mutserve/{sample}.mt.vcf.gz',
+		tbi = 'mutserve/{sample}.mt.vcf.gz.tbi'
+	shell:
+		"""
+		module load {config[samtools_version]}
+		MUTSERVE_HOME="/data/OGL/resources/git/mutserve"
+		$MUTSERVE_HOME/mutserve call --reference $MUTSERVE_HOME/rCRS.fasta --output {output.vcf} --threads 2 {input.bam}
+		$MUTSERVE_HOME/mutserve annotate --input mutserve/{wildcards.sample}.txt --annotation $MUTSERVE_HOME/rCRS_annotation_2020-08-20.txt --output mutserve/{wildcards.sample}.AnnotatedVariants.txt
+		tabix -f -p vcf {output.vcf}
+		"""
+
+localrules: muteserve
+rule haplocheck:
+	input:
+		vcf = expand('mutserve/{sample}.mt.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
+		tbi = expand('mutserve/{sample}.mt.vcf.gz.tbi', sample=list(SAMPLE_LANEFILE.keys()))
+	output:
+		'mutserve/haplocheck.done.txt'
+	shell:
+		"""
+		module load {config[samtools_version]}
+		case "{input.vcf}" in
+			*\ *)
+				bcftools merge --merge none --missing-to-ref --output-type z {input.vcf} \
+				> mutserve/{config[analysis_batch_name]}.mt.vcf.gz
+				sleep 2
+				tabix -f -p vcf mutserve/{config[analysis_batch_name]}.mt.vcf.gz
+				;;
+			*)
+				cp -p -l {input.vcf} mutserve/{config[analysis_batch_name]}.mt.vcf.gz
+				cp -p -l {input.tbi} mutserve/{config[analysis_batch_name]}.mt.vcf.gz.tbi
+				;;
+		esac
+		HAPLOCHECK_HOME="/data/OGL/resources/git/haplocheck"
+		$HAPLOCHECK_HOME/haplocheck --out mutserve/{config[analysis_batch_name]} mutserve/{config[analysis_batch_name]}.mt.vcf.gz
+		touch {output}
+		"""
+
+
 #<40min, 9g max mem
 rule split_bam_by_chr:
 	input:
@@ -874,13 +944,23 @@ rule freebayes_phasing:
 		module load {config[vcflib_version]}
 		module load {config[samtools_version]}
 		module load {config[vt_version]}
-		freebayes-parallel /data/OGL/resources/freebayesRegion/{config[genomeBuild]}/region.{wildcards.chr} {threads} -f {config[ref_genome]} \
-			--limit-coverage 500 {input.bam} --min-alternate-fraction 0.05 \
-			--min-mapping-quality 1 --genotype-qualities --strict-vcf --use-mapping-quality \
-			| bcftools norm --multiallelics -any --output-type v - \
-			| vt decompose_blocksub -p -m -d 2 - \
-			| bcftools norm --check-ref s --fasta-ref {config[ref_genome]} --output-type u - \
-			| bcftools norm -d exact --output-type z - -o {output.vcf}
+		if [[ {wildcards.chr} != "MT_contigs" ]]; then
+			freebayes-parallel /data/OGL/resources/freebayesRegion/{config[genomeBuild]}/region.{wildcards.chr} {threads} -f {config[ref_genome]} \
+				--skip-coverage 1000 {input.bam} --min-alternate-fraction 0.05 \
+				--min-mapping-quality 1 --genotype-qualities --strict-vcf --use-mapping-quality \
+				| bcftools norm --multiallelics -any --output-type v - \
+				| vt decompose_blocksub -p -m -d 2 - \
+				| bcftools norm --check-ref s --fasta-ref {config[ref_genome]} --output-type u - \
+				| bcftools norm -d exact --output-type z - -o {output.vcf}
+		else
+			freebayes-parallel /data/OGL/resources/freebayesRegion/{config[genomeBuild]}/region.{wildcards.chr} {threads} -f {config[ref_genome]} \
+				--limit-coverage 500 {input.bam} --min-alternate-fraction 0.05 \
+				--min-mapping-quality 1 --genotype-qualities --strict-vcf --use-mapping-quality \
+				| bcftools norm --multiallelics -any --output-type v - \
+				| vt decompose_blocksub -p -m -d 2 - \
+				| bcftools norm --check-ref s --fasta-ref {config[ref_genome]} --output-type u - \
+				| bcftools norm -d exact --output-type z - -o {output.vcf}
+		fi
 		sleep 2
 		tabix -f -p vcf {output.vcf}
 		vcffilter -f "QUAL > 15 & QA / AO > 15 & SAF > 0 & SAR > 0 & RPR > 0 & RPL > 0 & AO > 2 & DP > 3" {output.vcf} | bgzip -f > {output.filteredvcf}
@@ -893,6 +973,7 @@ rule freebayes_phasing:
 		whatshap phase --reference {config[ref_genome]} --indels {output.filteredvcf} {input.bam} | bgzip -f > {output.phasedvcf}
 		tabix -f -p vcf {output.phasedvcf}
 		"""
+#--skip-coverage 1000 added using the if statement on 1/3/2022, because some of WGS data failed when uysing --limit-coerage 500padded
 
 # try rtg eval wihtout vt and see how it goes.
 	# | vt decompose -s - \
@@ -982,7 +1063,7 @@ rule merge_freebayes:
 #fast and only used 4 cpus, 100mg and 4 mins for 2 wgs data.
 rule merge_dv_fb_vcfs:
 	input:
-		'deepvariant/deepvariantVcf.merge.done.txt',
+		'deepvariant/deepvariant.gvcf.merge.done.txt',
 		'freebayes/freebayes.merge.done.txt'
 	output:
 		'prioritization/dv_fb.merge.done.txt'
@@ -992,14 +1073,15 @@ rule merge_dv_fb_vcfs:
 		module load {config[samtools_version]}
 		WORK_DIR=/lscratch/$SLURM_JOB_ID
 		bcftools isec --threads {threads} -p $WORK_DIR --collapse none --no-version -Oz \
-			deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz \
+			deepvariant/{config[analysis_batch_name]}.glnexus.vcf.gz \
 			freebayes/{config[analysis_batch_name]}.freebayes.vcf.gz
 		rm $WORK_DIR/0003.vcf* &
-		bcftools annotate --threads {threads} --set-id 'dv_%CHROM\:%POS%REF\>%ALT' -x FORMAT/VAF,FORMAT/PL \
+		bcftools annotate --threads {threads} --set-id 'dv_%CHROM\:%POS%REF\>%ALT' \
 			--no-version $WORK_DIR/0000.vcf.gz -Oz -o $WORK_DIR/dv.vcf.gz && rm $WORK_DIR/0000.vcf* &
-		bcftools annotate --threads {threads} --set-id 'fb_%CHROM\:%POS%REF\>%ALT' -x INFO,FORMAT/RO,FORMAT/QR,FORMAT/AO,FORMAT/QA,FORMAT/GL \
-			--no-version $WORK_DIR/0001.vcf.gz -Oz -o $WORK_DIR/fb.vcf.gz && rm $WORK_DIR/0001.vcf* &
-		bcftools annotate --threads {threads} --set-id 'dvFb_%CHROM\:%POS%REF\>%ALT' -x FORMAT/VAF,FORMAT/PL \
+		bcftools annotate --threads {threads} --set-id 'fb_%CHROM\:%POS%REF\>%ALT' -x ^INFO/QA,FORMAT/RO,FORMAT/QR,FORMAT/AO,FORMAT/QA,FORMAT/GL \
+			--no-version $WORK_DIR/0001.vcf.gz -Ou - \
+			| bcftools +fill-tags - -Oz -o $WORK_DIR/fb.vcf.gz -- -t AC,AC_Hom,AC_Het,AN,AF && rm $WORK_DIR/0001.vcf* &
+		bcftools annotate --threads {threads} --set-id 'dvFb_%CHROM\:%POS%REF\>%ALT' \
 			--no-version $WORK_DIR/0002.vcf.gz -Oz -o $WORK_DIR/dvFb.vcf.gz
 		rm $WORK_DIR/0002.vcf* &
 		tabix -f -p vcf $WORK_DIR/dv.vcf.gz
@@ -1022,7 +1104,7 @@ rule merge_dv_fb_vcfs:
 			sed -e 's/^chrM/MT/' -e 's/<ID=chrM/<ID=MT/' $WORK_DIR/GRCh37.vcf \
 				| sed -e 's/^chr//' -e 's/<ID=chr/<ID=/' - \
 			 	| bcftools norm --check-ref s --fasta-ref $hg19ref --output-type u - \
-				| bcftools sort -m 60G -T $WORK_DIR -Ou - \
+				| bcftools sort -m 60G -T $WORK_DIR/ -Ou - \
 				| bcftools norm --threads $(({threads}-4)) -d exact --output-type z - -o prioritization/{config[analysis_batch_name]}.GRCh37.vcf.gz
 			tabix -f -p vcf prioritization/{config[analysis_batch_name]}.GRCh37.vcf.gz
 		fi

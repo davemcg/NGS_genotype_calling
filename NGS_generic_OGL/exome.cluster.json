@@ -15,6 +15,13 @@
 		"mem" : "32g",
 		"extra" : "--gres=lscratch:50"
 	},
+	"glnexus" :
+	{
+		"partition" : "norm",
+		"time" : "8:00:00",
+		"mem" : "128g",
+		"extra" : "--gres=lscratch:200"
+	},
 	"freebayes" :
 	{
 		"partition" : "largemem",

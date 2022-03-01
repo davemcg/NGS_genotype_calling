@@ -7,7 +7,7 @@ bed: '/data/OGL/resources/bed/OGLv1.GRCh38.sorted.bed' # bed file is used for co
 padded_bed: '/data/OGL/resources/bed/xgenV2_OGLv1.500padded.bed' #for deepvariant variant calling in exome & panel
 real_bed: 'FALSE' # TRUE or FALSE, if a real bed is provided, use the bed above for freebayes filtering. If not real_bed, then the bed above is used for deepvariant, but not for freebayes filtering.
 markDup: 'TRUE' # TRUE, FALSE
-cram: 'FALSE' # TRUE to convert bam to cram, values other than TRUE will not convert. #Keep bam for panel and exome if addtional analyses are anticipated
+cram: 'TRUE' # TRUE to convert bam to cram, values other than TRUE will not convert. #Keep bam for panel and exome if addtional analyses are anticipated
 #recal_bam: 'FALSE' #TRUE to merge chr bams to single sample recalibrated bam
 multiqc: 'TRUE' # will run only if TrueSeq
 picardQC: 'TRUE'
@@ -17,7 +17,7 @@ GATKgvcf: 'FALSE' # will run only if TRUE
 cutadapt: 'FALSE' #TRUE to trim adaptor using cutadapt, #FALSE not to trim.
 regions: '/home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/chr_split_24_coords.txt' #chr1 to chr22, chrX, chrY
 deepvariant: 'TRUE'
-deepvariantGVCFmerge: 'FALSE' #GVCF files from deepvariant will be merged.
+#deepvariantGVCFmerge: 'FALSE' #GVCF files from deepvariant will be merged.
 freebayes_phasing: 'TRUE'
 coverage: 'TRUE'
 manta: 'TRUE'
@@ -43,6 +43,7 @@ crossmap_version: 'crossmap/0.5.4'
 old_cram_ref: '/data/OGL/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta'
 bwa-mem2_ref: '/data/OGL/resources/genomes/NCBI/GRCh38Decoy/genome.fa' #GRCh37 is hard-coded in the Snakefile
 ref_genome: '/data/OGL/resources/genomes/NCBI/GRCh38Decoy/genome.fa' ##GRCh37 is hard-coded in the Snakefile
+GRCh38Decoy2: '/data/OGL/resources/genomes/GRCh38/bwa-mem2/GRCh38Decoy2.fa' #BCM duplicated regions masked
 1000g_indels: '/fdb/GATK_resource_bundle/b37-2.8/1000G_phase1.indels.b37.vcf'
 mills_gold_indels: '/fdb/GATK_resource_bundle/b37-2.8/Mills_and_1000G_gold_standard.indels.b37.vcf'
 dbsnp_var: '/fdb/GATK_resource_bundle/b37-2.8/dbsnp_138.b37.excluding_sites_after_129.vcf'
@@ -60,8 +61,8 @@ vt_version: 'vt/0.57721'
 vcftools_version: 'vcftools/0.1.16'
 freebayes_exome_region: '/data/OGL/resources/freebayesRegion/xGenV1.10000.GRCh38.region' # panel 500 regions worked for MiSeq OGLv1; made by make_freebayes_region.sh. Exome 10,000 region file made with 64gmem of the bp 54390.markDup.bam file. Took ~ 20 min.
 #freebayes_wgs_region: '/data/OGL/resources/freebayesRegion/v37d5/region'
-CRESTdb: '/data/OGL/resources/CRESTvariantClassification.xlsx'
-SCRAMBLEdb: '/data/OGL/resources/SCRAMBLEvariantClassification.xlsx'
+#CRESTdb: '/data/OGL/resources/CRESTvariantClassification.xlsx'
+SCRAMBLEdb: '/data/OGL/resources/SCRAMBLEvariantClassification.xlsx' # set in Snakefile for hg19 and hg38
 scramble_version: 'scramble/1.0.1-32893ef'
 mosdepth_version: 'mosdepth/0.2.8'
 bedtools_version: 'bedtools/2.29.0'

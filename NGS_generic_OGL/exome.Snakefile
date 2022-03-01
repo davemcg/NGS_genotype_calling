@@ -67,11 +67,11 @@ else:
 		return(rg_out)
 
 # import CREST hg19 regions, chr1 to chrY
-REGIONS_file = config['regions']
-if '/home/$USER' in REGIONS_file:
-	REGIONS_file = os.environ['HOME'] + REGIONS_file.split('$USER')[-1]
-REGIONS = open(REGIONS_file).readlines()
-REGIONS = [r.strip() for r in REGIONS]
+# REGIONS_file = config['regions']
+# if '/home/$USER' in REGIONS_file:
+# 	REGIONS_file = os.environ['HOME'] + REGIONS_file.split('$USER')[-1]
+# REGIONS = open(REGIONS_file).readlines()
+# REGIONS = [r.strip() for r in REGIONS]
 
 if config['genomeBuild'].upper() in ['GRCH37', 'HG19']:
 	config['ref_genome'] = '/data/OGL/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta'
@@ -93,15 +93,15 @@ else:
 wildcard_constraints:
 	sample='|'.join(list(SAMPLE_LANEFILE.keys())),
 	chr = '|'.join(CHRS),
-	lane = '|'.join(list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in [y for sub in list(SAMPLE_LANEFILE.values()) for y in sub]]))),
-	region = '|'.join(REGIONS)
+	lane = '|'.join(list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in [y for sub in list(SAMPLE_LANEFILE.values()) for y in sub]])))
+#	region = '|'.join(REGIONS)
 
 rule all:
 	input:
 		# expand('CRESTanno/{sample}.predSV.xlsx', sample=list(SAMPLE_LANEFILE.keys())) if config['CREST'] == 'TRUE' else 'dummy.txt',
 		expand('gvcfs/{sample}.g.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())) if config['GATKgvcf'] == 'TRUE' else 'dummy.txt',
 		# expand('recal_bam/{sample}.recal.bam', sample=list(SAMPLE_LANEFILE.keys())) if config['recal_bam'] == 'TRUE' else 'dummy.txt',
-		expand('cram/{sample}.cram', sample=list(SAMPLE_LANEFILE.keys())) if config['cram'] == 'TRUE' else expand('bam/{sample}.bam', sample=list(SAMPLE_LANEFILE.keys())),
+		expand('bam/{sample}.cram', sample=list(SAMPLE_LANEFILE.keys())) if config['cram'] == 'TRUE' else expand('bam/{sample}.bam', sample=list(SAMPLE_LANEFILE.keys())),
 		# 'GATK_metrics/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
 		'fastqc/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
 		# expand('picardQC/{sample}.insert_size_metrics.txt', sample=list(SAMPLE_LANEFILE.keys())) if config['picardQC'] == 'TRUE' else 'dummy.txt',
@@ -433,17 +433,22 @@ rule bam_to_cram:
 		bam = 'sample_bam/{sample}.markDup.bam',
 		bai = 'sample_bam/{sample}.markDup.bai'
 	output:
-		cram = 'cram/{sample}.cram',
-		crai = 'cram/{sample}.crai'
+		cram = 'bam/{sample}.cram',
+		crai = 'bam/{sample}.crai'
 	threads:
 		8
 	shell:
 		"""
 		module load {config[samtools_version]}
-		samtools sort -O bam -l 0 --threads {threads} -T /lscratch/$SLURM_JOB_ID {input.bam} | \
-		samtools view -T {config[ref_genome]} --threads {threads} -C -o {output.cram} -
-		samtools index {output.cram} {output.crai}
+		samtools view -T {config[ref_genome]} --threads {threads} --output-fmt cram,store_md=1,store_nm=1 -o {output.cram} {input.bam}
+		samtools index -@ {threads} {output.cram} {output.crai}
 		"""
+
+# samtools view -O cram,store_md=1,store_nm=1 -o aln.cram aln.bam
+# samtools view --input-fmt cram,decode_md=0 -o aln.new.bam aln.cram
+#old: samtools sort -O bam -l 0 --threads {threads} -T /lscratch/$SLURM_JOB_ID {input.bam} | \
+#		samtools view -T {config[ref_genome]} --threads {threads} -C -o {output.cram} -
+# or # samtools view -T {config[ref_genome]} --threads {threads} -C -o {output.cram} {input.bam}
 
 localrules: keep_bam
 rule keep_bam:
@@ -597,7 +602,7 @@ rule automap_roh:
 		module load {config[samtools_version]} {config[bedtools_version]} {config[R_version]}
 		mkdir -p /lscratch/$SLURM_JOB_ID/AutoMap
 		zcat {input.vcf} > /lscratch/$SLURM_JOB_ID/AutoMap/{wildcards.sample}.vcf
-		bash /data/OGLd/resources/git/AutoMap/AutoMap_v1.2.sh \
+		bash /data/OGL/resources/git/AutoMap/AutoMap_v1.2.sh \
 			--vcf /lscratch/$SLURM_JOB_ID/AutoMap/{wildcards.sample}.vcf \
 			--out AutoMap --genome hg38
 		grep -v ^# {output.tsv} | cut -f 1-3 > {output.bed}
@@ -609,12 +614,13 @@ rule automap_roh:
 				-outputFile AutoMap/{wildcards.sample}/{wildcards.sample}.annotated.tsv
 			Rscript ~/git/NGS_genotype_calling/NGS_generic_OGL/automap.R {output.tsv} AutoMap/{wildcards.sample}/{wildcards.sample}.annotated.tsv {config[OGL_Dx_research_genes]} {output.annotated}
 			rm AutoMap/{wildcards.sample}/{wildcards.sample}.annotated.tsv
+			awk -F "\t" 'BEGIN{{OFS="\t"}} NR>1 {{sum += $4}} END {{print "## The autosomal ROH region occupies " sum/28.75 "%"}}' {output.annotated} >> {output.annotated}
 		else
 			touch {output.annotated}
 		fi
 		"""
 
-
+#Automap requires at least $10k variants passed QC filters, thus panel data fail frequently. Redirect by ">/dev/null 2>&1 || touch {output.tsv}" does not show error in sinteractive, but error in snakemake run.
 		# [ -s file.txt ]: check whether a file is empty
 rule merge_freebayes:
 	input:
@@ -729,10 +735,50 @@ rule merge_deepvariant_vcf:
 		touch {output}
 		"""
 
+rule glnexus:
+	input:
+		vcf = expand('deepvariant/gvcf/{sample}.dv.g.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
+		bam = expand('sample_bam/{sample}/{sample}.markDup.bam', sample=list(SAMPLE_LANEFILE.keys())),
+		bai = expand('sample_bam/{sample}/{sample}.markDup.bai', sample=list(SAMPLE_LANEFILE.keys()))
+	output:
+		'deepvariant/deepvariant.gvcf.merge.done.txt'
+	threads: 24
+	shell:
+		"""
+		module load {config[glnexus_version]} {config[samtools_version]} {config[whatshap_version]} parallel
+		WORK_DIR="/lscratch/${{SLURM_JOB_ID}}"
+		glnexus --dir /lscratch/$SLURM_JOB_ID/glnexus --config DeepVariantWES --bed {config[padded_bed]} \
+			--threads {threads}  --mem-gbytes 96 \
+			{input.vcf} \
+			| bcftools norm --multiallelics -any --output-type u --no-version \
+			| bcftools norm --check-ref s --fasta-ref {config[ref_genome]} --output-type u --no-version - \
+			| bcftools +fill-tags - -Ou -- -t AC,AC_Hom,AC_Het,AN,AF \
+			| bcftools annotate --threads {threads} --set-id 'dv_%CHROM\:%POS%REF\>%ALT' --no-version - -Oz -o $WORK_DIR/glnexus.vcf.gz
+		tabix -f -p vcf $WORK_DIR/glnexus.vcf.gz
+		head -n 19 /data/OGL/resources/whatshap/vcf.contig.filename.{config[genomeBuild]}.txt > $WORK_DIR/contig.txt
+		CONTIGFILE="$WORK_DIR/contig.txt"
+		mkdir -p /lscratch/$SLURM_JOB_ID/chr
+		mkdir -p /lscratch/$SLURM_JOB_ID/phased
+		cat $CONTIGFILE | parallel -C "\t" -j 19 "bcftools filter -r {{1}} --output-type z $WORK_DIR/glnexus.vcf.gz -o $WORK_DIR/chr/{{2}}.vcf.gz"
+		cat $CONTIGFILE | parallel -C "\t" -j 19 "tabix -f -p vcf $WORK_DIR/chr/{{2}}.vcf.gz"
+		cat $CONTIGFILE | parallel -C "\t" -j 19 --tmpdir $WORK_DIR --eta --halt 2 --line-buffer \
+		 	--tag "whatshap phase --reference {config[ref_genome]} \
+			--indels $WORK_DIR/chr/{{2}}.vcf.gz {input.bam} \
+			| bgzip -f > $WORK_DIR/phased/{{2}}.phased.vcf.gz"
+		cat $CONTIGFILE | parallel -C "\t" -j 19 "tabix -f -p vcf $WORK_DIR/phased/{{2}}.phased.vcf.gz"
+		PHASEDCHRFILE=""
+		cut -f 2 $CONTIGFILE > $WORK_DIR/temp.chr.txt
+		while read line; do PHASEDCHRFILE+=" /lscratch/${{SLURM_JOB_ID}}/phased/$line.phased.vcf.gz"; done < $WORK_DIR/temp.chr.txt
+		echo "chr files are $PHASEDCHRFILE"
+		bcftools concat --threads {threads} --output-type z $PHASEDCHRFILE > deepvariant/{config[analysis_batch_name]}.glnexus.phased.vcf.gz
+		tabix -f -p vcf deepvariant/{config[analysis_batch_name]}.glnexus.phased.vcf.gz
+		touch {output}
+		"""
+
 localrules: merge_dv_fb_vcfs
 rule merge_dv_fb_vcfs:
 	input:
-		'deepvariant/deepvariantVcf.merge.done.txt',
+		'deepvariant/deepvariant.gvcf.merge.done.txt',
 		'freebayes/freebayes.merge.done.txt'
 	output:
 		'prioritization/dv_fb.merge.done.txt'
@@ -745,13 +791,14 @@ rule merge_dv_fb_vcfs:
 			deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz \
 			freebayes/{config[analysis_batch_name]}.freebayes.vcf.gz
 		rm $WORK_DIR/0003.vcf &
-		bcftools annotate --threads {threads} --set-id 'dv_%CHROM\:%POS%REF\>%ALT' -x FORMAT/VAF,FORMAT/PL \
+		bcftools annotate --threads {threads} --set-id 'dv_%CHROM\:%POS%REF\>%ALT' \
 			--no-version $WORK_DIR/0000.vcf -Oz -o $WORK_DIR/dv.vcf.gz
 		rm $WORK_DIR/0000.vcf &
-		bcftools annotate --threads {threads} --set-id 'fb_%CHROM\:%POS%REF\>%ALT' -x INFO,FORMAT/RO,FORMAT/QR,FORMAT/AO,FORMAT/QA,FORMAT/GL \
-			--no-version $WORK_DIR/0001.vcf -Oz -o $WORK_DIR/fb.vcf.gz
+		bcftools annotate --threads {threads} --set-id 'fb_%CHROM\:%POS%REF\>%ALT' -x ^INFO/QA,FORMAT/RO,FORMAT/QR,FORMAT/AO,FORMAT/QA,FORMAT/GL \
+			--no-version $WORK_DIR/0001.vcf -Ou - \
+			| bcftools +fill-tags - -Oz -o $WORK_DIR/fb.vcf.gz -- -t AC,AC_Hom,AC_Het,AN,AF
 		rm $WORK_DIR/0001.vcf &
-		bcftools annotate --threads {threads} --set-id 'dvFb_%CHROM\:%POS%REF\>%ALT' -x FORMAT/VAF,FORMAT/PL \
+		bcftools annotate --threads {threads} --set-id 'dvFb_%CHROM\:%POS%REF\>%ALT' \
 			--no-version $WORK_DIR/0002.vcf -Oz -o $WORK_DIR/dvFb.vcf.gz
 		rm $WORK_DIR/0002.vcf &
 		tabix -f -p vcf $WORK_DIR/dv.vcf.gz
@@ -771,7 +818,7 @@ rule merge_dv_fb_vcfs:
 				$WORK_DIR/GRCh37.vcf
 			sed -e 's/^chr//' -e 's/<ID=chr/<ID=/' $WORK_DIR/GRCh37.vcf \
 			 	| bcftools norm --check-ref s --fasta-ref $hg19ref --output-type u - \
-				| bcftools sort -m 26G -T $WORK_DIR -Ou - \
+				| bcftools sort -m 26G -T $WORK_DIR/ -Ou - \
 				| bcftools norm --threads $(({threads}-4)) -d exact --output-type z - -o prioritization/{config[analysis_batch_name]}.GRCh37.vcf.gz
 			tabix -f -p vcf prioritization/{config[analysis_batch_name]}.GRCh37.vcf.gz
 		fi

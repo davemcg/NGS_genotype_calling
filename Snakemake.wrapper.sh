@@ -15,7 +15,8 @@
 
 cp /data/OGL/resources/NGS_genotype_calling.git.log .
 mkdir -p 00log
-module load snakemake/6.8.2 || exit 1
+module load snakemake/6.0.5 || exit 1
+#snakemake/6.8.2 act a little bit weird. Line no. is Snakefile messed up. 3/1/2022
 #previous version 6.0.5 2/18/2022
 #previous version 5.7.4/5.24.1
 sbcmd="sbatch --cpus-per-task={threads} \

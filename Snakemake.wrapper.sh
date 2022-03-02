@@ -14,6 +14,8 @@
 #When there is two or more *metadata_file*.csv present in the folder, then -e *metadata_file.csv will produce "binary operator expected". Thus changed to only single file.
 
 cp /data/OGL/resources/NGS_genotype_calling.git.log .
+#git log | head -n 5 > /data/OGL/resources/NGS_genotype_calling.git.log
+
 mkdir -p 00log
 module load snakemake/6.0.5 || exit 1
 #snakemake/6.8.2 act a little bit weird. Line no. is Snakefile messed up. 3/1/2022

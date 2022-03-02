@@ -107,7 +107,7 @@
 	},
 	"realign" :
 	{
-		"partition" : "norm,unlimited",
+		"partition" : "norm",
 		"time" : "16:00:00",
 		"mem" : "100g",
 		"extra" : "--gres=lscratch:400"

@@ -207,13 +207,13 @@ if config['inputFileType'] == 'single_lane_fastq':
 			cp -p -l {input.bai} {output.bai}
 			"""
 elif config['inputFileType'].upper() in ['BAM', 'CRAM']:
-	rule realign:
+	rule realign: # up to 12.5h for cram
 		input:
 			lambda wildcards: join('old_bam/', str(SAMPLE_LANEFILE[wildcards.sample][0]))
 		output:
 			bam = temp('sample_bam/{sample}.markDup.bam'),
 			bai = temp('sample_bam/{sample}.markDup.bai')
-		threads: 28
+		threads: 36
 		params:
 			read_group = rg
 		shell:
@@ -231,25 +231,25 @@ elif config['inputFileType'].upper() in ['BAM', 'CRAM']:
  			case "{input}" in
 				*bam)
 					if [[ "{config[markDup]}" == "TRUE" ]]; then
-						java -Xmx16g -jar $BAZAMPATH/bazam.jar -bam {input} \
+						java -Xmx24g -jar $BAZAMPATH/bazam.jar -bam {input} \
 						| bwa mem -t $(({threads}-2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[ref_genome]} - \
 				 		| samblaster -M --addMateTags --quiet \
 						| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads}-2)) -o {output.bam} \
 							<(sambamba view -S -f bam -l 0 -t $(({threads}-2)) /dev/stdin)
 						mv {output.bam}.bai {output.bai}
 					elif [[ "{config[markDup]}" == "FALSE" ]]; then
-						java -Xmx16g -jar $BAZAMPATH/bazam.jar -bam {input} \
+						java -Xmx24g -jar $BAZAMPATH/bazam.jar -bam {input} \
 						| bwa mem -t $(({threads}-2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[ref_genome]} - \
 				 		| samblaster -M --acceptDupMarks --addMateTags --quiet \
 						| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads}-2)) -o {output.bam} \
 							<(sambamba view -S -f bam -l 0 -t $(({threads}-2)) /dev/stdin)
 						mv {output.bam}.bai {output.bai}
 					else
-						java -Xmx16g -jar $BAZAMPATH/bazam.jar -bam {input} \
-							| bwa-mem2 mem -t $(({threads}-4)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[bwa-mem2_ref]} \
+						java -Xmx24g -jar $BAZAMPATH/bazam.jar -bam {input} \
+							| bwa-mem2 mem -t $(({threads}-2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[bwa-mem2_ref]} \
 							| samblaster -M --acceptDupMarks --addMateTags --quiet \
-							| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads}-4)) -o /lscratch/$SLURM_JOB_ID/{wildcards.sample}.bam \
-								<(sambamba view -S -f bam -l 0 -t $(({threads}-4)) /dev/stdin)
+							| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads}-2)) -o /lscratch/$SLURM_JOB_ID/{wildcards.sample}.bam \
+								<(sambamba view -S -f bam -l 0 -t $(({threads}-2)) /dev/stdin)
 						module load {config[biobambam2_version]}
 						bammarkduplicatesopt markthreads={threads} level=6 \
 							tmpfile=/lscratch/$SLURM_JOB_ID/{wildcards.sample} \
@@ -262,25 +262,25 @@ elif config['inputFileType'].upper() in ['BAM', 'CRAM']:
 					;;
 				*cram)
 					if [[ "{config[markDup]}" == "TRUE" ]]; then
-						java -Xmx16g -Dsamjdk.reference_fasta={config[old_cram_ref]} -jar $BAZAMPATH/bazam.jar -bam {input} \
+						java -Xmx24g -Dsamjdk.reference_fasta={config[old_cram_ref]} -jar $BAZAMPATH/bazam.jar -bam {input} \
 							| bwa mem -t $(({threads}-2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[ref_genome]} - \
 				 			| samblaster -M --addMateTags --quiet \
 							| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads}-2)) -o {output.bam} \
 								<(sambamba view -S -f bam -l 0 -t $(({threads}-2)) /dev/stdin)
 						mv {output.bam}.bai {output.bai}
 					elif [[ "{config[markDup]}" == "FALSE" ]]; then
-						java -Xmx16g -Dsamjdk.reference_fasta={config[old_cram_ref]} -jar $BAZAMPATH/bazam.jar -bam {input} \
+						java -Xmx24g -Dsamjdk.reference_fasta={config[old_cram_ref]} -jar $BAZAMPATH/bazam.jar -bam {input} \
 							| bwa mem -t $(({threads}-2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[ref_genome]} - \
 				 			| samblaster -M --acceptDupMarks --addMateTags --quiet \
 							| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads}-2)) -o {output.bam} \
 								<(sambamba view -S -f bam -l 0 -t $(({threads}-2)) /dev/stdin)
 						mv {output.bam}.bai {output.bai}
 					else
-						java -Xmx16g -Dsamjdk.reference_fasta={config[old_cram_ref]} -jar $BAZAMPATH/bazam.jar -bam {input} \
-							| bwa-mem2 mem -t $(({threads}/2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[bwa-mem2_ref]} - \
+						java -Xmx24g -Dsamjdk.reference_fasta={config[old_cram_ref]} -jar $BAZAMPATH/bazam.jar -bam {input} \
+							| bwa-mem2 mem -t $(({threads}-2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[bwa-mem2_ref]} - \
 				 			| samblaster -M --acceptDupMarks --addMateTags --quiet \
-							| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads}/2)) -o /lscratch/$SLURM_JOB_ID/{wildcards.sample}.bam \
-								<(sambamba view -S -f bam -l 0 -t $(({threads}/2)) /dev/stdin)
+							| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads}-2)) -o /lscratch/$SLURM_JOB_ID/{wildcards.sample}.bam \
+								<(sambamba view -S -f bam -l 0 -t $(({threads}-2)) /dev/stdin)
 						module load {config[biobambam2_version]}
 						bammarkduplicatesopt markthreads={threads} level=6 \
 							tmpfile=/lscratch/$SLURM_JOB_ID/{wildcards.sample} \
@@ -780,8 +780,8 @@ rule scramble_annotation:
 		anno = 'scramble_anno/{sample}.scramble.xlsx'
 	shell:
 		"""
-		module load {config[R_version]}
-		module load {config[annovar_version]}
+		if [[ $(module list 2>&1 | grep "annovar" | wc -l) < 1 ]]; then module load {config[annovar_version]}; fi
+		if [[ $(module list 2>&1 | grep "R/" | wc -l) < 1 ]]; then module load {config[R_version]}; fi
 		if [[ {config[genomeBuild]} == "GRCh38" ]]; then
 			ver=hg38
 		else
@@ -864,7 +864,7 @@ rule muteserve:
 		tbi = 'mutserve/{sample}.mt.vcf.gz.tbi'
 	shell:
 		"""
-		module load {config[samtools_version]}
+		if [[ $(module list 2>&1 | grep "samtools" | wc -l) < 1 ]]; then module load {config[samtools_version]}; fi
 		MUTSERVE_HOME="/data/OGL/resources/git/mutserve"
 		$MUTSERVE_HOME/mutserve call --reference $MUTSERVE_HOME/rCRS.fasta --output {output.vcf} --threads 2 {input.bam}
 		$MUTSERVE_HOME/mutserve annotate --input mutserve/{wildcards.sample}.txt --annotation $MUTSERVE_HOME/rCRS_annotation_2020-08-20.txt --output mutserve/{wildcards.sample}.AnnotatedVariants.txt
@@ -880,7 +880,7 @@ rule haplocheck:
 		'mutserve/haplocheck.done.txt'
 	shell:
 		"""
-		module load {config[samtools_version]}
+		if [[ $(module list 2>&1 | grep "samtools" | wc -l) < 1 ]]; then module load {config[samtools_version]}; fi
 		case "{input.vcf}" in
 			*\ *)
 				bcftools merge --merge none --missing-to-ref --output-type z {input.vcf} \
@@ -1016,13 +1016,23 @@ rule automap_roh:
 	shell:
 		"""
 		module load {config[samtools_version]} {config[bedtools_version]} {config[R_version]}
+		if [[ {config[genomeBuild]} == "GRCh38" ]]; then
+			ver=hg38
+		else
+			ver=hg19
+		fi
 		mkdir -p /lscratch/$SLURM_JOB_ID/AutoMap
 		zcat {input.vcf} > /lscratch/$SLURM_JOB_ID/AutoMap/{wildcards.sample}.vcf
 		bash /data/OGL/resources/git/AutoMap/AutoMap_v1.2.sh \
 			--vcf /lscratch/$SLURM_JOB_ID/AutoMap/{wildcards.sample}.vcf \
-			--out AutoMap --genome hg38
-		grep -v ^# {output.tsv} | cut -f 1-3 > {output.bed}
-		if [ -s {output.bed} ]; then
+			--out AutoMap --genome $ver --chrX
+		echo "AutoMap1.2 done"
+		if [[ $(grep -v ^# {output.tsv} | wc -l) == 0 ]]; then
+			touch {output.bed}
+			touch {output.annotated}
+			echo "no ROH region detected."
+		else
+			grep -v ^# {output.tsv} | cut -f 1-3 > {output.bed}
 			module load {config[annotsv_version]}
 			AnnotSV -SVinputFile {output.bed} \
 				-SVinputInfo 1 -genomeBuild {config[genomeBuild]} \
@@ -1030,11 +1040,9 @@ rule automap_roh:
 				-outputFile AutoMap/{wildcards.sample}/{wildcards.sample}.annotated.tsv
 			Rscript ~/git/NGS_genotype_calling/NGS_generic_OGL/automap.R {output.tsv} AutoMap/{wildcards.sample}/{wildcards.sample}.annotated.tsv {config[OGL_Dx_research_genes]} {output.annotated}
 			rm AutoMap/{wildcards.sample}/{wildcards.sample}.annotated.tsv
-		else
-			touch {output.annotated}
 		fi
 		"""
-
+# [ -s file ] test whether a file is present and with content
 rule merge_freebayes:
 	input:
 		vcf = expand('freebayes/vcf/{sample}.phased.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),

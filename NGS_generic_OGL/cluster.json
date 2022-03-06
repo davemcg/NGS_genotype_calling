@@ -110,7 +110,7 @@
 		"partition" : "norm",
 		"time" : "16:00:00",
 		"mem" : "100g",
-		"extra" : "--gres=lscratch:400"
+		"extra" : "--gres=lscratch:500"
 	},
 	"align" :
 	{

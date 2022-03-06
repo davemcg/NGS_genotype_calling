@@ -392,8 +392,8 @@ rule coverage:
 	threads: 8
 	shell:
 		"""
-		module load {config[mosdepth_version]}
-		module load {config[R_version]}
+		if [[ $(module list 2>&1 | grep "mosdepth" | wc -l) < 1 ]]; then module load {config[mosdepth_version]}; fi
+		if [[ $(module list 2>&1 | grep "R/" | wc -l) < 1 ]]; then module load {config[R_version]}; fi
 		cd coverage/mosdepth
 		mosdepth -t {threads} --no-per-base --by {config[bed]} --use-median --mapq 0 --fast-mode --thresholds 10,20,30 \
 			{wildcards.sample}.md ../../{input.bam}
@@ -501,8 +501,8 @@ rule scramble_annotation:
 		del_anno = 'scramble_anno/{sample}.scramble.del.tsv'
 	shell:
 		"""
-		module load {config[R_version]}
-		module load {config[annovar_version]}
+		if [[ $(module list 2>&1 | grep "annovar" | wc -l) < 1 ]]; then module load {config[annovar_version]}; fi
+		if [[ $(module list 2>&1 | grep "R/" | wc -l) < 1 ]]; then module load {config[R_version]}; fi
 		if [[ {config[genomeBuild]} == "GRCh38" ]]; then
 			ver=hg38
 		else
@@ -599,14 +599,27 @@ rule automap_roh:
 		annotated = 'AutoMap/{sample}/{sample}.HomRegions.annot.tsv'
 	shell:
 		"""
-		module load {config[samtools_version]} {config[bedtools_version]} {config[R_version]}
+		if [[ $(module list 2>&1 | grep "samtools" | wc -l) < 1 ]]; then module load {config[samtools_version]}; fi
+		if [[ $(module list 2>&1 | grep "bedtools" | wc -l) < 1 ]]; then module load {config[bedtools_version]}; fi
+		if [[ $(module list 2>&1 | grep "R/" | wc -l) < 1 ]]; then module load {config[R_version]}; fi
+		if [[ {config[genomeBuild]} == "GRCh38" ]]; then
+			ver=hg38
+		else
+			ver=hg19
+		fi
 		mkdir -p /lscratch/$SLURM_JOB_ID/AutoMap
 		zcat {input.vcf} > /lscratch/$SLURM_JOB_ID/AutoMap/{wildcards.sample}.vcf
 		bash /data/OGL/resources/git/AutoMap/AutoMap_v1.2.sh \
 			--vcf /lscratch/$SLURM_JOB_ID/AutoMap/{wildcards.sample}.vcf \
-			--out AutoMap --genome hg38
-		grep -v ^# {output.tsv} | cut -f 1-3 > {output.bed}
-		if [ -s {output.bed} ]; then
+			--out AutoMap --genome $ver --chrX \
+			--minsize 1 --minvar 20
+		echo "AutoMap1.2 done"
+		if [[ $(grep -v ^# {output.tsv} | wc -l) == 0 ]]; then
+			touch {output.bed}
+			touch {output.annotated}
+			echo "no ROH region detected."
+		else
+			grep -v ^# {output.tsv} | cut -f 1-3 > {output.bed}
 			module load {config[annotsv_version]}
 			AnnotSV -SVinputFile {output.bed} \
 				-SVinputInfo 1 -genomeBuild {config[genomeBuild]} \
@@ -614,9 +627,6 @@ rule automap_roh:
 				-outputFile AutoMap/{wildcards.sample}/{wildcards.sample}.annotated.tsv
 			Rscript ~/git/NGS_genotype_calling/NGS_generic_OGL/automap.R {output.tsv} AutoMap/{wildcards.sample}/{wildcards.sample}.annotated.tsv {config[OGL_Dx_research_genes]} {output.annotated}
 			rm AutoMap/{wildcards.sample}/{wildcards.sample}.annotated.tsv
-			awk -F "\t" 'BEGIN{{OFS="\t"}} NR>1 {{sum += $4}} END {{print "## The autosomal ROH region occupies " sum/28.75 "%"}}' {output.annotated} >> {output.annotated}
-		else
-			touch {output.annotated}
 		fi
 		"""
 
@@ -687,17 +697,20 @@ rule deepvariant:
 		N_SHARDS="32"
 		mkdir -p /lscratch/$SLURM_JOB_ID/{wildcards.sample}
 		WORK_DIR=/lscratch/$SLURM_JOB_ID/{wildcards.sample}
+		cp {input} $WORK_DIR
 		cd $WORK_DIR
 		run_deepvariant --model_type WES --num_shards $N_SHARDS \
 			--ref {config[ref_genome]} \
 			--regions {config[padded_bed]} \
-			--reads $PROJECT_WD/{input.bam} \
-			--output_vcf $PROJECT_WD/{output.vcf} \
-			--output_gvcf $PROJECT_WD/{output.gvcf} \
+			--reads $WORK_DIR/$(basename {input.bam})  \
+			--output_vcf $WORK_DIR/$(basename {output.vcf}) \
+			--output_gvcf $WORK_DIR/$(basename {output.gvcf}) \
 			--sample_name {wildcards.sample} \
 			--intermediate_results_dir $WORK_DIR \
 			--call_variants_extra_args="use_openvino=true"
 		cd $PROJECT_WD
+		cp $WORK_DIR/$(basename {output.vcf})* deepvariant/vcf
+		cp $WORK_DIR/$(basename {output.gvcf})* deepvariant/gvcf
 		module unload {config[deepvariant_version]}
 		module load {config[samtools_version]}
 		bcftools norm --multiallelics -any --output-type u {output.vcf} \
@@ -785,7 +798,7 @@ rule merge_dv_fb_vcfs:
 	threads: 8
 	shell:
 		"""
-		module load {config[samtools_version]}
+		if [[ $(module list 2>&1 | grep "samtools" | wc -l) < 1 ]]; then module load {config[samtools_version]}; fi
 		WORK_DIR=/lscratch/$SLURM_JOB_ID
 		bcftools isec -p $WORK_DIR --collapse none -Ov \
 			deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz \
@@ -1126,7 +1139,7 @@ rule picard_merge_gvcfs:
 	threads: 2
 	shell:
 		"""
-		module load {config[picard_version]}
+		if [[ $(module list 2>&1 | grep "picard" | wc -l) < 1 ]]; then module load {config[picard_version]}; fi
 		cat_inputs_i=""
 		for gvcf in {input}; do
 			cat_inputs_i+="I=$gvcf "; done

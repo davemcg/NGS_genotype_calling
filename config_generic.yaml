@@ -26,7 +26,7 @@ lane_pair_delim: ['_R1_001.fastq', '_R2_001.fastq'] #OGL & DavidM:'_R1_001', '_R
 #read_groups: ['@RG\\tID:Lineagen_41001412010527\\tSM:Lineagen_41001412010527\\tPL:ILLUMINA'] # not used in current version of Snakefiles
 manta_version: 'manta/1.6.0'
 annotsv_version: 'annotsv/3.0.5'
-deepvariant_version: 'deepvariant/1.1.0'
+deepvariant_version: 'deepvariant/1.3.0'
 glnexus_version: 'glnexus/1.2.7'
 picard_version:  'picard/2.23.7'
 samtools_version: 'samtools/1.11'

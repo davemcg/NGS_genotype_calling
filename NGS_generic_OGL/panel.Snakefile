@@ -117,6 +117,7 @@ rule all:
 		expand('scramble_anno/{sample}.scramble.xlsx', sample=list(SAMPLE_LANEFILE.keys())) if config['SCRAMble'] == 'TRUE' else 'dummy.txt',
 		expand('manta/manta.{sample}.annotated.tsv', sample=list(SAMPLE_LANEFILE.keys())),
 		'bcmlocus/combine.bcmlocus.done.txt' #expand('bcmlocus/{sample}.bcmlocus.txt', sample=list(SAMPLE_LANEFILE.keys()))
+		#expand('AutoMap/{sample}/{sample}.HomRegions.annot.tsv', sample=list(SAMPLE_LANEFILE.keys()))
 
 localrules: dummy
 rule dummy:
@@ -665,21 +666,24 @@ rule deepvariant:
 	shell:
 		"""
 		module load {config[deepvariant_version]}
-		PROJECT_WD=$PWD
+		PROJECT_WD="$PWD"
 		N_SHARDS="4"
 		mkdir -p /lscratch/$SLURM_JOB_ID/{wildcards.sample}
 		WORK_DIR=/lscratch/$SLURM_JOB_ID/{wildcards.sample}
+		cp {input} $WORK_DIR
 		cd $WORK_DIR
 		run_deepvariant --model_type WES --num_shards $N_SHARDS \
 			--ref {config[ref_genome]} \
 			--regions {config[padded_bed]} \
-			--reads $PROJECT_WD/{input.bam} \
-			--output_vcf $PROJECT_WD/{output.vcf} \
-			--output_gvcf $PROJECT_WD/{output.gvcf} \
+			--reads $WORK_DIR/$(basename {input.bam})  \
+			--output_vcf $WORK_DIR/$(basename {output.vcf}) \
+			--output_gvcf $WORK_DIR/$(basename {output.gvcf}) \
 			--sample_name {wildcards.sample} \
 			--intermediate_results_dir $WORK_DIR \
 			--call_variants_extra_args="use_openvino=true"
 		cd $PROJECT_WD
+		cp $WORK_DIR/$(basename {output.vcf})* deepvariant/vcf
+		cp $WORK_DIR/$(basename {output.gvcf})* deepvariant/gvcf
 		module unload {config[deepvariant_version]}
 		module load {config[samtools_version]}
 		bcftools norm --multiallelics -any --output-type u {output.vcf} \
@@ -1138,16 +1142,12 @@ rule bcm_locus:
 	output:
 		vcf = temp('bcmlocus/{sample}.vcf'),
 		avinput = temp('bcmlocus/{sample}.avinput'),
-		annovarOut = temp('bcmlocus/{sample}.avinput.hg38_multianno.txt'),
 		bcm_out = 'bcmlocus/{sample}.bcmlocus.tsv'
 	shell:
 		"""
-		check=$(module list 2>&1 | grep "samtools" | wc -l)
-		if [[ $check < 1 ]]; then module load {config[samtools_version]}; fi
-		check=$(module list 2>&1 | grep "freebayes" | wc -l)
-		if [[ $check < 1 ]]; then module load {config[freebayes_version]}; fi
-		check=$(module list 2>&1 | grep "annovar" | wc -l)
-		if [[ $check < 1 ]]; then module load {config[annovar_version]}; fi
+		if [[ $(module list 2>&1 | grep "samtools" | wc -l) < 1 ]]; then module load {config[samtools_version]}; fi
+		if [[ $(module list 2>&1 | grep "freebayes" | wc -l) < 1 ]]; then module load {config[freebayes_version]}; fi
+		if [[ $(module list 2>&1 | grep "annovar" | wc -l) < 1 ]]; then module load {config[annovar_version]}; fi
 		freebayes -f {config[ref_genome]} --max-complex-gap 90 -p 6 -C 3 -F 0.05 \
 			--genotype-qualities --strict-vcf --use-mapping-quality \
 			--targets /data/OGL/resources/bed/OPN1LWe2e5.bed \
@@ -1158,9 +1158,14 @@ rule bcm_locus:
 			| bcftools norm -d exact --output-type v - \
 			> {output.vcf}
 		convert2annovar.pl -format vcf4old {output.vcf} -includeinfo --outfile {output.avinput}
+		if [[ {config[genomeBuild]} == "GRCh38" ]]; then
+			ver=hg38
+		else
+			ver=hg19
+		fi
 		table_annovar.pl {output.avinput} \
-			$ANNOVAR_DATA/hg38 \
-			-buildver hg38 \
+			$ANNOVAR_DATA/$ver \
+			-buildver $ver \
 			-remove \
 			-out {output.avinput} \
 			--protocol refGeneWithVer \
@@ -1169,12 +1174,12 @@ rule bcm_locus:
 			--polish -nastring . \
 			--thread 1 \
 			--otherinfo
-		sed -i "1 s/Otherinfo1\tOtherinfo2\tOtherinfo3\tOtherinfo4\tOtherinfo5\tOtherinfo6\tOtherinfo7\tOtherinfo8\tOtherinfo9\tOtherinfo10/CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tGT_FIELDS/" {output.annovarOut}
-		check=$(module list 2>&1 | grep "R/" | wc -l)
-		if [[ $check < 1 ]]; then module load {config[R_version]}; fi
+		sed -i "1 s/Otherinfo1\tOtherinfo2\tOtherinfo3\tOtherinfo4\tOtherinfo5\tOtherinfo6\tOtherinfo7\tOtherinfo8\tOtherinfo9\tOtherinfo10/CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tGT_FIELDS/" bcmlocus/{wildcards.sample}.avinput."hg38"_multianno.txt
+		if [[ $(module list 2>&1 | grep "R/" | wc -l) < 1 ]]; then module load {config[R_version]}; fi
 		Rscript ~/git/NGS_genotype_calling/NGS_generic_OGL/bcmlocus.R \
 			/data/OGL/resources/bcmlocus.xlsx \
-			{wildcards.sample} {output.annovarOut} {output.bcm_out}
+			{wildcards.sample} bcmlocus/{wildcards.sample}.avinput."hg38"_multianno.txt {output.bcm_out}
+		rm bcmlocus/{wildcards.sample}.avinput."hg38"_multianno.txt
 		"""
 ## Next step: get CN information
 
@@ -1191,6 +1196,47 @@ rule combine_bcmlocus:
 			tail -n 1 $file >> bcmlocus/{config[analysis_batch_name]}.bcmlocus.all.tsv
  		done
 		touch {output}
+		"""
+
+localrules: automap_roh
+rule automap_roh:
+	input:
+		vcf = 'freebayes/vcf/{sample}.vcf.gz'
+	output:
+		tsv = temp('AutoMap/{sample}/{sample}.HomRegions.tsv'),
+		bed = temp('AutoMap/{sample}/{sample}.HomRegions.bed'),
+		annotated = 'AutoMap/{sample}/{sample}.HomRegions.annot.tsv'
+	shell:
+		"""
+		if [[ $(module list 2>&1 | grep "samtools" | wc -l) < 1 ]]; then module load {config[samtools_version]}; fi
+		if [[ $(module list 2>&1 | grep "bedtools" | wc -l) < 1 ]]; then module load {config[bedtools_version]}; fi
+		if [[ $(module list 2>&1 | grep "R/" | wc -l) < 1 ]]; then module load {config[R_version]}; fi
+		if [[ {config[genomeBuild]} == "GRCh38" ]]; then
+			ver=hg38
+		else
+			ver=hg19
+		fi
+		mkdir -p /lscratch/$SLURM_JOB_ID/AutoMap
+		zcat {input.vcf} > /lscratch/$SLURM_JOB_ID/AutoMap/{wildcards.sample}.vcf
+		bash /data/OGL/resources/git/AutoMap/AutoMap_v1.2.sh \
+			--vcf /lscratch/$SLURM_JOB_ID/AutoMap/{wildcards.sample}.vcf \
+			--out AutoMap --genome $ver --chrX \
+			--minsize 0.5 --minvar 15
+		echo "AutoMap1.2 done"
+		if [[ $(grep -v ^# {output.tsv} | wc -l) == 0 ]]; then
+			touch {output.bed}
+			touch {output.annotated}
+			echo "no ROH region detected."
+		else
+			grep -v ^# {output.tsv} | cut -f 1-3 > {output.bed}
+			module load {config[annotsv_version]}
+			AnnotSV -SVinputFile {output.bed} \
+				-SVinputInfo 1 -genomeBuild {config[genomeBuild]} \
+				-outputDir AutoMap/{wildcards.sample} \
+				-outputFile AutoMap/{wildcards.sample}/{wildcards.sample}.annotated.tsv
+			Rscript ~/git/NGS_genotype_calling/NGS_generic_OGL/automap.R {output.tsv} AutoMap/{wildcards.sample}/{wildcards.sample}.annotated.tsv {config[OGL_Dx_research_genes]} {output.annotated}
+			rm AutoMap/{wildcards.sample}/{wildcards.sample}.annotated.tsv
+		fi
 		"""
 
 rule gatk_realigner_target:

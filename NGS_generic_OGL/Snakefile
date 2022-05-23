@@ -650,10 +650,35 @@ rule deepvariantS3:
 		cp ${{OUTPUT_VCF}}* ${{DV_OUTPUT_DIR}}/*.html deepvariant/vcf || exit 2
 		cp ${{OUTPUT_GVCF}}* deepvariant/gvcf || exit 2
 		"""
+
+rule glnexus:
+	input:
+		vcf = expand('deepvariant/gvcf/{sample}.g.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
+		#bam = expand('sample_bam/{sample}.markDup.bam', sample=list(SAMPLE_LANEFILE.keys())),
+		#bai = expand('sample_bam/{sample}.markDup.bai', sample=list(SAMPLE_LANEFILE.keys()))
+	output:
+		'deepvariant/deepvariant.gvcf.merge.done.txt'
+	threads: 72
+	shell:
+		"""
+		module load {config[glnexus_version]} {config[samtools_version]}
+		WORK_DIR="/lscratch/${{SLURM_JOB_ID}}"
+		glnexus --dir /lscratch/$SLURM_JOB_ID/glnexus --config DeepVariant \
+			--threads $(({threads} - 8)) --mem-gbytes 512 \
+			{input.vcf} \
+			| bcftools norm --multiallelics -any --output-type u --no-version \
+			| bcftools norm --check-ref s --fasta-ref {config[ref_genome]} --output-type u --no-version - \
+			| bcftools +fill-tags - -Ou -- -t AC,AC_Hom,AC_Het,AN,AF \
+			| bcftools annotate --threads $(({threads} - 8)) --set-id 'dv_%CHROM\:%POS%REF\>%ALT' --no-version - -Oz -o deepvariant/{config[analysis_batch_name]}.glnexus.vcf.gz
+		tabix -f -p vcf deepvariant/{config[analysis_batch_name]}.glnexus.vcf.gz
+		touch {output}
+		"""
+
 #took 55min & 43G mem.
 rule dv_whatshap:
 	input:
-		vcf = 'deepvariant/vcf/{sample}.vcf.gz',
+		glnexus = 'deepvariant/deepvariant.gvcf.merge.done.txt',
+		#vcf = 'deepvariant/vcf/{sample}.vcf.gz',
 		bam = 'sample_bam/{sample}.markDup.bam',
 		bai = 'sample_bam/{sample}.markDup.bai'
 	output:
@@ -664,16 +689,14 @@ rule dv_whatshap:
 		"""
 		module load {config[samtools_version]} {config[whatshap_version]} parallel
 		WORK_DIR="/lscratch/${{SLURM_JOB_ID}}"
-		FILTEREDVCF="/lscratch/$SLURM_JOB_ID/{wildcards.sample}.dv.filtered.vcf.gz"
+		FILTEREDVCF="/lscratch/$SLURM_JOB_ID/{wildcards.sample}.vcf.gz"
 		rm -rf $WORK_DIR/*
-		bcftools filter --include 'FILTER="PASS"' --output-type u {input.vcf} \
-			| bcftools norm --multiallelics -any --output-type u - \
-			| bcftools norm --check-ref s --fasta-ref {config[ref_genome]} --output-type u - \
-			| bcftools norm --threads $(({threads}-6)) -d exact --output-type z --output $FILTEREDVCF
-		tabix -f -p vcf $FILTEREDVCF && echo "Filtered vcf index created" || exit 3
+		cp deepvariant/{config[analysis_batch_name]}.glnexus.vcf.gz* /lscratch/$SLURM_JOB_ID
+		bcftools view --threads {threads} -Oz --samples {wildcards.sample} $WORK_DIR/{config[analysis_batch_name]}.glnexus.vcf.gz \
+			-o $WORK_DIR/{wildcards.sample}.vcf.gz && rm $WORK_DIR/{config[analysis_batch_name]}.glnexus.vcf.gz*
+		tabix -f -p vcf $WORK_DIR/{wildcards.sample}.vcf.gz
 		CONTIGFILE="/data/OGL/resources/whatshap/vcf.contig.filename.{config[genomeBuild]}.txt"
-		cp {config[ref_genome]} {config[ref_genome]}.fai {input.bam} {input.bai} $WORK_DIR \
-			&& echo "Ref and bam files copied to lscratch"  || exit 4
+		cp {config[ref_genome]} {config[ref_genome]}.fai {input.bam} {input.bai} $WORK_DIR
 		mkdir -p /lscratch/$SLURM_JOB_ID/filtered
 		mkdir -p /lscratch/$SLURM_JOB_ID/phased
 		( cat $CONTIGFILE | parallel -C "\t" -j 21 "bcftools filter --threads $(({threads}-6)) -r {{1}} --output-type z $FILTEREDVCF -o $WORK_DIR/filtered/{{2}}.filtered.vcf.gz" ) && echo "Filtered vcf split to chr" || exit 5
@@ -717,29 +740,6 @@ rule merge_deepvariantVcf:
 				cp -p -l {input.tbi} deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz.tbi
 				;;
 		esac
-		touch {output}
-		"""
-
-rule glnexus:
-	input:
-		vcf = expand('deepvariant/gvcf/{sample}.g.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
-		#bam = expand('sample_bam/{sample}.markDup.bam', sample=list(SAMPLE_LANEFILE.keys())),
-		#bai = expand('sample_bam/{sample}.markDup.bai', sample=list(SAMPLE_LANEFILE.keys()))
-	output:
-		'deepvariant/deepvariant.gvcf.merge.done.txt'
-	threads: 72
-	shell:
-		"""
-		module load {config[glnexus_version]} {config[samtools_version]}
-		WORK_DIR="/lscratch/${{SLURM_JOB_ID}}"
-		glnexus --dir /lscratch/$SLURM_JOB_ID/glnexus --config DeepVariant \
-			--threads $(({threads} - 8)) --mem-gbytes 512 \
-			{input.vcf} \
-			| bcftools norm --multiallelics -any --output-type u --no-version \
-			| bcftools norm --check-ref s --fasta-ref {config[ref_genome]} --output-type u --no-version - \
-			| bcftools +fill-tags - -Ou -- -t AC,AC_Hom,AC_Het,AN,AF \
-			| bcftools annotate --threads $(({threads} - 8)) --set-id 'dv_%CHROM\:%POS%REF\>%ALT' --no-version - -Oz -o deepvariant/{config[analysis_batch_name]}.glnexus.vcf.gz
-		tabix -f -p vcf deepvariant/{config[analysis_batch_name]}.glnexus.vcf.gz
 		touch {output}
 		"""
 
@@ -854,14 +854,15 @@ rule manta:
 # 			-t 16 -M 4 -g hg19 -a $method {input.bam}; done
 # 		"""
 
-localrules: muteserve
-rule muteserve:
+localrules: mutserve
+rule mutserve:
 	input:
 		bam = 'sample_bam/{sample}.markDup.bam',
 		bai = 'sample_bam/{sample}.markDup.bai'
 	output:
 		vcf = 'mutserve/{sample}.mt.vcf.gz',
 		tbi = 'mutserve/{sample}.mt.vcf.gz.tbi'
+	resources: res=1
 	shell:
 		"""
 		if [[ $(module list 2>&1 | grep "samtools" | wc -l) < 1 ]]; then module load {config[samtools_version]}; fi
@@ -871,7 +872,7 @@ rule muteserve:
 		tabix -f -p vcf {output.vcf}
 		"""
 
-localrules: muteserve
+localrules: haplocheck
 rule haplocheck:
 	input:
 		vcf = expand('mutserve/{sample}.mt.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
@@ -1071,7 +1072,8 @@ rule merge_freebayes:
 #fast and only used 4 cpus, 100mg and 4 mins for 2 wgs data.
 rule merge_dv_fb_vcfs:
 	input:
-		'deepvariant/deepvariant.gvcf.merge.done.txt',
+		'deepvariant/deepvariantVcf.merge.done.txt',
+		#'deepvariant/deepvariant.gvcf.merge.done.txt',
 		'freebayes/freebayes.merge.done.txt'
 	output:
 		'prioritization/dv_fb.merge.done.txt'
@@ -1081,13 +1083,14 @@ rule merge_dv_fb_vcfs:
 		module load {config[samtools_version]}
 		WORK_DIR=/lscratch/$SLURM_JOB_ID
 		bcftools isec --threads {threads} -p $WORK_DIR --collapse none --no-version -Oz \
-			deepvariant/{config[analysis_batch_name]}.glnexus.vcf.gz \
+			deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz \
 			freebayes/{config[analysis_batch_name]}.freebayes.vcf.gz
 		rm $WORK_DIR/0003.vcf* &
 		bcftools annotate --threads {threads} --set-id 'dv_%CHROM\:%POS%REF\>%ALT' \
 			--no-version $WORK_DIR/0000.vcf.gz -Oz -o $WORK_DIR/dv.vcf.gz && rm $WORK_DIR/0000.vcf* &
 		bcftools annotate --threads {threads} --set-id 'fb_%CHROM\:%POS%REF\>%ALT' -x ^INFO/QA,FORMAT/RO,FORMAT/QR,FORMAT/AO,FORMAT/QA,FORMAT/GL \
 			--no-version $WORK_DIR/0001.vcf.gz -Ou - \
+			| sed 's#0/0:.:.:.#0/0:10:10:10,0#g' - \
 			| bcftools +fill-tags - -Oz -o $WORK_DIR/fb.vcf.gz -- -t AC,AC_Hom,AC_Het,AN,AF && rm $WORK_DIR/0001.vcf* &
 		bcftools annotate --threads {threads} --set-id 'dvFb_%CHROM\:%POS%REF\>%ALT' \
 			--no-version $WORK_DIR/0002.vcf.gz -Oz -o $WORK_DIR/dvFb.vcf.gz
@@ -1096,9 +1099,8 @@ rule merge_dv_fb_vcfs:
 		tabix -f -p vcf $WORK_DIR/fb.vcf.gz
 		tabix -f -p vcf $WORK_DIR/dvFb.vcf.gz
 		bcftools concat --threads {threads} -a --rm-dups none --no-version \
-			$WORK_DIR/dvFb.vcf.gz $WORK_DIR/dv.vcf.gz $WORK_DIR/fb.vcf.gz -Ov \
-			| sed 's#0/0:.:.:.#0/0:10:10:10,0#g' - \
-			| bgzip -f > prioritization/{config[analysis_batch_name]}.vcf.gz
+			$WORK_DIR/dvFb.vcf.gz $WORK_DIR/dv.vcf.gz $WORK_DIR/fb.vcf.gz -Oz \
+			-o prioritization/{config[analysis_batch_name]}.vcf.gz
 		tabix -f -p vcf prioritization/{config[analysis_batch_name]}.vcf.gz
 		rm $WORK_DIR/dvFb.vcf.gz* $WORK_DIR/dv.vcf.gz* $WORK_DIR/fb.vcf.gz*
 		if [[ {config[genomeBuild]} == "GRCh38" ]]; then

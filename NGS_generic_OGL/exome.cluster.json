@@ -106,8 +106,8 @@
 	},
 	"merge_lane_bam" :
 	{
-		"partition" : "norm",
-		"time" : "6:00:00",
+		"partition" : "quick,norm",
+		"time" : "4:00:00",
 		"mem" : "16G",
 		"extra" : "--gres=lscratch:100"
 	},

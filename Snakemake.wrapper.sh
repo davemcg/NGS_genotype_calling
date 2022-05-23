@@ -31,10 +31,12 @@ sbcmd="sbatch --cpus-per-task={threads} \
 
 lib=$2
 ngstype=$3
+metadata_file=$(grep "metadata_file" $1 | head -n 1 | cut -d"'" -f 2)
 
-if [ -e metadata_file.csv ];
+if [ -e $metadata_file ];
 then
 	echo "metadata_file provided"
+	sort --field-separator="," -k 1,2 $metadata_file > metadata_file.edited && mv metadata_file.edited $metadata_file
 else
 	for fastq1 in fastq/*.gz; do
 	filename=$(basename $fastq1)

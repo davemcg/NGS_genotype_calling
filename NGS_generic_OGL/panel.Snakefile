@@ -932,6 +932,7 @@ rule merge_dv_fb_vcfs:
 		rm $WORK_DIR/0000.vcf &
 		bcftools annotate --threads {threads} --set-id 'fb_%CHROM\:%POS%REF\>%ALT' -x ^INFO/QA,FORMAT/RO,FORMAT/QR,FORMAT/AO,FORMAT/QA,FORMAT/GL \
 			--no-version $WORK_DIR/0001.vcf -Ou - \
+			| sed 's#0/0:.:.:.#0/0:10:10:10,0#g' - \
 			| bcftools +fill-tags - -Oz -o $WORK_DIR/fb.vcf.gz -- -t AC,AC_Hom,AC_Het,AN,AF
 		rm $WORK_DIR/0001.vcf &
 		bcftools annotate --threads {threads} --set-id 'dvFb_%CHROM\:%POS%REF\>%ALT' \
@@ -941,9 +942,8 @@ rule merge_dv_fb_vcfs:
 		tabix -f -p vcf $WORK_DIR/fb.vcf.gz
 		tabix -f -p vcf $WORK_DIR/dvFb.vcf.gz
 		bcftools concat --threads {threads} -a --rm-dups none --no-version \
-			$WORK_DIR/dvFb.vcf.gz $WORK_DIR/dv.vcf.gz $WORK_DIR/fb.vcf.gz -Ov \
-			| sed 's#0/0:.:.:.#0/0:10:10:10,0#g' - \
-			| bgzip -f > prioritization/{config[analysis_batch_name]}.vcf.gz
+			$WORK_DIR/dvFb.vcf.gz $WORK_DIR/dv.vcf.gz $WORK_DIR/fb.vcf.gz -Oz \
+			-o prioritization/{config[analysis_batch_name]}.vcf.gz
 		tabix -f -p vcf prioritization/{config[analysis_batch_name]}.vcf.gz
 		if [[ {config[genomeBuild]} == "GRCh38" ]]; then
 			module load {config[crossmap_version]}

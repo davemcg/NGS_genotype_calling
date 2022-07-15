@@ -8,6 +8,10 @@
 		"error" : "00log/{rule}_{wildcards}.err",
 		"extra" : "--gres=lscratch:50"
 	},
+	"bcm_locus":
+	{
+		"mem" : "24g"
+	},
 	"deepvariant" :
 	{
 		"partition" : "norm",

@@ -45,6 +45,10 @@
 		"mem" : "720g",
 		"extra" : "--gres=lscratch:400"
 	},
+	"bcm_locus":
+	{
+		"mem" : "24g"
+	},
 	"sve" :
 	{
 		"partition" : "norm",

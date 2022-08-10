@@ -1,3 +1,4 @@
+#use with earlier version of the variant scramble db.
 args <- commandArgs(trailingOnly=TRUE)
 library(tidyverse)
 library(readxl)

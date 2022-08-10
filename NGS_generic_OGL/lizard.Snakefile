@@ -129,19 +129,19 @@ wildcard_constraints:
 
 rule all:
 	input:
-		expand('gvcfs/{sample}.g.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())) if config['GATKgvcf'] == 'TRUE' else 'dummy.txt',
+		#expand('gvcfs/{sample}.g.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())) if config['GATKgvcf'] == 'TRUE' else 'dummy.txt',
 		expand('bam/{sample}.cram', sample=list(SAMPLE_LANEFILE.keys())) if config['cram'] == 'TRUE' else expand('bam/{sample}.bam', sample=list(SAMPLE_LANEFILE.keys())),
 		# 'GATK_metrics/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
 		'fastqc/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
 		 expand('picardQC/{sample}.insert_size_metrics.txt', sample=list(SAMPLE_LANEFILE.keys())) if config['picardQC'] == 'TRUE' else 'dummy.txt',
 		#'deepvariant/deepvariantVcf.merge.done.txt' if config['deepvariant'] == 'TRUE' else 'dummy.txt',
-		'prioritization/dv_fb.merge.done.txt' if config['freebayes_phasing'] == 'TRUE' else 'dummy.txt',
+		#'prioritization/dv_fb.merge.done.txt' if config['freebayes_phasing'] == 'TRUE' else 'dummy.txt',
 		'coverage/mean.coverage.done.txt' if config['coverage'] == 'TRUE' else 'dummy.txt',
-		'mutserve/haplocheck.done.txt',
-		expand('manta/manta.{sample}.annotated.tsv', sample=list(SAMPLE_LANEFILE.keys())) if config['manta'] == 'TRUE' else 'dummy.txt',
-		expand('scramble_anno/{sample}.scramble.tsv', sample=list(SAMPLE_LANEFILE.keys())) if config['SCRAMble'] == 'TRUE' else 'dummy.txt',
-		expand('AutoMap/{sample}/{sample}.HomRegions.annot.tsv', sample=list(SAMPLE_LANEFILE.keys())),
-		'bcmlocus/combine.bcmlocus.done.txt'
+		#'mutserve/haplocheck.done.txt',
+		#expand('manta/manta.{sample}.annotated.tsv', sample=list(SAMPLE_LANEFILE.keys())) if config['manta'] == 'TRUE' else 'dummy.txt',
+		#expand('scramble_anno/{sample}.scramble.tsv', sample=list(SAMPLE_LANEFILE.keys())) if config['SCRAMble'] == 'TRUE' else 'dummy.txt',
+		#expand('AutoMap/{sample}/{sample}.HomRegions.annot.tsv', sample=list(SAMPLE_LANEFILE.keys())),
+		#'bcmlocus/combine.bcmlocus.done.txt'
 
 localrules: dummy
 rule dummy:
@@ -465,18 +465,18 @@ rule coverage:
 		module load {config[mosdepth_version]}
 		module load {config[R_version]}
 		cd coverage/mosdepth
-		mosdepth -t {threads} --no-per-base --by {config[bed]} --use-median --mapq 0 --fast-mode --thresholds 10,20,30 \
+		mosdepth -t {threads} --no-per-base --use-median --mapq 0 --fast-mode \
 			{wildcards.sample}.md ../../{input.bam}
 		cd ../..
 		#mv {wildcards.sample}.md.* coverage/mosdepth/.
-		zcat {output.thresholds} \
-			 | sed '1 s/^.*$/chr\tstart\tend\tgene\tcoverageTen\tcoverageTwenty\tcoverageThirty/' \
-			 > {output.thresholds}.tsv
-		echo -e "sample\tlength\tmean" > {output.region_summary}
-		tail -n 1 {output.summary} | cut -f 2,4 | sed 's/^/{wildcards.sample}\t/' >> {output.region_summary}
-		Rscript ~/git/NGS_genotype_calling/NGS_generic_OGL/mosdepth_bed_coverage.R \
-			{output.thresholds}.tsv {config[OGL_Dx_research_genes]} {output.region_summary} {output.xlsx}
-		rm {output.thresholds}.tsv
+		#zcat {output.thresholds} \
+		#	 | sed '1 s/^.*$/chr\tstart\tend\tgene\tcoverageTen\tcoverageTwenty\tcoverageThirty/' \
+		#	 > {output.thresholds}.tsv
+		#echo -e "sample\tlength\tmean" > {output.region_summary}
+		#tail -n 1 {output.summary} | cut -f 2,4 | sed 's/^/{wildcards.sample}\t/' >> {output.region_summary}
+		#Rscript ~/git/NGS_genotype_calling/NGS_generic_OGL/mosdepth_bed_coverage.R \
+		#	{output.thresholds}.tsv {config[OGL_Dx_research_genes]} {output.region_summary} {output.xlsx}
+		#rm {output.thresholds}.tsv
 		"""
 
 localrules: mean_coverage

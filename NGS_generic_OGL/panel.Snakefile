@@ -498,7 +498,7 @@ rule CoNVaDING_1:
 		module load {config[R_version]}
 		case "{params.sex}" in
 			"1")
-				perl ~/git/CoNVaDING/CoNVaDING.pl -mode StartWithBam \
+				perl /data/OGL/resources/git/CoNVaDING/CoNVaDING.pl -mode StartWithBam \
 					-inputDir sample_bam/{wildcards.sample} \
 					-outputDir /lscratch/$SLURM_JOB_ID \
 					-bed {config[bed]} \
@@ -518,7 +518,7 @@ rule CoNVaDING_1:
 				touch {output}
 				;;
 			"2")
-				perl ~/git/CoNVaDING/CoNVaDING.pl -mode StartWithBam \
+				perl /data/OGL/resources/git/CoNVaDING/CoNVaDING.pl -mode StartWithBam \
 					-inputDir sample_bam/{wildcards.sample} \
 					-outputDir /lscratch/$SLURM_JOB_ID \
 					-bed {config[bed]} \
@@ -538,7 +538,7 @@ rule CoNVaDING_1:
 				touch {output}
 				;;
 			*)
-				perl ~/git/CoNVaDING/CoNVaDING.pl -mode StartWithBam \
+				perl /data/OGL/resources/git/CoNVaDING/CoNVaDING.pl -mode StartWithBam \
 					-inputDir sample_bam/{wildcards.sample} \
 					-outputDir /lscratch/$SLURM_JOB_ID \
 					-bed {config[bed]} \
@@ -580,25 +580,25 @@ rule CoNVaDING_2:
  		filetest0=$((ls CoNVaDING/normalized_coverage/*.markDup.aligned.only.normalized.coverage.txt >> /dev/null 2>&1 && echo TRUE) || echo FALSE)
 		if [ $filetest0 == "TRUE" ];
 		then
-			perl ~/git/CoNVaDING/CoNVaDING.pl -mode StartWithMatchScore \
+			perl /data/OGL/resources/git/CoNVaDING/CoNVaDING.pl -mode StartWithMatchScore \
 				-inputDir CoNVaDING/normalized_coverage \
 				-outputDir  CoNVaDING/MatchScore \
 				-controlsDir {config[CoNVaDING_ctr_dir]}
-			perl ~/git/CoNVaDING/CoNVaDING.pl \
+			perl /data/OGL/resources/git/CoNVaDING/CoNVaDING.pl \
   				-mode StartWithBestScore \
   				-inputDir CoNVaDING/MatchScore \
   				-outputDir CoNVaDING/CNV_hiSens \
   				-controlsDir {config[CoNVaDING_ctr_dir]} \
   				-ratioCutOffLow 0.71 \
   				-ratioCutOffHigh 1.35
-			# perl ~/git/CoNVaDING/CoNVaDING.pl \
+			# perl /data/OGL/resources/git/CoNVaDING/CoNVaDING.pl \
   			# 	-mode GenerateTargetQcList \
   			# 	-inputDir {config[CoNVaDING_ctr_dir]} \
   			# 	-outputDir CoNVaDING/TargetQcList \
   			# 	-controlsDir {config[CoNVaDING_ctr_dir]} \
   			# 	-ratioCutOffLow 0.71 \
   			# 	-ratioCutOffHigh 1.35
-			# perl ~/git/CoNVaDING/CoNVaDING.pl \
+			# perl /data/OGL/resources/git/CoNVaDING/CoNVaDING.pl \
 			# 	-mode CreateFinalList \
 			# 	-inputDir CoNVaDING/CNV_hiSens \
   			# 	-targetQcList CoNVaDING/TargetQcList \
@@ -607,12 +607,12 @@ rule CoNVaDING_2:
 		filetest1=$((ls CoNVaDING/normalized_coverage_male/*.markDup.aligned.only.normalized.coverage.txt >> /dev/null 2>&1 && echo TRUE) || echo FALSE)
 		if [ $filetest1 == "TRUE" ];
 		then
-			perl ~/git/CoNVaDING/CoNVaDING.pl -mode StartWithMatchScore \
+			perl /data/OGL/resources/git/CoNVaDING/CoNVaDING.pl -mode StartWithMatchScore \
 				-inputDir CoNVaDING/normalized_coverage_male \
 				-outputDir  CoNVaDING/MatchScore_male \
 				-controlsDir {config[CoNVaDING_ctr_dir]}_male \
 				-sexChr
-			perl ~/git/CoNVaDING/CoNVaDING.pl \
+			perl /data/OGL/resources/git/CoNVaDING/CoNVaDING.pl \
   				-mode StartWithBestScore \
   				-inputDir CoNVaDING/MatchScore_male \
   				-outputDir CoNVaDING/CNV_hiSens \
@@ -624,12 +624,12 @@ rule CoNVaDING_2:
 		filetest2=$((ls CoNVaDING/normalized_coverage_female/*.markDup.aligned.only.normalized.coverage.txt >> /dev/null 2>&1 && echo TRUE) || echo FALSE)
 		if [ $filetest2 == "TRUE" ];
 		then
-			perl ~/git/CoNVaDING/CoNVaDING.pl -mode StartWithMatchScore \
+			perl /data/OGL/resources/git/CoNVaDING/CoNVaDING.pl -mode StartWithMatchScore \
 				-inputDir CoNVaDING/normalized_coverage_female \
 				-outputDir  CoNVaDING/MatchScore_female \
 				-controlsDir {config[CoNVaDING_ctr_dir]}_female \
 				-sexChr
-			perl ~/git/CoNVaDING/CoNVaDING.pl \
+			perl /data/OGL/resources/git/CoNVaDING/CoNVaDING.pl \
   				-mode StartWithBestScore \
   				-inputDir CoNVaDING/MatchScore_female \
   				-outputDir CoNVaDING/CNV_hiSens \
@@ -1144,7 +1144,8 @@ rule bcm_locus:
 		"""
 		if [[ $(module list 2>&1 | grep "mosdepth" | wc -l) < 1 ]]; then module load {config[mosdepth_version]}; fi
 		if [[ $(module list 2>&1 | grep "R/" | wc -l) < 1 ]]; then module load {config[R_version]}; fi
-		cd coverage/mosdepth
+		mkdir -p bcmlocus/mosdepth
+		cd bcmlocus/mosdepth
 		mosdepth -t {threads} --no-per-base --by {config[bcmlocus_bed]} --use-median --mapq 0 --fast-mode \
 			{wildcards.sample}.md ../../{input.bam}
 		cd ../..
@@ -1200,7 +1201,7 @@ rule combine_bcmlocus:
 		"""
 		echo -e "CHROM\tPOS\tID\tREF\tALT\tQUAL\tFunc.refGeneWithVer\tGene.refGeneWithVer\tGeneDetail.refGeneWithVer\tExonicFunc.refGeneWithVer\tAAChange.refGeneWithVer\tHGVSp\tAnnotation\tFunction\tACMG_Class\tNote\tSample\tINFO\tFORMAT\tGT_FIELDS" > bcmlocus/{config[analysis_batch_name]}.bcmlocus.all.tsv
 		for file in {input}; do
-			tail -n 1 $file >> bcmlocus/{config[analysis_batch_name]}.bcmlocus.all.tsv
+			tail -n +2 $file >> bcmlocus/{config[analysis_batch_name]}.bcmlocus.all.tsv
  		done
 		touch {output}
 		"""

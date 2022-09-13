@@ -508,6 +508,7 @@ rule CoNVaDING_1:
 				mkdir -p CoNVaDING/normalized_coverage_male
 				cp /lscratch/$SLURM_JOB_ID/{wildcards.sample}.markDup.aligned.only.normalized.coverage.txt \
 					CoNVaDING/normalized_coverage_male/{wildcards.sample}.markDup.aligned.only.normalized.coverage.txt
+				chgrp OGL {config[CoNVaDING_ctr_dir]}_male/{wildcards.sample}.markDup.aligned.only.normalized.coverage.txt
 				Rscript ~/git/NGS_genotype_calling/NGS_generic_OGL/chrRD.R \
 					CoNVaDING/normalized_coverage_male/{wildcards.sample}.markDup.aligned.only.normalized.coverage.txt \
 					CoNVaDING/normalized_coverage_male/{wildcards.sample}.chrRD.pdf \
@@ -528,6 +529,7 @@ rule CoNVaDING_1:
 				mkdir -p CoNVaDING/normalized_coverage_female
 				cp /lscratch/$SLURM_JOB_ID/{wildcards.sample}.markDup.aligned.only.normalized.coverage.txt \
 					CoNVaDING/normalized_coverage_female/{wildcards.sample}.markDup.aligned.only.normalized.coverage.txt
+				chgrp OGL {config[CoNVaDING_ctr_dir]}_female/{wildcards.sample}.markDup.aligned.only.normalized.coverage.txt
 				Rscript ~/git/NGS_genotype_calling/NGS_generic_OGL/chrRD.R \
 					CoNVaDING/normalized_coverage_female/{wildcards.sample}.markDup.aligned.only.normalized.coverage.txt \
 					CoNVaDING/normalized_coverage_female/{wildcards.sample}.chrRD.pdf \
@@ -548,6 +550,7 @@ rule CoNVaDING_1:
 				mkdir -p CoNVaDING/normalized_coverage
 				cp /lscratch/$SLURM_JOB_ID/{wildcards.sample}.markDup.aligned.only.normalized.coverage.txt \
 					CoNVaDING/normalized_coverage/{wildcards.sample}.markDup.aligned.only.normalized.coverage.txt
+				chgrp OGL {config[CoNVaDING_ctr_dir]}/{wildcards.sample}.markDup.aligned.only.normalized.coverage.txt
 				Rscript ~/git/NGS_genotype_calling/NGS_generic_OGL/chrRD.R \
 					CoNVaDING/normalized_coverage/{wildcards.sample}.markDup.aligned.only.normalized.coverage.txt \
 					CoNVaDING/normalized_coverage/{wildcards.sample}.chrRD.pdf \
@@ -574,12 +577,13 @@ rule CoNVaDING_2:
 	input:
 		expand('CoNVaDING/progress1.{sample}', sample=list(SAMPLE_LANEFILE.keys())),
 	output:
-		temp('CoNVaDING/progress2.done')
+		'CoNVaDING/progress2.done'
 	shell:
 		"""
  		filetest0=$((ls CoNVaDING/normalized_coverage/*.markDup.aligned.only.normalized.coverage.txt >> /dev/null 2>&1 && echo TRUE) || echo FALSE)
 		if [ $filetest0 == "TRUE" ];
 		then
+			#cp -a CoNVaDING/normalized_coverage/*.markDup.aligned.only.normalized.coverage.txt {config[CoNVaDING_ctr_dir]}
 			perl /data/OGL/resources/git/CoNVaDING/CoNVaDING.pl -mode StartWithMatchScore \
 				-inputDir CoNVaDING/normalized_coverage \
 				-outputDir  CoNVaDING/MatchScore \
@@ -607,6 +611,7 @@ rule CoNVaDING_2:
 		filetest1=$((ls CoNVaDING/normalized_coverage_male/*.markDup.aligned.only.normalized.coverage.txt >> /dev/null 2>&1 && echo TRUE) || echo FALSE)
 		if [ $filetest1 == "TRUE" ];
 		then
+			#cp -a CoNVaDING/normalized_coverage_male/*.markDup.aligned.only.normalized.coverage.txt {config[CoNVaDING_ctr_dir]}
 			perl /data/OGL/resources/git/CoNVaDING/CoNVaDING.pl -mode StartWithMatchScore \
 				-inputDir CoNVaDING/normalized_coverage_male \
 				-outputDir  CoNVaDING/MatchScore_male \
@@ -624,6 +629,7 @@ rule CoNVaDING_2:
 		filetest2=$((ls CoNVaDING/normalized_coverage_female/*.markDup.aligned.only.normalized.coverage.txt >> /dev/null 2>&1 && echo TRUE) || echo FALSE)
 		if [ $filetest2 == "TRUE" ];
 		then
+			#cp -a CoNVaDING/normalized_coverage_female/*.markDup.aligned.only.normalized.coverage.txt {config[CoNVaDING_ctr_dir]}
 			perl /data/OGL/resources/git/CoNVaDING/CoNVaDING.pl -mode StartWithMatchScore \
 				-inputDir CoNVaDING/normalized_coverage_female \
 				-outputDir  CoNVaDING/MatchScore_female \
@@ -760,13 +766,13 @@ rule glnexus:
 		"""
 		module load {config[glnexus_version]} {config[samtools_version]} {config[whatshap_version]} parallel
 		WORK_DIR="/lscratch/${{SLURM_JOB_ID}}"
-		glnexus --dir /lscratch/$SLURM_JOB_ID/glnexus --config DeepVariantWES --bed {config[padded_bed]} \
+		glnexus_cli --dir /lscratch/$SLURM_JOB_ID/glnexus --config DeepVariantWES --bed {config[padded_bed]} \
 			--threads {threads} \
 			{input.vcf} \
 			| bcftools norm --multiallelics -any --output-type u --no-version \
 			| bcftools norm --check-ref s --fasta-ref {config[ref_genome]} --output-type u --no-version - \
 			| bcftools +fill-tags - -Ou -- -t AC,AC_Hom,AC_Het,AN,AF \
-			| bcftools annotate --threads {threads} --set-id 'dv_%CHROM\:%POS%REF\>%ALT' --no-version - -Oz -o $WORK_DIR/glnexus.vcf.gz
+			| bcftools annotate --threads {threads} --set-id 'dvg_%CHROM\:%POS%REF\>%ALT' --no-version - -Oz -o $WORK_DIR/glnexus.vcf.gz
 		tabix -f -p vcf $WORK_DIR/glnexus.vcf.gz
 		head -n 19 /data/OGL/resources/whatshap/vcf.contig.filename.{config[genomeBuild]}.txt > $WORK_DIR/contig.txt
 		CONTIGFILE="$WORK_DIR/contig.txt"
@@ -913,6 +919,7 @@ rule merge_freebayes:
 localrules: merge_dv_fb_vcfs
 rule merge_dv_fb_vcfs:
 	input:
+		'deepvariant/deepvariantVcf.merge.done.txt',
 		'deepvariant/deepvariant.gvcf.merge.done.txt',
 		'freebayes/freebayes.merge.done.txt'
 	output:
@@ -922,26 +929,39 @@ rule merge_dv_fb_vcfs:
 		"""
 		if [[ $(module list 2>&1 | grep "samtools" | wc -l) < 1 ]]; then module load {config[samtools_version]}; fi
 		WORK_DIR=/lscratch/$SLURM_JOB_ID
-		bcftools isec -p $WORK_DIR --collapse none -Ov \
+		bcftools isec -p $WORK_DIR/dv -w 2 --collapse none --output-type u --threads {threads} \
 			deepvariant/{config[analysis_batch_name]}.glnexus.phased.vcf.gz \
+			deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
+		bcftools +fill-tags $WORK_DIR/dv/0001.bcf -Ov -- -t AC,AC_Hom,AC_Het,AN,AF \
+			| sed 's#0/0:.:.:.#0/0:10:10:10,0#g' - \
+			| bcftools annotate --threads {threads} --set-id 'dv_%CHROM\:%POS%REF\>%ALT' --no-version - -Oz -o $WORK_DIR/dv/dv.hf.vcf.gz
+		tabix -f -p vcf $WORK_DIR/dv/dv.hf.vcf.gz
+		bcftools concat --threads {threads} -a --rm-dups none --no-version \
+			deepvariant/{config[analysis_batch_name]}.glnexus.phased.vcf.gz $WORK_DIR/dv/dv.hf.vcf.gz -Oz \
+			-o $WORK_DIR/dv.glnexus.hf.vcf.gz
+		tabix -f -p vcf $WORK_DIR/dv.glnexus.hf.vcf.gz
+		rm -r -f $WORK_DIR/dv
+		bcftools isec --threads {threads} -p $WORK_DIR --collapse none -Oz \
+			$WORK_DIR/dv.glnexus.hf.vcf.gz \
 			freebayes/{config[analysis_batch_name]}.freebayes.vcf.gz
-		rm $WORK_DIR/0003.vcf &
-		bcftools annotate --threads {threads} --set-id 'dv_%CHROM\:%POS%REF\>%ALT' \
-			--no-version $WORK_DIR/0000.vcf -Oz -o $WORK_DIR/dv.vcf.gz
-		rm $WORK_DIR/0000.vcf &
+		rm $WORK_DIR/0003.vcf.gz &
+		#bcftools annotate --threads {threads} --set-id 'dv_%CHROM\:%POS%REF\>%ALT' \
+		#	--no-version $WORK_DIR/0000.vcf -Oz -o $WORK_DIR/dv.vcf.gz
+		#rm $WORK_DIR/0000.vcf &
 		bcftools annotate --threads {threads} --set-id 'fb_%CHROM\:%POS%REF\>%ALT' -x ^INFO/QA,FORMAT/RO,FORMAT/QR,FORMAT/AO,FORMAT/QA,FORMAT/GL \
-			--no-version $WORK_DIR/0001.vcf -Ou - \
+			--no-version $WORK_DIR/0001.vcf.gz -Ov - \
 			| sed 's#0/0:.:.:.#0/0:10:10:10,0#g' - \
 			| bcftools +fill-tags - -Oz -o $WORK_DIR/fb.vcf.gz -- -t AC,AC_Hom,AC_Het,AN,AF
-		rm $WORK_DIR/0001.vcf &
-		bcftools annotate --threads {threads} --set-id 'dvFb_%CHROM\:%POS%REF\>%ALT' \
-			--no-version $WORK_DIR/0002.vcf -Oz -o $WORK_DIR/dvFb.vcf.gz
-		rm $WORK_DIR/0002.vcf &
-		tabix -f -p vcf $WORK_DIR/dv.vcf.gz
+		rm $WORK_DIR/0001.vcf.gz &
+		zcat $WORK_DIR/0002.vcf.gz | sed 's/\tdv/\tfbDv/' | bgzip -@ {threads} > $WORK_DIR/dvFb.vcf.gz
+		#bcftools annotate --threads {threads} --set-id 'dvFb_%CHROM\:%POS%REF\>%ALT' \
+		#	--no-version $WORK_DIR/0002.vcf -Oz -o $WORK_DIR/dvFb.vcf.gz
+		rm $WORK_DIR/0002.vcf.gz &
+		tabix -f -p vcf $WORK_DIR/0000.vcf.gz
 		tabix -f -p vcf $WORK_DIR/fb.vcf.gz
 		tabix -f -p vcf $WORK_DIR/dvFb.vcf.gz
 		bcftools concat --threads {threads} -a --rm-dups none --no-version \
-			$WORK_DIR/dvFb.vcf.gz $WORK_DIR/dv.vcf.gz $WORK_DIR/fb.vcf.gz -Oz \
+			$WORK_DIR/dvFb.vcf.gz $WORK_DIR/0000.vcf.gz $WORK_DIR/fb.vcf.gz -Oz \
 			-o prioritization/{config[analysis_batch_name]}.vcf.gz
 		tabix -f -p vcf prioritization/{config[analysis_batch_name]}.vcf.gz
 		if [[ {config[genomeBuild]} == "GRCh38" ]]; then

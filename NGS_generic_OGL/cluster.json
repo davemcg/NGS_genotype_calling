@@ -41,13 +41,13 @@
 	"glnexus" :
 	{
 		"partition" : "largemem",
-		"time" : "9:00:00",
-		"mem" : "720g",
-		"extra" : "--gres=lscratch:400"
+		"time" : "8:00:00",
+		"mem" : "512g",
+		"extra" : "--gres=lscratch:600"
 	},
 	"bcm_locus":
 	{
-		"mem" : "24g"
+		"mem" : "32g"
 	},
 	"sve" :
 	{
@@ -85,6 +85,11 @@
 		"extra" : "--gres=lscratch:100"
 	},
 	"merge_deepvariantVcf" :
+	{
+		"mem" : "64g",
+		"threads" : "16"
+	},
+	"merge_deepvariant_glnexusVcf" :
 	{
 		"mem" : "64g",
 		"threads" : "16"

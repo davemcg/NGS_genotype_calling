@@ -19,7 +19,8 @@ annovar <- read_tsv(annovar_file, col_names = TRUE, na = c("NA", "", "None"), co
   type_convert() %>% 
   separate(AAChange.refGeneWithVer, c("Gene", "Transcript", "Exon", "HGVSc", "HGVSp"), sep = ":", remove = FALSE, convert = TRUE) %>% 
   mutate(Note = "") %>% 
-  mutate(Sample = sampleName)
+  mutate(Sample = sampleName) %>% 
+  filter(QUAL > 1)
 
 annovar_edit <- left_join(annovar, bcmlocus, by=c("HGVSc", "HGVSp")) %>% 
   select(CHROM, POS, ID, REF, ALT, QUAL, Func.refGeneWithVer, Gene.refGeneWithVer, GeneDetail.refGeneWithVer, ExonicFunc.refGeneWithVer, AAChange.refGeneWithVer,

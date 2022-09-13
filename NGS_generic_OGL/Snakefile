@@ -135,13 +135,13 @@ rule all:
 		'fastqc/multiqc_report' if config['multiqc'] == 'TRUE' else 'dummy.txt',
 		 expand('picardQC/{sample}.insert_size_metrics.txt', sample=list(SAMPLE_LANEFILE.keys())) if config['picardQC'] == 'TRUE' else 'dummy.txt',
 		#'deepvariant/deepvariantVcf.merge.done.txt' if config['deepvariant'] == 'TRUE' else 'dummy.txt',
-		'prioritization/dv_fb.merge.done.txt' if config['freebayes_phasing'] == 'TRUE' else 'dummy.txt',
+		'prioritization/dv_fb.merge.done.txt' if config['freebayes_phasing'] == 'TRUE' else 'deepvariant/deepvariant_phased_glnexusVcf.merge.done.txt',
 		'coverage/mean.coverage.done.txt' if config['coverage'] == 'TRUE' else 'dummy.txt',
 		'mutserve/haplocheck.done.txt',
 		expand('manta/manta.{sample}.annotated.tsv', sample=list(SAMPLE_LANEFILE.keys())) if config['manta'] == 'TRUE' else 'dummy.txt',
 		expand('scramble_anno/{sample}.scramble.tsv', sample=list(SAMPLE_LANEFILE.keys())) if config['SCRAMble'] == 'TRUE' else 'dummy.txt',
-		expand('AutoMap/{sample}/{sample}.HomRegions.annot.tsv', sample=list(SAMPLE_LANEFILE.keys())),
-		'bcmlocus/combine.bcmlocus.done.txt'
+		expand('AutoMap/{sample}/{sample}.HomRegions.annot.tsv', sample=list(SAMPLE_LANEFILE.keys())) if config['freebayes_phasing'] == 'TRUE' else 'deepvariant/deepvariant_phased_glnexusVcf.merge.done.txt',
+		'bcmlocus/combine.bcmlocus.done.txt' if config['bcmlocus'] == 'TRUE' else 'dummy.txt'
 
 localrules: dummy
 rule dummy:
@@ -651,6 +651,50 @@ rule deepvariantS3:
 		cp ${{OUTPUT_GVCF}}* deepvariant/gvcf || exit 2
 		"""
 
+#probably add the following to the step above.
+rule dv_hardfilter:
+	input:
+		vcf = 'deepvariant/vcf/{sample}.vcf.gz'
+	output:
+		filteredvcf = 'deepvariant/vcf/{sample}.dv.filtered.vcf.gz',
+		filteredtbi = 'deepvariant/vcf/{sample}.dv.filtered.vcf.gz.tbi'
+	threads: 8
+	shell:
+		"""
+		module load {config[samtools_version]}
+		bcftools filter --include 'FILTER="PASS" & FORMAT/AD[0:1]>2' --output-type u {input.vcf} \
+			| bcftools norm --multiallelics -any --output-type u - \
+			| bcftools norm --check-ref s --fasta-ref {config[ref_genome]} --output-type u - \
+			| bcftools norm --threads $(({threads}-2)) -d exact --output-type z --output {output.vcf}
+		tabix -f -p vcf ${output.vcf}
+		"""
+#AD[0:1]>2 to remove the variant on a single read but read from both F- and R- reads.
+
+rule merge_deepvariantVcf:
+	input:
+		vcf = expand('deepvariant/vcf/{sample}.dv.filtered.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
+		tbi = expand('deepvariant/vcf/{sample}.dv.filtered.vcf.gz.tbi', sample=list(SAMPLE_LANEFILE.keys()))
+	output:
+		'deepvariant/deepvariantVcf.merge.done.txt'
+	threads: 16
+	shell:
+		"""
+		module load {config[samtools_version]}
+		case "{input.vcf}" in
+			*\ *)
+				bcftools merge --merge none --missing-to-ref --output-type z --threads {threads} {input.vcf} \
+				> deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
+				sleep 2
+				tabix -f -p vcf deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
+				;;
+			*)
+				cp -p -l {input.vcf} deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
+				cp -p -l {input.tbi} deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz.tbi
+				;;
+		esac
+		touch {output}
+		"""
+
 rule glnexus:
 	input:
 		vcf = expand('deepvariant/gvcf/{sample}.g.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
@@ -663,13 +707,15 @@ rule glnexus:
 		"""
 		module load {config[glnexus_version]} {config[samtools_version]}
 		WORK_DIR="/lscratch/${{SLURM_JOB_ID}}"
-		glnexus --dir /lscratch/$SLURM_JOB_ID/glnexus --config DeepVariant \
-			--threads $(({threads} - 8)) --mem-gbytes 512 \
+		glnexus_cli --dir /lscratch/$SLURM_JOB_ID/glnexus --config DeepVariant \
+			--threads $(({threads} - 6)) --mem-gbytes 512 \
 			{input.vcf} \
-			| bcftools norm --multiallelics -any --output-type u --no-version \
+			| bcftools view --threads $((72 - 6)) -Ob -o $WORK_DIR/{config[analysis_batch_name]}.glnexus.bcf
+		df -h $WORK_DIR
+		bcftools norm --multiallelics -any --output-type u --no-version $WORK_DIR/{config[analysis_batch_name]}.glnexus.bcf \
 			| bcftools norm --check-ref s --fasta-ref {config[ref_genome]} --output-type u --no-version - \
 			| bcftools +fill-tags - -Ou -- -t AC,AC_Hom,AC_Het,AN,AF \
-			| bcftools annotate --threads $(({threads} - 8)) --set-id 'dv_%CHROM\:%POS%REF\>%ALT' --no-version - -Oz -o deepvariant/{config[analysis_batch_name]}.glnexus.vcf.gz
+			| bcftools annotate --threads $(({threads} - 6)) --set-id 'dvg_%CHROM\:%POS%REF\>%ALT' --no-version - -Oz -o deepvariant/{config[analysis_batch_name]}.glnexus.vcf.gz
 		tabix -f -p vcf deepvariant/{config[analysis_batch_name]}.glnexus.vcf.gz
 		touch {output}
 		"""
@@ -682,8 +728,8 @@ rule dv_whatshap:
 		bam = 'sample_bam/{sample}.markDup.bam',
 		bai = 'sample_bam/{sample}.markDup.bai'
 	output:
-		phasedvcf = 'deepvariant/vcf/{sample}.dv.phased.vcf.gz',
-		phasedtbi = 'deepvariant/vcf/{sample}.dv.phased.vcf.gz.tbi'
+		phasedvcf = 'deepvariant/vcf/{sample}.dv.glnexus.phased.vcf.gz',
+		phasedtbi = 'deepvariant/vcf/{sample}.dv.glnexus.phased.vcf.gz.tbi'
 	threads: 26
 	shell:
 		"""
@@ -718,12 +764,12 @@ rule dv_whatshap:
 #deepvariant normalizes most indels, but not all, thus bcftools norm needed
 #deepvariant does not inlucde duplicate variant, thus no need to use -d none, but codes included anyway.
 #samtools 1.11: bcftools filter --include 'FILTER="PASS"'
-rule merge_deepvariantVcf:
+rule merge_deepvariant_glnexusVcf:
 	input:
-		vcf = expand('deepvariant/vcf/{sample}.dv.phased.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
-		tbi = expand('deepvariant/vcf/{sample}.dv.phased.vcf.gz.tbi', sample=list(SAMPLE_LANEFILE.keys()))
+		vcf = expand('deepvariant/vcf/{sample}.dv.glnexus.phased.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
+		tbi = expand('deepvariant/vcf/{sample}.dv.glnexus.phased.vcf.gz.tbi', sample=list(SAMPLE_LANEFILE.keys()))
 	output:
-		'deepvariant/deepvariantVcf.merge.done.txt'
+		'deepvariant/deepvariant_phased_glnexusVcf.merge.done.txt'
 	threads: 16
 	shell:
 		"""
@@ -731,13 +777,13 @@ rule merge_deepvariantVcf:
 		case "{input.vcf}" in
 			*\ *)
 				bcftools merge --merge none --missing-to-ref --output-type z --threads {threads} {input.vcf} \
-				> deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
+				> deepvariant/{config[analysis_batch_name]}.dv.glnexus.phased.vcf.gz
 				sleep 2
-				tabix -f -p vcf deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
+				tabix -f -p vcf deepvariant/{config[analysis_batch_name]}.dv.glnexus.phased.vcf.gz
 				;;
 			*)
-				cp -p -l {input.vcf} deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
-				cp -p -l {input.tbi} deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz.tbi
+				cp -p -l {input.vcf} deepvariant/{config[analysis_batch_name]}.dv.glnexus.phased.vcf.gz
+				cp -p -l {input.tbi} deepvariant/{config[analysis_batch_name]}.dv.glnexus.phased.vcf.gz.tbi
 				;;
 		esac
 		touch {output}
@@ -900,7 +946,7 @@ rule haplocheck:
 		$HAPLOCHECK_HOME/haplocheck --out mutserve/{config[analysis_batch_name]} mutserve/{config[analysis_batch_name]}.mt.vcf.gz
 		touch {output}
 		"""
-
+#~1h
 rule bcm_locus:
 	input:
 		bam = 'sample_bam/{sample}.markDup.bam',
@@ -921,12 +967,12 @@ rule bcm_locus:
 		#took 150min? why so long?
 		RG=$(samtools view -H {input.bam} | grep "^@RG" | head -n 1 | sed 's/\t/\\\\t/g')
 		#java -Xmx16g -Dsamjdk.reference_fasta={config[ref_genome]} -jar $BAZAMPATH/bazam.jar -f "pair.r1.referenceIndex == pair.r2.referenceIndex" -bam {input.bam} --regions chrX:153929000-154373500 \
-		#| bwa-mem2 mem -t $(({threads}/2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R $RG {config[GRCh38Decoy2]} - \
+		#| bwa-mem2 mem -t $(({threads}/2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R $RG {config[GRCh38Decoy2]} -
 		java -Xmx16g -jar $BAZAMPATH/bazam.jar -bam {input.bam} --regions chrX:153929000-154373500 \
-		| bwa-mem2 mem -t $(({threads}/2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R $RG {config[GRCh38Decoy2]} - \
+		| bwa-mem2 mem -t $(({threads} - 2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R $RG {config[GRCh38Decoy2]} - \
 		| samblaster -M --addMateTags --quiet \
-		| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads}/2)) -o {output.bam} \
-			<(sambamba view -S -f bam -l 0 -t $(({threads}/2)) /dev/stdin)
+		| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads} - 2)) -o {output.bam} \
+			<(sambamba view -S -f bam -l 0 -t $(({threads} - 2)) /dev/stdin)
 		mv {output.bam}.bai {output.bai}
 		if [[ $(module list 2>&1 | grep "mosdepth" | wc -l) < 1 ]]; then module load {config[mosdepth_version]}; fi
 		if [[ $(module list 2>&1 | grep "R/" | wc -l) < 1 ]]; then module load {config[R_version]}; fi
@@ -987,7 +1033,7 @@ rule combine_bcmlocus:
 		"""
 		echo -e "CHROM\tPOS\tID\tREF\tALT\tQUAL\tFunc.refGeneWithVer\tGene.refGeneWithVer\tGeneDetail.refGeneWithVer\tExonicFunc.refGeneWithVer\tAAChange.refGeneWithVer\tHGVSp\tAnnotation\tFunction\tACMG_Class\tNote\tSample\tINFO\tFORMAT\tGT_FIELDS" > bcmlocus/{config[analysis_batch_name]}.bcmlocus.all.tsv
 		for file in {input}; do
-			tail -n 1 $file >> bcmlocus/{config[analysis_batch_name]}.bcmlocus.all.tsv
+			tail -n +2 $file >> bcmlocus/{config[analysis_batch_name]}.bcmlocus.all.tsv
  		done
 		touch {output}
 		"""
@@ -1165,7 +1211,7 @@ rule merge_freebayes:
 rule merge_dv_fb_vcfs:
 	input:
 		'deepvariant/deepvariantVcf.merge.done.txt',
-		#'deepvariant/deepvariant.gvcf.merge.done.txt',
+		'deepvariant/deepvariant.gvcf.merge.done.txt',
 		'freebayes/freebayes.merge.done.txt'
 	output:
 		'prioritization/dv_fb.merge.done.txt'

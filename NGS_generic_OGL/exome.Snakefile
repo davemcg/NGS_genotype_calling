@@ -687,7 +687,11 @@ rule deepvariant:
 		bai = 'sample_bam/{sample}.markDup.bai'
 	output:
 		vcf = 'deepvariant/vcf/{sample}.dv.vcf.gz',
-		gvcf = 'deepvariant/gvcf/{sample}.dv.g.vcf.gz'
+		gvcf = 'deepvariant/gvcf/{sample}.dv.g.vcf.gz',
+		filteredvcf = temp('deepvariant/vcf/{sample}.dv.filtered.vcf.gz'),
+		filteretbi = temp('deepvariant/vcf/{sample}.dv.filtered.vcf.gz.tbi'),
+		phasedvcf = 'deepvariant/vcf/{sample}.dv.phased.vcf.gz',
+		phasedtbi = 'deepvariant/vcf/{sample}.dv.phased.vcf.gz.tbi'
 	threads: 32
 	shell:
 		"""
@@ -710,49 +714,44 @@ rule deepvariant:
 		cd $PROJECT_WD
 		cp $WORK_DIR/$(basename {output.vcf})* deepvariant/vcf
 		cp $WORK_DIR/$(basename {output.gvcf})* deepvariant/gvcf
+		module unload {config[deepvariant_version]}
+		module load {config[samtools_version]}
+		bcftools norm --multiallelics -any --output-type u {output.vcf} \
+			| bcftools norm -d exact --output-type u - \
+			| bcftools filter --threads $(({threads}-4)) --include 'FILTER="PASS" & FORMAT/AD[0:1]>2' --output-type z --output {output.filteredvcf}
+		sleep 2
+		tabix -f -p vcf {output.filteredvcf}
+		module load {config[whatshap_version]}
+		whatshap phase --reference {config[ref_genome]} --indels {output.filteredvcf} {input.bam} | bgzip -f > {output.phasedvcf}
+		tabix -f -p vcf {output.phasedvcf}
 		"""
-#,
-#filteredvcf = temp('deepvariant/vcf/{sample}.dv.filtered.vcf.gz'),
-#filteretbi = temp('deepvariant/vcf/{sample}.dv.filtered.vcf.gz.tbi'),
-#phasedvcf = 'deepvariant/vcf/{sample}.dv.phased.vcf.gz',
-#phasedtbi = 'deepvariant/vcf/{sample}.dv.phased.vcf.gz.tbi'
-#removed from shell script above:
-#module unload {config[deepvariant_version]}
-#module load {config[samtools_version]}
-#bcftools norm --multiallelics -any --output-type u {output.vcf} \
-#	| bcftools norm -d exact --output-type u - \
-#	| bcftools filter --threads $(({threads}-4)) --include 'FILTER="PASS" & FORMAT/AD[0:1]>2' --output-type z --output {output.filteredvcf}
-#sleep 2
-#tabix -f -p vcf {output.filteredvcf}
-#module load {config[whatshap_version]}
-#whatshap phase --reference {config[ref_genome]} --indels {output.filteredvcf} {input.bam} | bgzip -f > {output.phasedvcf}
-#tabix -f -p vcf {output.phasedvcf}
-
 #deepvariant PASS filter requires Alt AD > 1. I used > 2 for more stringent filtering.
-# rule merge_deepvariant_vcf:
-# 	input:
-# 		vcf = expand('deepvariant/vcf/{sample}.dv.phased.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
-# 		tbi = expand('deepvariant/vcf/{sample}.dv.phased.vcf.gz.tbi', sample=list(SAMPLE_LANEFILE.keys()))
-# 	output:
-# 		'deepvariant/deepvariantVcf.merge.done.txt'
-# 	threads: 8
-# 	shell:
-# 		"""
-# 		module load {config[samtools_version]}
-# 		case "{input.vcf}" in
-# 			*\ *)
-# 				bcftools merge --merge none --missing-to-ref --output-type z --threads {threads} {input.vcf} \
-# 				> deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
-# 				sleep 2
-# 				tabix -f -p vcf deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
-# 				;;
-# 			*)
-# 				cp -p -l {input.vcf} deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
-# 				cp -p -l {input.tbi} deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz.tbi
-# 				;;
-# 		esac
-# 		touch {output}
-# 		"""
+
+localrules: merge_deepvariant_vcf
+rule merge_deepvariant_vcf:
+	input:
+		vcf = expand('deepvariant/vcf/{sample}.dv.phased.vcf.gz', sample=list(SAMPLE_LANEFILE.keys())),
+		tbi = expand('deepvariant/vcf/{sample}.dv.phased.vcf.gz.tbi', sample=list(SAMPLE_LANEFILE.keys()))
+	output:
+		'deepvariant/deepvariantVcf.merge.done.txt'
+	threads: 8
+	shell:
+		"""
+		module load {config[samtools_version]}
+		case "{input.vcf}" in
+			*\ *)
+				bcftools merge --merge none --missing-to-ref --output-type z --threads {threads} {input.vcf} \
+				> deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
+				sleep 2
+				tabix -f -p vcf deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
+				;;
+			*)
+				cp -p -l {input.vcf} deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
+				cp -p -l {input.tbi} deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz.tbi
+				;;
+		esac
+		touch {output}
+		"""
 
 rule glnexus:
 	input:
@@ -766,13 +765,13 @@ rule glnexus:
 		"""
 		module load {config[glnexus_version]} {config[samtools_version]} {config[whatshap_version]} parallel
 		WORK_DIR="/lscratch/${{SLURM_JOB_ID}}"
-		glnexus --dir /lscratch/$SLURM_JOB_ID/glnexus --config DeepVariantWES --bed {config[padded_bed]} \
+		glnexus_cli --dir /lscratch/$SLURM_JOB_ID/glnexus --config DeepVariantWES --bed {config[padded_bed]} \
 			--threads {threads}  --mem-gbytes 96 \
 			{input.vcf} \
 			| bcftools norm --multiallelics -any --output-type u --no-version \
 			| bcftools norm --check-ref s --fasta-ref {config[ref_genome]} --output-type u --no-version - \
 			| bcftools +fill-tags - -Ou -- -t AC,AC_Hom,AC_Het,AN,AF \
-			| bcftools annotate --threads {threads} --set-id 'dv_%CHROM\:%POS%REF\>%ALT' --no-version - -Oz -o deepvariant/{config[analysis_batch_name]}.glnexus.vcf.gz
+			| bcftools annotate --threads {threads} --set-id 'dvg_%CHROM\:%POS%REF\>%ALT' --no-version - -Oz -o deepvariant/{config[analysis_batch_name]}.glnexus.vcf.gz
 		tabix -f -p vcf deepvariant/{config[analysis_batch_name]}.glnexus.vcf.gz
 		touch {output}
 		"""
@@ -827,6 +826,7 @@ rule merge_glnexus_phased_vcf:
 localrules: merge_dv_fb_vcfs
 rule merge_dv_fb_vcfs:
 	input:
+		'deepvariant/deepvariantVcf.merge.done.txt',
 		'deepvariant/deepvariant.glnexus.phased.merge.done.txt',
 		'freebayes/freebayes.merge.done.txt'
 	output:
@@ -836,44 +836,80 @@ rule merge_dv_fb_vcfs:
 		"""
 		if [[ $(module list 2>&1 | grep "samtools" | wc -l) < 1 ]]; then module load {config[samtools_version]}; fi
 		WORK_DIR=/lscratch/$SLURM_JOB_ID
-		bcftools isec --threads {threads} -p $WORK_DIR --collapse none --no-version -Oz \
+		bcftools isec -p $WORK_DIR/dv -w 2 --collapse none --output-type u --threads {threads} \
 			deepvariant/{config[analysis_batch_name]}.dv.glnexus.phased.vcf.gz \
-			freebayes/{config[analysis_batch_name]}.freebayes.vcf.gz
-		rm $WORK_DIR/0003.vcf* &
-		bcftools annotate --threads {threads} --set-id 'dv_%CHROM\:%POS%REF\>%ALT' \
-			--no-version $WORK_DIR/0000.vcf.gz -Oz -o $WORK_DIR/dv.vcf.gz && rm $WORK_DIR/0000.vcf* &
-		bcftools annotate --threads {threads} --set-id 'fb_%CHROM\:%POS%REF\>%ALT' -x ^INFO/QA,FORMAT/RO,FORMAT/QR,FORMAT/AO,FORMAT/QA,FORMAT/GL \
-			--no-version $WORK_DIR/0001.vcf.gz -Ou - \
-			| bcftools +fill-tags - -Ov -- -t AC,AC_Hom,AC_Het,AN,AF \
+			deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
+		bcftools +fill-tags $WORK_DIR/dv/0001.bcf -Ov -- -t AC,AC_Hom,AC_Het,AN,AF \
 			| sed 's#0/0:.:.:.#0/0:10:10:10,0#g' - \
-			| bgzip -f > $WORK_DIR/fb.vcf.gz
-		rm $WORK_DIR/0001.vcf* &
-		bcftools annotate --threads {threads} --set-id 'dvFb_%CHROM\:%POS%REF\>%ALT' \
-			--no-version $WORK_DIR/0002.vcf.gz -Oz -o $WORK_DIR/dvFb.vcf.gz
-		rm $WORK_DIR/0002.vcf* &
-		tabix -f -p vcf $WORK_DIR/dv.vcf.gz
+			| bcftools annotate --threads {threads} --set-id 'dv_%CHROM\:%POS%REF\>%ALT' --no-version - -Oz -o $WORK_DIR/dv/dv.hf.vcf.gz
+		tabix -f -p vcf $WORK_DIR/dv/dv.hf.vcf.gz
+		bcftools concat --threads {threads} -a --rm-dups none --no-version \
+			deepvariant/{config[analysis_batch_name]}.glnexus.phased.vcf.gz $WORK_DIR/dv/dv.hf.vcf.gz -Oz \
+			-o $WORK_DIR/dv.glnexus.hf.vcf.gz
+		tabix -f -p vcf $WORK_DIR/dv.glnexus.hf.vcf.gz
+		rm -r -f $WORK_DIR/dv
+		bcftools isec --threads {threads} -p $WORK_DIR --collapse none -Oz \
+			$WORK_DIR/dv.glnexus.hf.vcf.gz \
+			freebayes/{config[analysis_batch_name]}.freebayes.vcf.gz
+		rm $WORK_DIR/0003.vcf.gz &
+		#bcftools annotate --threads {threads} --set-id 'dv_%CHROM\:%POS%REF\>%ALT' \
+		#	--no-version $WORK_DIR/0000.vcf -Oz -o $WORK_DIR/dv.vcf.gz
+		#rm $WORK_DIR/0000.vcf &
+		bcftools annotate --threads {threads} --set-id 'fb_%CHROM\:%POS%REF\>%ALT' -x ^INFO/QA,FORMAT/RO,FORMAT/QR,FORMAT/AO,FORMAT/QA,FORMAT/GL \
+			--no-version $WORK_DIR/0001.vcf.gz -Ov - \
+			| sed 's#0/0:.:.:.#0/0:10:10:10,0#g' - \
+			| bcftools +fill-tags - -Oz -o $WORK_DIR/fb.vcf.gz -- -t AC,AC_Hom,AC_Het,AN,AF
+		rm $WORK_DIR/0001.vcf.gz &
+		zcat $WORK_DIR/0002.vcf.gz | sed 's/\tdv/\tfbDv/' | bgzip -@ {threads} > $WORK_DIR/dvFb.vcf.gz
+		rm $WORK_DIR/0002.vcf.gz &
+		tabix -f -p vcf $WORK_DIR/0000.vcf.gz
 		tabix -f -p vcf $WORK_DIR/fb.vcf.gz
 		tabix -f -p vcf $WORK_DIR/dvFb.vcf.gz
 		bcftools concat --threads {threads} -a --rm-dups none --no-version \
-			$WORK_DIR/dvFb.vcf.gz $WORK_DIR/dv.vcf.gz $WORK_DIR/fb.vcf.gz -Oz \
+			$WORK_DIR/dvFb.vcf.gz $WORK_DIR/0000.vcf.gz $WORK_DIR/fb.vcf.gz -Oz \
 			-o prioritization/{config[analysis_batch_name]}.vcf.gz
 		tabix -f -p vcf prioritization/{config[analysis_batch_name]}.vcf.gz
-		if [[ {config[genomeBuild]} == "GRCh38" ]]; then
-			module load {config[crossmap_version]}
-			hg19ref=/data/OGL/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta
-			crossmap vcf /data/OGL/resources/ucsc/hg38ToHg19.over.chain.gz \
-				prioritization/{config[analysis_batch_name]}.vcf.gz \
-				$hg19ref \
-				$WORK_DIR/GRCh37.vcf
-			sed -e 's/^chrM/MT/' -e 's/<ID=chrM/<ID=MT/' $WORK_DIR/GRCh37.vcf \
-				| sed -e 's/^chr//' -e 's/<ID=chr/<ID=/' - \
-				| bcftools norm --check-ref s --fasta-ref $hg19ref --output-type u - \
-				| bcftools sort -m 20G -T $WORK_DIR/ -Ou - \
-				| bcftools norm --threads $(({threads}-4)) -d exact --output-type z - -o prioritization/{config[analysis_batch_name]}.GRCh37.vcf.gz
-			tabix -f -p vcf prioritization/{config[analysis_batch_name]}.GRCh37.vcf.gz
-		fi
 		touch {output}
 		"""
+# if [[ $(module list 2>&1 | grep "samtools" | wc -l) < 1 ]]; then module load {config[samtools_version]}; fi
+# WORK_DIR=/lscratch/$SLURM_JOB_ID
+# bcftools isec --threads {threads} -p $WORK_DIR --collapse none --no-version -Oz \
+# 	deepvariant/{config[analysis_batch_name]}.dv.glnexus.phased.vcf.gz \
+# 	freebayes/{config[analysis_batch_name]}.freebayes.vcf.gz
+# rm $WORK_DIR/0003.vcf* &
+# bcftools annotate --threads {threads} --set-id 'dv_%CHROM\:%POS%REF\>%ALT' \
+# 	--no-version $WORK_DIR/0000.vcf.gz -Oz -o $WORK_DIR/dv.vcf.gz && rm $WORK_DIR/0000.vcf* &
+# bcftools annotate --threads {threads} --set-id 'fb_%CHROM\:%POS%REF\>%ALT' -x ^INFO/QA,FORMAT/RO,FORMAT/QR,FORMAT/AO,FORMAT/QA,FORMAT/GL \
+# 	--no-version $WORK_DIR/0001.vcf.gz -Ou - \
+# 	| bcftools +fill-tags - -Ov -- -t AC,AC_Hom,AC_Het,AN,AF \
+# 	| sed 's#0/0:.:.:.#0/0:10:10:10,0#g' - \
+# 	| bgzip -f > $WORK_DIR/fb.vcf.gz
+# rm $WORK_DIR/0001.vcf* &
+# bcftools annotate --threads {threads} --set-id 'dvFb_%CHROM\:%POS%REF\>%ALT' \
+# 	--no-version $WORK_DIR/0002.vcf.gz -Oz -o $WORK_DIR/dvFb.vcf.gz
+# rm $WORK_DIR/0002.vcf* &
+# tabix -f -p vcf $WORK_DIR/dv.vcf.gz
+# tabix -f -p vcf $WORK_DIR/fb.vcf.gz
+# tabix -f -p vcf $WORK_DIR/dvFb.vcf.gz
+# bcftools concat --threads {threads} -a --rm-dups none --no-version \
+# 	$WORK_DIR/dvFb.vcf.gz $WORK_DIR/dv.vcf.gz $WORK_DIR/fb.vcf.gz -Oz \
+# 	-o prioritization/{config[analysis_batch_name]}.vcf.gz
+# tabix -f -p vcf prioritization/{config[analysis_batch_name]}.vcf.gz
+# if [[ {config[genomeBuild]} == "GRCh38" ]]; then
+# 	module load {config[crossmap_version]}
+# 	hg19ref=/data/OGL/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta
+# 	crossmap vcf /data/OGL/resources/ucsc/hg38ToHg19.over.chain.gz \
+# 		prioritization/{config[analysis_batch_name]}.vcf.gz \
+# 		$hg19ref \
+# 		$WORK_DIR/GRCh37.vcf
+# 	sed -e 's/^chrM/MT/' -e 's/<ID=chrM/<ID=MT/' $WORK_DIR/GRCh37.vcf \
+# 		| sed -e 's/^chr//' -e 's/<ID=chr/<ID=/' - \
+# 		| bcftools norm --check-ref s --fasta-ref $hg19ref --output-type u - \
+# 		| bcftools sort -m 20G -T $WORK_DIR/ -Ou - \
+# 		| bcftools norm --threads $(({threads}-4)) -d exact --output-type z - -o prioritization/{config[analysis_batch_name]}.GRCh37.vcf.gz
+# 	tabix -f -p vcf prioritization/{config[analysis_batch_name]}.GRCh37.vcf.gz
+# fi
+
 #exome some MT sequences were covered based on mosdepth. 5/21/2022.
 #bcftools 0: private to the first vcf; 1: private to the 2nd vcf; 2: records shared by both from 1st vcf; 3: records shared by both from 2nd vcf.
 #<30min, 3gb max mem for wgs
@@ -983,7 +1019,7 @@ rule combine_bcmlocus:
 		"""
 		echo -e "CHROM\tPOS\tID\tREF\tALT\tQUAL\tFunc.refGeneWithVer\tGene.refGeneWithVer\tGeneDetail.refGeneWithVer\tExonicFunc.refGeneWithVer\tAAChange.refGeneWithVer\tHGVSp\tAnnotation\tFunction\tACMG_Class\tNote\tSample\tINFO\tFORMAT\tGT_FIELDS" > bcmlocus/{config[analysis_batch_name]}.bcmlocus.all.tsv
 		for file in {input}; do
-			tail -n 1 $file >> bcmlocus/{config[analysis_batch_name]}.bcmlocus.all.tsv
+			tail -n +2 $file >> bcmlocus/{config[analysis_batch_name]}.bcmlocus.all.tsv
  		done
 		touch {output}
 		"""

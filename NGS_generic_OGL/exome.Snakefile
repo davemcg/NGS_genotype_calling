@@ -844,7 +844,7 @@ rule merge_dv_fb_vcfs:
 			| bcftools annotate --threads {threads} --set-id 'dv_%CHROM\:%POS%REF\>%ALT' --no-version - -Oz -o $WORK_DIR/dv/dv.hf.vcf.gz
 		tabix -f -p vcf $WORK_DIR/dv/dv.hf.vcf.gz
 		bcftools concat --threads {threads} -a --rm-dups none --no-version \
-			deepvariant/{config[analysis_batch_name]}.glnexus.phased.vcf.gz $WORK_DIR/dv/dv.hf.vcf.gz -Oz \
+			deepvariant/{config[analysis_batch_name]}.dv.glnexus.phased.vcf.gz $WORK_DIR/dv/dv.hf.vcf.gz -Oz \
 			-o $WORK_DIR/dv.glnexus.hf.vcf.gz
 		tabix -f -p vcf $WORK_DIR/dv.glnexus.hf.vcf.gz
 		rm -r -f $WORK_DIR/dv

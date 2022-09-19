@@ -43,7 +43,7 @@ annovar_version: 'annovar/2020-06-08' #updated from 2019-10-24 on 3/4/2022
 crossmap_version: 'crossmap/0.5.4'
 #ref_genome: '/fdb/GATK_resource_bundle/b37-2.8/human_g1k_v37_decoy.fasta'
 old_cram_ref: '/data/OGL/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta'
-bwa-mem2_ref: '/data/OGL/resources/genomes/NCBI/GRCh38Decoy/genome.fa' #GRCh37 is hard-coded in the Snakefile
+bwa-mem2_ref: '/data/OGL/resources/genomes/NCBI/GRCh38Decoy/genome.fa' #GRCh37 is hard-coded in the Snakefile, /data/OGL/resources/genomes/Broad/references_Homo_sapiens_assembly38.fasta
 ref_genome: '/data/OGL/resources/genomes/NCBI/GRCh38Decoy/genome.fa' ##GRCh37 is hard-coded in the Snakefile
 GRCh38Decoy2: '/data/OGL/resources/genomes/GRCh38/bwa-mem2/GRCh38Decoy2.fa' #BCM duplicated regions masked
 1000g_indels: '/fdb/GATK_resource_bundle/b37-2.8/1000G_phase1.indels.b37.vcf'

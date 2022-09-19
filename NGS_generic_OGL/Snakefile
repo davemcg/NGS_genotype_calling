@@ -651,7 +651,7 @@ rule deepvariantS3:
 		cp ${{OUTPUT_GVCF}}* deepvariant/gvcf || exit 2
 		"""
 
-#probably add the following to the step above.
+#probably add the following to the step above, since it only takes a few mins to finish.
 rule dv_hardfilter:
 	input:
 		vcf = 'deepvariant/vcf/{sample}.vcf.gz'
@@ -665,8 +665,8 @@ rule dv_hardfilter:
 		bcftools filter --include 'FILTER="PASS" & FORMAT/AD[0:1]>2' --output-type u {input.vcf} \
 			| bcftools norm --multiallelics -any --output-type u - \
 			| bcftools norm --check-ref s --fasta-ref {config[ref_genome]} --output-type u - \
-			| bcftools norm --threads $(({threads}-2)) -d exact --output-type z --output {output.vcf}
-		tabix -f -p vcf ${output.vcf}
+			| bcftools norm --threads $(({threads}-2)) -d exact --output-type z --output {output.filteredvcf}
+		tabix -f -p vcf {output.filteredvcf}
 		"""
 #AD[0:1]>2 to remove the variant on a single read but read from both F- and R- reads.
 
@@ -1220,45 +1220,78 @@ rule merge_dv_fb_vcfs:
 		"""
 		module load {config[samtools_version]}
 		WORK_DIR=/lscratch/$SLURM_JOB_ID
-		bcftools isec --threads {threads} -p $WORK_DIR --collapse none --no-version -Oz \
-			deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz \
-			freebayes/{config[analysis_batch_name]}.freebayes.vcf.gz
-		rm $WORK_DIR/0003.vcf* &
-		bcftools annotate --threads {threads} --set-id 'dv_%CHROM\:%POS%REF\>%ALT' \
-			--no-version $WORK_DIR/0000.vcf.gz -Oz -o $WORK_DIR/dv.vcf.gz && rm $WORK_DIR/0000.vcf* &
-		bcftools annotate --threads {threads} --set-id 'fb_%CHROM\:%POS%REF\>%ALT' -x ^INFO/QA,FORMAT/RO,FORMAT/QR,FORMAT/AO,FORMAT/QA,FORMAT/GL \
-			--no-version $WORK_DIR/0001.vcf.gz -Ou - \
+		bcftools isec -p $WORK_DIR/dv -w 2 --collapse none --output-type u --threads {threads} \
+			deepvariant/{config[analysis_batch_name]}.dv.glnexus.phased.vcf.gz \
+			deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
+		bcftools +fill-tags $WORK_DIR/dv/0001.bcf -Ov -- -t AC,AC_Hom,AC_Het,AN,AF \
 			| sed 's#0/0:.:.:.#0/0:10:10:10,0#g' - \
-			| bcftools +fill-tags - -Oz -o $WORK_DIR/fb.vcf.gz -- -t AC,AC_Hom,AC_Het,AN,AF && rm $WORK_DIR/0001.vcf* &
-		bcftools annotate --threads {threads} --set-id 'dvFb_%CHROM\:%POS%REF\>%ALT' \
-			--no-version $WORK_DIR/0002.vcf.gz -Oz -o $WORK_DIR/dvFb.vcf.gz
-		rm $WORK_DIR/0002.vcf* &
-		tabix -f -p vcf $WORK_DIR/dv.vcf.gz
+			| bcftools annotate --threads {threads} --set-id 'dv_%CHROM\:%POS%REF\>%ALT' --no-version - -Oz -o $WORK_DIR/dv/dv.hf.vcf.gz
+		tabix -f -p vcf $WORK_DIR/dv/dv.hf.vcf.gz
+		bcftools concat --threads {threads} -a --rm-dups none --no-version \
+			deepvariant/{config[analysis_batch_name]}.dv.glnexus.phased.vcf.gz $WORK_DIR/dv/dv.hf.vcf.gz -Oz \
+			-o $WORK_DIR/dv.glnexus.hf.vcf.gz
+		tabix -f -p vcf $WORK_DIR/dv.glnexus.hf.vcf.gz
+		rm -r -f $WORK_DIR/dv
+		bcftools isec --threads {threads} -p $WORK_DIR --collapse none -Oz \
+			$WORK_DIR/dv.glnexus.hf.vcf.gz \
+			freebayes/{config[analysis_batch_name]}.freebayes.vcf.gz
+		rm $WORK_DIR/0003.vcf.gz &
+		#bcftools annotate --threads {threads} --set-id 'dv_%CHROM\:%POS%REF\>%ALT' \
+		#	--no-version $WORK_DIR/0000.vcf -Oz -o $WORK_DIR/dv.vcf.gz
+		#rm $WORK_DIR/0000.vcf &
+		bcftools annotate --threads {threads} --set-id 'fb_%CHROM\:%POS%REF\>%ALT' -x ^INFO/QA,FORMAT/RO,FORMAT/QR,FORMAT/AO,FORMAT/QA,FORMAT/GL \
+			--no-version $WORK_DIR/0001.vcf.gz -Ov - \
+			| sed 's#0/0:.:.:.#0/0:10:10:10,0#g' - \
+			| bcftools +fill-tags - -Oz -o $WORK_DIR/fb.vcf.gz -- -t AC,AC_Hom,AC_Het,AN,AF
+		rm $WORK_DIR/0001.vcf.gz &
+		zcat $WORK_DIR/0002.vcf.gz | sed 's/\tdv/\tfbDv/' | bgzip -@ {threads} > $WORK_DIR/dvFb.vcf.gz
+		rm $WORK_DIR/0002.vcf.gz &
+		tabix -f -p vcf $WORK_DIR/0000.vcf.gz
 		tabix -f -p vcf $WORK_DIR/fb.vcf.gz
 		tabix -f -p vcf $WORK_DIR/dvFb.vcf.gz
 		bcftools concat --threads {threads} -a --rm-dups none --no-version \
-			$WORK_DIR/dvFb.vcf.gz $WORK_DIR/dv.vcf.gz $WORK_DIR/fb.vcf.gz -Oz \
+			$WORK_DIR/dvFb.vcf.gz $WORK_DIR/0000.vcf.gz $WORK_DIR/fb.vcf.gz -Oz \
 			-o prioritization/{config[analysis_batch_name]}.vcf.gz
 		tabix -f -p vcf prioritization/{config[analysis_batch_name]}.vcf.gz
-		rm $WORK_DIR/dvFb.vcf.gz* $WORK_DIR/dv.vcf.gz* $WORK_DIR/fb.vcf.gz*
-		if [[ {config[genomeBuild]} == "GRCh38" ]]; then
-			module load {config[crossmap_version]}
-			hg19refM=/data/OGL/resources/1000G_phase2_GRCh37/human_g1k_v37_decoyM.fasta
-			hg19ref=/data/OGL/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta
-			crossmap vcf /data/OGL/resources/ucsc/hg38ToHg19.over.chain.gz \
-				prioritization/{config[analysis_batch_name]}.vcf.gz \
-				$hg19refM \
-				$WORK_DIR/GRCh37.vcf
-			sed -e 's/^chrM/MT/' -e 's/<ID=chrM/<ID=MT/' $WORK_DIR/GRCh37.vcf \
-				| sed -e 's/^chr//' -e 's/<ID=chr/<ID=/' - \
-			 	| bcftools norm --check-ref s --fasta-ref $hg19ref --output-type u - \
-				| bcftools sort -m 60G -T $WORK_DIR/ -Ou - \
-				| bcftools norm --threads $(({threads}-4)) -d exact --output-type z - -o prioritization/{config[analysis_batch_name]}.GRCh37.vcf.gz
-			tabix -f -p vcf prioritization/{config[analysis_batch_name]}.GRCh37.vcf.gz
-		fi
 		touch {output}
 		"""
-
+# bcftools isec --threads {threads} -p $WORK_DIR --collapse none --no-version -Oz \
+# 	deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz \
+# 	freebayes/{config[analysis_batch_name]}.freebayes.vcf.gz
+# rm $WORK_DIR/0003.vcf* &
+# bcftools annotate --threads {threads} --set-id 'dv_%CHROM\:%POS%REF\>%ALT' \
+# 	--no-version $WORK_DIR/0000.vcf.gz -Oz -o $WORK_DIR/dv.vcf.gz && rm $WORK_DIR/0000.vcf* &
+# bcftools annotate --threads {threads} --set-id 'fb_%CHROM\:%POS%REF\>%ALT' -x ^INFO/QA,FORMAT/RO,FORMAT/QR,FORMAT/AO,FORMAT/QA,FORMAT/GL \
+# 	--no-version $WORK_DIR/0001.vcf.gz -Ou - \
+# 	| sed 's#0/0:.:.:.#0/0:10:10:10,0#g' - \
+# 	| bcftools +fill-tags - -Oz -o $WORK_DIR/fb.vcf.gz -- -t AC,AC_Hom,AC_Het,AN,AF && rm $WORK_DIR/0001.vcf* &
+# bcftools annotate --threads {threads} --set-id 'dvFb_%CHROM\:%POS%REF\>%ALT' \
+# 	--no-version $WORK_DIR/0002.vcf.gz -Oz -o $WORK_DIR/dvFb.vcf.gz
+# rm $WORK_DIR/0002.vcf* &
+# tabix -f -p vcf $WORK_DIR/dv.vcf.gz
+# tabix -f -p vcf $WORK_DIR/fb.vcf.gz
+# tabix -f -p vcf $WORK_DIR/dvFb.vcf.gz
+# bcftools concat --threads {threads} -a --rm-dups none --no-version \
+# 	$WORK_DIR/dvFb.vcf.gz $WORK_DIR/dv.vcf.gz $WORK_DIR/fb.vcf.gz -Oz \
+# 	-o prioritization/{config[analysis_batch_name]}.vcf.gz
+# tabix -f -p vcf prioritization/{config[analysis_batch_name]}.vcf.gz
+# rm $WORK_DIR/dvFb.vcf.gz* $WORK_DIR/dv.vcf.gz* $WORK_DIR/fb.vcf.gz*
+# if [[ {config[genomeBuild]} == "GRCh38" ]]; then
+# 	module load {config[crossmap_version]}
+# 	hg19refM=/data/OGL/resources/1000G_phase2_GRCh37/human_g1k_v37_decoyM.fasta
+# 	hg19ref=/data/OGL/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta
+# 	crossmap vcf /data/OGL/resources/ucsc/hg38ToHg19.over.chain.gz \
+# 		prioritization/{config[analysis_batch_name]}.vcf.gz \
+# 		$hg19refM \
+# 		$WORK_DIR/GRCh37.vcf
+# 	sed -e 's/^chrM/MT/' -e 's/<ID=chrM/<ID=MT/' $WORK_DIR/GRCh37.vcf \
+# 		| sed -e 's/^chr//' -e 's/<ID=chr/<ID=/' - \
+# 		| bcftools norm --check-ref s --fasta-ref $hg19ref --output-type u - \
+# 		| bcftools sort -m 60G -T $WORK_DIR/ -Ou - \
+# 		| bcftools norm --threads $(({threads}-4)) -d exact --output-type z - -o prioritization/{config[analysis_batch_name]}.GRCh37.vcf.gz
+# 	tabix -f -p vcf prioritization/{config[analysis_batch_name]}.GRCh37.vcf.gz
+# fi
+# touch {output}
 
 #sort necessary before mark_dup? it was sorted during the merge lane_bam step.
 rule picard_clean_sam:

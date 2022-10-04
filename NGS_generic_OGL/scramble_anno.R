@@ -21,12 +21,18 @@ output_xlsx_file <- args[7]
 annovar <- read_tsv(annovar_file, col_names = TRUE, na = c("NA", "", "None", "."), col_types = cols(.default = col_character())) %>% 
   mutate(sample = sampleName) %>% 
   mutate(Intronic = gsub("0>-", "", Intronic)) %>% 
-  unite("variant", Insertion:Insertion_Direction, sep = "-", remove = FALSE )
+  unite("variant", Insertion:Insertion_Direction, sep = "-", remove = TRUE) %>% 
+  separate(Insertion, c("chr", "pos"), sep = ":", remove = FALSE, convert = TRUE) %>% 
+  mutate(pos = round(pos, -2)) %>% 
+  unite("temp_Insertion", chr, pos, sep = ":", remove = TRUE) %>% 
+  unite("temp_variantID", temp_Insertion, MEI_Family, Insertion_Direction, sep = "-", remove = FALSE ) %>% 
+  select(-temp_Insertion)
+  
 # Do not use type_convert() because it converts chr:pos.
 
 classificationDF <- read_xlsx(scrambledb_file, sheet = "Variant", na = c("NA", "", "None", ".")) %>% 
-  select("variant", "autoClassification", "manualClassification", "cohortAF", "note") %>% 
-  distinct(variant, .keep_all = TRUE)
+  select("temp_variantID", "autoClassification", "manualClassification", "cohortAF", "note") %>% 
+  distinct(temp_variantID, .keep_all = TRUE)
 
 #panelGene <- read_tsv(args[3], col_names = TRUE, col_types = cols(.default = col_character())) %>% select(gene, panel_class)
 panelGene <- read_xlsx(geneCategory_file, sheet = "analysis", na = c("NA", "", "None", ".")) %>% select(gene, panel_class)
@@ -53,11 +59,11 @@ annovar$Intronic <- sapply(1:nrow(annovar), function(x) {mapHGMD(annovar[x, "Int
 
 #annovar <- annovar %>% unite("refgenewithver", Intronic, AA, sep = ",", remove = TRUE, na.rm = TRUE)
 
-annoted <- left_join(annovar, classificationDF, by = c("variant")) %>% 
+annoted <- left_join(annovar, classificationDF, by = c("temp_variantID")) %>% 
   replace_na(list(autoClassification = "Not classified", manualClassification = "Not classified")) 
 
-annoted$autoClassification = factor(annoted$autoClassification, levels = c("Pathogenic", "Likely pathogenic", "VOUS", "Not classified", "Likely benign", "Benign", "Artifact")) 
-annoted$manualClassification = factor(annoted$manualClassification, levels = c("Pathogenic", "Likely pathogenic", "VOUS", "Not classified", "Likely benign", "Benign", "Artifact")) 
+annoted$autoClassification = factor(annoted$autoClassification, levels = c("Pathogenic", "Likely pathogenic", "VOUS", "VUS", "Not classified", "Likely benign", "Benign", "Artifact")) 
+annoted$manualClassification = factor(annoted$manualClassification, levels = c("Pathogenic", "Likely pathogenic", "VOUS", "VUS", "Not classified", "Likely benign", "Benign", "Artifact")) 
 
 chromosome_name <- c("chr1","chr2","chr3","chr4","chr5","chr6","chr7","chr8","chr9","chr10","chr11","chr12","chr13","chr14","chr15","chr16","chr17","chr18","chr19","chr20","chr21","chr22","chrX","chrY","chrM",
          "1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","X","Y","MT")
@@ -66,7 +72,7 @@ annoted1 <- left_join(annoted, panelGene, by = c("Gene" = "gene")) %>%
   replace_na(list(panel_class = "Other")) %>% 
   mutate(eyeGene = ifelse(panel_class %in% c("Dx", "Candidate"), 1, 0)) %>% 
   mutate(Clipped_Reads_In_Cluster = as.integer(Clipped_Reads_In_Cluster)) %>% 
-  select(variant, Insertion, MEI_Family, Insertion_Direction, Clipped_Reads_In_Cluster, Alignment_Score, 
+  select(variant, Insertion, temp_variantID, MEI_Family, Insertion_Direction, Clipped_Reads_In_Cluster, Alignment_Score, 
          Alignment_Percent_Length, Alignment_Percent_Identity, Clipped_Sequence, Clipped_Side, Start_In_MEI, Stop_In_MEI, 
          polyA_Position, polyA_Seq, polyA_SupportingReads, TSD, TSD_length, panel_class, eyeGene, Func_refGene, Gene, Intronic, AA, autoClassification, manualClassification, cohortAF, sample, note) %>% 
   separate(Insertion,
@@ -89,7 +95,7 @@ if (dim(annoted1)[1] == 0) {
 
 write_tsv(annoted1, file.path('.',  output_file), na=".")
 
-annoted2 <- filter(annoted1, manualClassification %in% c("Pathogenic", "Likely pathogenic", "VOUS") | autoClassification %in% c("Not classified"), !Func_refGene %in% c("intergenic"))
+annoted2 <- filter(annoted1, !autoClassification %in% c("Likely benign", "Benign"),  !manualClassification %in% c("Likely benign", "Benign", "Artifact"), !Func_refGene %in% c("intergenic"))
 if (dim(annoted2)[1] == 0) {
   print("###no scramble mei candidate after filtering with scramble db###")
   annoted2 <- annoted2 %>% add_row(note = "no scramble mei candidate after filtering with scramble db")

@@ -22,7 +22,7 @@ else
 	table_annovar.pl scramble_anno/"$sample".avinput $ANNOVAR_DATA/$ver -buildver $ver -remove -out scramble_anno/"$sample" --protocol refGene -operation g --argument '-splicing 100 -hgvs' --polish -nastring . --thread 1
 	awk -F"\t" 'BEGIN{OFS="\t"} NR==1 {print "Func_refGene","Gene","Intronic","AA"} NR>1 {print $6,$7,$8,$10}' scramble_anno/"$sample"."$ver"_multianno.txt | paste scramble/"$sample"_MEIs.txt - > scramble_anno/"$sample".forR.txt
 	rm scramble_anno/"$sample"."$ver"_multianno.txt
-	Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/scramble_anno.R scramble_anno/"$sample".forR.txt /data/OGL/resources/SCRAMBLEvariantClassification.GRCh38.v1.xlsx /data/OGL/resources/OGLpanelGeneDxORcandidate.xlsx /data/OGL/resources/HGMD/HGMDtranscript.txt "$sample" scramble_anno/"$sample".scramble.tsv scramble_anno/"$sample".scramble.xlsx
+	Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/scramble_anno.R scramble_anno/"$sample".forR.txt /data/OGL/resources/scramble/SCRAMBLEvariantClassification.GRCh38.2022-09.xlsx /data/OGL/resources/OGLpanelGeneDxORcandidate.xlsx /data/OGL/resources/HGMD/HGMDtranscript.txt "$sample" scramble_anno/"$sample".scramble.tsv scramble_anno/"$sample".scramble.xlsx
 fi
 rm scramble_anno/"$sample".avinput
 rm scramble_anno/"$sample".forR.txt

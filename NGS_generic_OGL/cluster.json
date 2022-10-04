@@ -25,9 +25,9 @@
 	},
 	"deepvariantS3" :
 	{
-		"partition" : "norm,quick",
+		"partition" : "norm",
 		"extra" : "--gres=lscratch:100",
-		"time" : "4:00:00",
+		"time" : "6:00:00",
 		"mem" : "32g"
 	},
 	"dv_whatshap" :
@@ -47,7 +47,10 @@
 	},
 	"bcm_locus":
 	{
-		"mem" : "32g"
+		"partition" : "norm",
+		"mem" : "64g",
+		"time" : "6:00:00",
+		"extra" : "--gres=lscratch:150"
 	},
 	"sve" :
 	{
@@ -86,12 +89,12 @@
 	},
 	"merge_deepvariantVcf" :
 	{
-		"mem" : "64g",
+		"mem" : "16g",
 		"threads" : "16"
 	},
 	"merge_deepvariant_glnexusVcf" :
 	{
-		"mem" : "64g",
+		"mem" : "16g",
 		"threads" : "16"
 	},
 	"merge_freebayes" :
@@ -117,8 +120,8 @@
 	"realign" :
 	{
 		"partition" : "norm",
-		"time" : "16:00:00",
-		"mem" : "100g",
+		"time" : "12:00:00",
+		"mem" : "128g",
 		"extra" : "--gres=lscratch:500"
 	},
 	"align" :

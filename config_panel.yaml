@@ -54,7 +54,8 @@ vcflib_version: 'vcflib/1.0.1'
 vt_version: 'vt/0.57721'
 vcftools_version: 'vcftools/0.1.16'
 freebayes_region: '/data/OGL/resources/freebayesRegion/freebayes.OGLv1.500.GRCh38.region' # choice of 20, 500, 1000 regions made for OGLv1. Panel 500 regions worked for MiSeq OGLv1; made by make_freebayes_region.sh
-SCRAMBLEdb: '/data/OGL/resources/SCRAMBLEvariantClassification.GRCh38.v1.xlsx' # hardcoded in Snakefile for hg19
+SCRAMBLEdb: '/data/OGL/resources/scramble/SCRAMBLEvariantClassification.GRCh38.2022-09.xlsx' # hardcoded in Snakefile for hg19
+scrambleDELdb: '/data/OGL/resources/scramble/exome.del.freq.2022-09.tsv'
 scramble_version: 'scramble/1.0.1-32893ef'
 mosdepth_version: 'mosdepth/0.2.8'
 bedtools_version: 'bedtools/2.29.0'

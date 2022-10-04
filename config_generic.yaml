@@ -45,7 +45,7 @@ crossmap_version: 'crossmap/0.5.4'
 old_cram_ref: '/data/OGL/resources/1000G_phase2_GRCh37/human_g1k_v37_decoy.fasta'
 bwa-mem2_ref: '/data/OGL/resources/genomes/NCBI/GRCh38Decoy/genome.fa' #GRCh37 is hard-coded in the Snakefile, /data/OGL/resources/genomes/Broad/references_Homo_sapiens_assembly38.fasta
 ref_genome: '/data/OGL/resources/genomes/NCBI/GRCh38Decoy/genome.fa' ##GRCh37 is hard-coded in the Snakefile
-GRCh38Decoy2: '/data/OGL/resources/genomes/GRCh38/bwa-mem2/GRCh38Decoy2.fa' #BCM duplicated regions masked
+GRCh38Decoy2: '/data/OGL/resources/genomes/GRCh38/bwa-mem2/GRCh38Decoy2.fa' #BCM duplicated regions masked, for bwa-mem2
 1000g_indels: '/fdb/GATK_resource_bundle/b37-2.8/1000G_phase1.indels.b37.vcf'
 mills_gold_indels: '/fdb/GATK_resource_bundle/b37-2.8/Mills_and_1000G_gold_standard.indels.b37.vcf'
 dbsnp_var: '/fdb/GATK_resource_bundle/b37-2.8/dbsnp_138.b37.excluding_sites_after_129.vcf'
@@ -64,7 +64,8 @@ vcftools_version: 'vcftools/0.1.16'
 freebayes_exome_region: '/data/OGL/resources/freebayesRegion/xGenV1.10000.GRCh38.region' # panel 500 regions worked for MiSeq OGLv1; made by make_freebayes_region.sh. Exome 10,000 region file made with 64gmem of the bp 54390.markDup.bam file. Took ~ 20 min.
 #freebayes_wgs_region: '/data/OGL/resources/freebayesRegion/v37d5/region'
 #CRESTdb: '/data/OGL/resources/CRESTvariantClassification.xlsx'
-SCRAMBLEdb: '/data/OGL/resources/SCRAMBLEvariantClassification.GRCh38.v1.xlsx' # set in Snakefile for hg19
+SCRAMBLEdb: '/data/OGL/resources/scramble/SCRAMBLEvariantClassification.GRCh38.2022-09.xlsx' # set in Snakefile for hg19
+scrambleDELdb: '/data/OGL/resources/scramble/exome.del.freq.2022-09.tsv'
 scramble_version: 'scramble/1.0.1-32893ef'
 mosdepth_version: 'mosdepth/0.2.8'
 bedtools_version: 'bedtools/2.29.0'

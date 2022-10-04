@@ -538,7 +538,9 @@ rule scramble_annotation:
 		else
 			module load {config[annotsv_version]} {config[crossmap_version]}
 			tail -n +2 {input.deletion} | awk -F"\t" 'BEGIN{{OFS="\t"}} {{print $1,$2,$3,"DEL"}}' > {input.deletion}.bed
-			AnnotSV -genomeBuild {config[genomeBuild]} -SVinputFile {input.deletion}.bed -SVinputInfo 0 -svtBEDcol 4 -outputFile {output.del_anno}
+			AnnotSV -genomeBuild {config[genomeBuild]} -SVinputFile {input.deletion}.bed -SVinputInfo 0 -svtBEDcol 4 -outputFile {output.del_anno}.temp
+			Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/scramble_del_edit.R {output.del_anno}.temp {config[scrambleDELdb]} {output.del_anno}.temp
+			rm {output.del_anno}.temp
 		fi
 		"""
 #Try this strategy,if not working well, consider split by chr as in the GATK.
@@ -763,7 +765,7 @@ rule glnexus:
 	threads: 24
 	shell:
 		"""
-		module load {config[glnexus_version]} {config[samtools_version]} {config[whatshap_version]} parallel
+		module load {config[glnexus_version]} {config[samtools_version]}
 		WORK_DIR="/lscratch/${{SLURM_JOB_ID}}"
 		glnexus_cli --dir /lscratch/$SLURM_JOB_ID/glnexus --config DeepVariantWES --bed {config[padded_bed]} \
 			--threads {threads}  --mem-gbytes 96 \

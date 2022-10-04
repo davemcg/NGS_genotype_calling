@@ -1064,7 +1064,9 @@ rule scramble_annotation:
 		else
 			if [[ $(module list 2>&1 | grep "annotsv" | wc -l) < 1 ]]; then module load {config[annotsv_version]}; fi
 			tail -n +2 {input.deletion} | awk -F"\t" 'BEGIN{{OFS="\t"}} {{print $1,$2,$3,"DEL"}}' > {input.deletion}.bed
-			AnnotSV -genomeBuild {config[genomeBuild]} -SVinputFile {input.deletion}.bed -SVinputInfo 0 -svtBEDcol 4 -outputFile {output.del_anno}
+			AnnotSV -genomeBuild {config[genomeBuild]} -SVinputFile {input.deletion}.bed -SVinputInfo 0 -svtBEDcol 4 -outputFile {output.del_anno}.temp
+			Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/scramble_del_edit.R {output.del_anno}.temp {config[scrambleDELdb]} {output.del_anno}.temp
+			rm {output.del_anno}.temp
 		fi
 		"""
 #--intronhgvs 100

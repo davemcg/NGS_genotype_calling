@@ -213,7 +213,7 @@ elif config['inputFileType'].upper() in ['BAM', 'CRAM']:
 		output:
 			bam = temp('sample_bam/{sample}.markDup.bam'),
 			bai = temp('sample_bam/{sample}.markDup.bai')
-		threads: 36
+		threads: 56
 		params:
 			read_group = rg
 		shell:
@@ -231,21 +231,21 @@ elif config['inputFileType'].upper() in ['BAM', 'CRAM']:
  			case "{input}" in
 				*bam)
 					if [[ "{config[markDup]}" == "TRUE" ]]; then
-						java -Xmx24g -jar $BAZAMPATH/bazam.jar -bam {input} \
+						java -Xmx112g -jar $BAZAMPATH/bazam.jar -bam {input} \
 						| bwa mem -t $(({threads}-2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[ref_genome]} - \
 				 		| samblaster -M --addMateTags --quiet \
 						| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads}-2)) -o {output.bam} \
 							<(sambamba view -S -f bam -l 0 -t $(({threads}-2)) /dev/stdin)
 						mv {output.bam}.bai {output.bai}
 					elif [[ "{config[markDup]}" == "FALSE" ]]; then
-						java -Xmx24g -jar $BAZAMPATH/bazam.jar -bam {input} \
+						java -Xmx112g -jar $BAZAMPATH/bazam.jar -bam {input} \
 						| bwa mem -t $(({threads}-2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[ref_genome]} - \
 				 		| samblaster -M --acceptDupMarks --addMateTags --quiet \
 						| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads}-2)) -o {output.bam} \
 							<(sambamba view -S -f bam -l 0 -t $(({threads}-2)) /dev/stdin)
 						mv {output.bam}.bai {output.bai}
 					else
-						java -Xmx24g -jar $BAZAMPATH/bazam.jar -bam {input} \
+						java -Xmx112g -jar $BAZAMPATH/bazam.jar -bam {input} \
 							| bwa-mem2 mem -t $(({threads}-2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[bwa-mem2_ref]} \
 							| samblaster -M --acceptDupMarks --addMateTags --quiet \
 							| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads}-2)) -o /lscratch/$SLURM_JOB_ID/{wildcards.sample}.bam \
@@ -262,21 +262,21 @@ elif config['inputFileType'].upper() in ['BAM', 'CRAM']:
 					;;
 				*cram)
 					if [[ "{config[markDup]}" == "TRUE" ]]; then
-						java -Xmx24g -Dsamjdk.reference_fasta={config[old_cram_ref]} -jar $BAZAMPATH/bazam.jar -bam {input} \
+						java -Xmx112g -Dsamjdk.reference_fasta={config[old_cram_ref]} -jar $BAZAMPATH/bazam.jar -bam {input} \
 							| bwa mem -t $(({threads}-2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[ref_genome]} - \
 				 			| samblaster -M --addMateTags --quiet \
 							| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads}-2)) -o {output.bam} \
 								<(sambamba view -S -f bam -l 0 -t $(({threads}-2)) /dev/stdin)
 						mv {output.bam}.bai {output.bai}
 					elif [[ "{config[markDup]}" == "FALSE" ]]; then
-						java -Xmx24g -Dsamjdk.reference_fasta={config[old_cram_ref]} -jar $BAZAMPATH/bazam.jar -bam {input} \
+						java -Xmx112g -Dsamjdk.reference_fasta={config[old_cram_ref]} -jar $BAZAMPATH/bazam.jar -bam {input} \
 							| bwa mem -t $(({threads}-2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[ref_genome]} - \
 				 			| samblaster -M --acceptDupMarks --addMateTags --quiet \
 							| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads}-2)) -o {output.bam} \
 								<(sambamba view -S -f bam -l 0 -t $(({threads}-2)) /dev/stdin)
 						mv {output.bam}.bai {output.bai}
 					else
-						java -Xmx24g -Dsamjdk.reference_fasta={config[old_cram_ref]} -jar $BAZAMPATH/bazam.jar -bam {input} \
+						java -Xmx112g -Dsamjdk.reference_fasta={config[old_cram_ref]} -jar $BAZAMPATH/bazam.jar -bam {input} \
 							| bwa-mem2 mem -t $(({threads}-2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[bwa-mem2_ref]} - \
 				 			| samblaster -M --acceptDupMarks --addMateTags --quiet \
 							| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads}-2)) -o /lscratch/$SLURM_JOB_ID/{wildcards.sample}.bam \
@@ -651,7 +651,8 @@ rule deepvariantS3:
 		cp ${{OUTPUT_GVCF}}* deepvariant/gvcf || exit 2
 		"""
 
-#probably add the following to the step above, since it only takes a few mins to finish.
+#probably add the following to the step above, since it only takes 30 seconds to finish.
+localrules: dv_hardfilter
 rule dv_hardfilter:
 	input:
 		vcf = 'deepvariant/vcf/{sample}.vcf.gz'
@@ -683,13 +684,13 @@ rule merge_deepvariantVcf:
 		case "{input.vcf}" in
 			*\ *)
 				bcftools merge --merge none --missing-to-ref --output-type z --threads {threads} {input.vcf} \
-				> deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
+				> deepvariant/{config[analysis_batch_name]}.dv.hf.vcf.gz
 				sleep 2
-				tabix -f -p vcf deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
+				tabix -f -p vcf deepvariant/{config[analysis_batch_name]}.dv.hf.vcf.gz
 				;;
 			*)
-				cp -p -l {input.vcf} deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
-				cp -p -l {input.tbi} deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz.tbi
+				cp -p -l {input.vcf} deepvariant/{config[analysis_batch_name]}.dv.hf.vcf.gz
+				cp -p -l {input.tbi} deepvariant/{config[analysis_batch_name]}.dv.hf.vcf.gz.tbi
 				;;
 		esac
 		touch {output}
@@ -823,8 +824,7 @@ rule scramble_annotation:
 	output:
 		avinput = temp('scramble_anno/{sample}.avinput'),
 		annovarR = temp('scramble_anno/{sample}.forR.txt'),
-		anno = 'scramble_anno/{sample}.scramble.tsv',
-		anno_xlsx = 'scramble_anno/{sample}.scramble.xlsx'
+		anno = 'scramble_anno/{sample}.scramble.tsv'
 	shell:
 		"""
 		if [[ $(module list 2>&1 | grep "annovar" | wc -l) < 1 ]]; then module load {config[annovar_version]}; fi
@@ -854,7 +854,7 @@ rule scramble_annotation:
 				--thread 1
 			awk -F"\t" 'BEGIN{{OFS="\t"}} NR==1 {{print "Func_refGene","Gene","Intronic","AA"}} NR>1 {{print $6,$7,$8,$10}}' scramble_anno/{wildcards.sample}."$ver"_multianno.txt | paste {input.mei} - > {output.annovarR}
 			rm scramble_anno/{wildcards.sample}."$ver"_multianno.txt
-			Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/scramble_anno.R {output.annovarR} {config[SCRAMBLEdb]} {config[OGL_Dx_research_genes]} {config[HGMDtranscript]} {wildcards.sample} {output.anno} {output.anno_xlsx}
+			Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/scramble_anno.R {output.annovarR} {config[SCRAMBLEdb]} {config[OGL_Dx_research_genes]} {config[HGMDtranscript]} {wildcards.sample} {output.anno}
 		fi
 		"""
 
@@ -959,20 +959,17 @@ rule bcm_locus:
 		vcf = temp('bcmlocus/{sample}.vcf'),
 		avinput = temp('bcmlocus/{sample}.avinput'),
 		bcm_out = 'bcmlocus/{sample}.bcmlocus.tsv'
-	threads: 8
+	threads: 20
 	shell:
 		"""
 		export TMPDIR=/lscratch/$SLURM_JOB_ID
-		module load {config[samtools_version]} {config[bazam_version]} {config[bwa-mem2_version]} {config[samblaster_version]} {config[sambamba_version]}
-		#took 150min? why so long?
+		module load {config[samtools_version]} {config[bazam_version]} {config[bwa_version]} {config[samblaster_version]} {config[sambamba_version]}
 		RG=$(samtools view -H {input.bam} | grep "^@RG" | head -n 1 | sed 's/\t/\\\\t/g')
-		#java -Xmx16g -Dsamjdk.reference_fasta={config[ref_genome]} -jar $BAZAMPATH/bazam.jar -f "pair.r1.referenceIndex == pair.r2.referenceIndex" -bam {input.bam} --regions chrX:153929000-154373500 \
-		#| bwa-mem2 mem -t $(({threads}/2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R $RG {config[GRCh38Decoy2]} -
-		java -Xmx16g -jar $BAZAMPATH/bazam.jar -bam {input.bam} --regions chrX:153929000-154373500 \
-		| bwa-mem2 mem -t $(({threads} - 2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R $RG {config[GRCh38Decoy2]} - \
+		java -Xmx32g -jar $BAZAMPATH/bazam.jar -bam {input.bam} --regions chrX:153929000-154373500 \
+		| bwa mem -t 16 -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R $RG /data/OGL/resources/genomes/GRCh38/GRCh38Decoy2.fa - \
 		| samblaster -M --addMateTags --quiet \
-		| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads} - 2)) -o {output.bam} \
-			<(sambamba view -S -f bam -l 0 -t $(({threads} - 2)) /dev/stdin)
+		| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t 16 -o {output.bam} \
+			<(sambamba view -S -f bam -l 0 -t 16 /dev/stdin)
 		mv {output.bam}.bai {output.bai}
 		if [[ $(module list 2>&1 | grep "mosdepth" | wc -l) < 1 ]]; then module load {config[mosdepth_version]}; fi
 		if [[ $(module list 2>&1 | grep "R/" | wc -l) < 1 ]]; then module load {config[R_version]}; fi
@@ -1021,6 +1018,8 @@ rule bcm_locus:
 			touch {output.bcm_out}
 		fi
 		"""
+#java -Xmx16g -Dsamjdk.reference_fasta={config[ref_genome]} -jar $BAZAMPATH/bazam.jar -f "pair.r1.referenceIndex == pair.r2.referenceIndex" -bam {input.bam} --regions chrX:153929000-154373500 \
+# | bwa-mem2 mem -t $(({threads}/2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R $RG {config[GRCh38Decoy2]} -
 ## Next step: get CN information
 
 localrules: combine_bcmlocus
@@ -1210,8 +1209,8 @@ rule merge_freebayes:
 #fast and only used 4 cpus, 100mg and 4 mins for 2 wgs data.
 rule merge_dv_fb_vcfs:
 	input:
+		'deepvariant/deepvariant_phased_glnexusVcf.merge.done.txt',
 		'deepvariant/deepvariantVcf.merge.done.txt',
-		'deepvariant/deepvariant.gvcf.merge.done.txt',
 		'freebayes/freebayes.merge.done.txt'
 	output:
 		'prioritization/dv_fb.merge.done.txt'
@@ -1222,7 +1221,7 @@ rule merge_dv_fb_vcfs:
 		WORK_DIR=/lscratch/$SLURM_JOB_ID
 		bcftools isec -p $WORK_DIR/dv -w 2 --collapse none --output-type u --threads {threads} \
 			deepvariant/{config[analysis_batch_name]}.dv.glnexus.phased.vcf.gz \
-			deepvariant/{config[analysis_batch_name]}.dv.phased.vcf.gz
+			deepvariant/{config[analysis_batch_name]}.dv.hf.vcf.gz
 		bcftools +fill-tags $WORK_DIR/dv/0001.bcf -Ov -- -t AC,AC_Hom,AC_Het,AN,AF \
 			| sed 's#0/0:.:.:.#0/0:10:10:10,0#g' - \
 			| bcftools annotate --threads {threads} --set-id 'dv_%CHROM\:%POS%REF\>%ALT' --no-version - -Oz -o $WORK_DIR/dv/dv.hf.vcf.gz

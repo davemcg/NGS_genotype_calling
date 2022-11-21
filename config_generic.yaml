@@ -3,8 +3,9 @@ analysis_batch_name: 'batchname' # name for freebayes vcf file. If YYYYMMDD, cur
 genomeBuild: 'GRCh38' #GRCh37 (hg19), GRCh38 (hg38), or any other values to use ref_genome and bwa-mem2_ref below.
 ped: '' #Can leave as blank ''. Only for ChrX CNV, has to have ped extenstion, header if present has to starts with #, ie miseq0626_0719.ped
 inputFileType: 'fastq' # single_lane_fastq, fastq, bam or cram.
-bed: '/data/OGL/resources/bed/OGLv1.GRCh38.sorted.bed' # bed file is used for coverage of eyeGene
-padded_bed: '/data/OGL/resources/bed/xgenV2_OGLv1.500padded.bed' #for deepvariant variant calling in exome & panel
+eGbed: '/data/OGL/resources/bed/OGLv1.GRCh38.sorted.bed' # bed file is used for coverage of eyeGene
+bed: '/data/OGL/resources/bed/xgenV2_OGLv1.hg38.bed'
+padded_bed: '/data/OGL/resources/bed/xgenV2_OGLv1.500padded.hg38.bed' #for deepvariant variant calling in exome & panel
 real_bed: 'FALSE' # TRUE or FALSE, if a real bed is provided, use the bed above for freebayes filtering. If not real_bed, then the bed above is used for deepvariant, but not for freebayes filtering.
 markDup: 'TRUE' # TRUE, FALSE, should markDup for optical dup in PCR-free genomes
 cram: 'FALSE' # TRUE to convert bam to cram, values other than TRUE will not convert. #Keep bam for panel and exome if addtional analyses are anticipated

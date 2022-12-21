@@ -1,9 +1,9 @@
 
 args <- commandArgs(trailingOnly=TRUE)
 #When testing, comment out line above and use the line below.
-# args <- c("W:/ddl_nisc_custom_capture/042020/scramble/107910Y.forR.txt",
-#           "Y:/resources/SCRAMBLEvariantClassification.xlsx", "Z:/OGL_NGS/variant_prioritization/data/OGLv1_panel_DxORcandidate.tsv",
-#           "W:/ddl_nisc_custom_capture/042020/scramble/107910Y.annoted.xlsx")
+ # args <- c("Z:/NextSeqAnalysis/221118/scramble_anno/G05256.forR.txt",
+ #           "Y:/resources/SCRAMBLEvariantClassification.xlsx", "Z:/OGL_NGS/variant_prioritization/data/OGLv1_panel_DxORcandidate.tsv",
+ #           "W:/ddl_nisc_custom_capture/042020/scramble/107910Y.annoted.xlsx")
 
 #R_version: 'R/3.6.3'
 
@@ -21,17 +21,17 @@ output_xlsx_file <- args[7]
 annovar <- read_tsv(annovar_file, col_names = TRUE, na = c("NA", "", "None", "."), col_types = cols(.default = col_character())) %>% 
   mutate(sample = sampleName) %>% 
   mutate(Intronic = gsub("0>-", "", Intronic)) %>% 
-  unite("variant", Insertion:Insertion_Direction, sep = "-", remove = TRUE) %>% 
+  unite("variant", Insertion:Insertion_Direction, sep = "-", remove = FALSE) %>% 
   separate(Insertion, c("chr", "pos"), sep = ":", remove = FALSE, convert = TRUE) %>% 
   mutate(pos = round(pos, -2)) %>% 
   unite("temp_Insertion", chr, pos, sep = ":", remove = TRUE) %>% 
   unite("temp_variantID", temp_Insertion, MEI_Family, Insertion_Direction, sep = "-", remove = FALSE ) %>% 
   select(-temp_Insertion)
-  
+ 
 # Do not use type_convert() because it converts chr:pos.
 
 classificationDF <- read_xlsx(scrambledb_file, sheet = "Variant", na = c("NA", "", "None", ".")) %>% 
-  select("temp_variantID", "autoClassification", "manualClassification", "cohortAF", "note") %>% 
+  select("temp_variantID", "autoClassification", "manualClassification", "note", "CohortFreq", "NaltP/NtotalP") %>% 
   distinct(temp_variantID, .keep_all = TRUE)
 
 #panelGene <- read_tsv(args[3], col_names = TRUE, col_types = cols(.default = col_character())) %>% select(gene, panel_class)
@@ -74,12 +74,12 @@ annoted1 <- left_join(annoted, panelGene, by = c("Gene" = "gene")) %>%
   mutate(Clipped_Reads_In_Cluster = as.integer(Clipped_Reads_In_Cluster)) %>% 
   select(variant, Insertion, temp_variantID, MEI_Family, Insertion_Direction, Clipped_Reads_In_Cluster, Alignment_Score, 
          Alignment_Percent_Length, Alignment_Percent_Identity, Clipped_Sequence, Clipped_Side, Start_In_MEI, Stop_In_MEI, 
-         polyA_Position, polyA_Seq, polyA_SupportingReads, TSD, TSD_length, panel_class, eyeGene, Func_refGene, Gene, Intronic, AA, autoClassification, manualClassification, cohortAF, sample, note) %>% 
+         polyA_Position, polyA_Seq, polyA_SupportingReads, TSD, TSD_length, panel_class, eyeGene, Func_refGene, Gene, Intronic, AA, autoClassification, manualClassification, sample, "note", "CohortFreq", "NaltP/NtotalP") %>% 
   separate(Insertion,
            c('temp_chromosome','temp_position'),
            sep = ':', remove = FALSE, convert = TRUE) %>% 
   filter(temp_chromosome %in% chromosome_name) %>% 
-  arrange( desc(eyeGene), manualClassification, desc(Clipped_Reads_In_Cluster)) %>% 
+  arrange(desc(eyeGene), manualClassification, desc(Clipped_Reads_In_Cluster)) %>% 
   select(-temp_chromosome, -temp_position) 
 
 

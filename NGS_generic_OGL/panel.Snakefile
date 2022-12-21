@@ -440,8 +440,8 @@ rule mean_coverage:
 		for file in {input}; do
 			filename=$(basename $file)
 			sm=$(echo $filename | sed 's/.md.mosdepth.summary.txt//')
-			on_target=$(tail -n 2 $file | awk 'NR>1{print $3/p} {p=$3}')
-			tail -n 1 $file | awk -v on_target="$on_target" -v sm="$sm" -F"\t" 'BEGIN{OFS="\t"}{print sm,$2,$4,on_target}' - >> coverage/{config[analysis_batch_name]}.mean.coverage.summary.tsv
+			on_target=$(tail -n 2 $file | awk 'NR>1{{print $3/p}} {{p=$3}}')
+			tail -n 1 $file | awk -v on_target="$on_target" -v sm="$sm" -F"\t" 'BEGIN{{OFS="\t"}}{{print sm,$2,$4,on_target}}' - >> coverage/{config[analysis_batch_name]}.mean.coverage.summary.tsv
  		done
 		touch {output}
 		"""
@@ -649,7 +649,8 @@ rule CoNVaDING_2:
 		awk -F"\t" 'BEGIN{{OFS="\t"}} {{sub(/CoNVaDING\/CNV_hiSens\//,""); sub(/.markDup.aligned.only.best.score.shortlist.txt/,""); print }}' CoNVaDING/shortlist.temp \
 			| grep -v -P 'CHR\tSTART' - > CoNVaDING/SHORTlist.txt && \
 			echo -e "SAMPLE\tCHR\tSTART\tSTOP\tGENE\tNUMBER_OF_TARGETS\tNUMBER_OF_TARGETS_PASS_SHAPIRO-WILK_TEST\tABBERATION" \
-			| cat - CoNVaDING/SHORTlist.txt > CoNVaDING/tmpout && mv CoNVaDING/tmpout CoNVaDING/SHORTlist.txt
+			| cat - CoNVaDING/SHORTlist.txt > CoNVaDING/tmpout && mv CoNVaDING/tmpout CoNVaDING/{config[analysis_batch_name]}.SHORTlist.txt
+		rm CoNVaDING/shortlist.temp
 		touch {output}
 		"""
 
@@ -1066,8 +1067,8 @@ rule scramble_annotation:
 			if [[ $(module list 2>&1 | grep "annotsv" | wc -l) < 1 ]]; then module load {config[annotsv_version]}; fi
 			tail -n +2 {input.deletion} | awk -F"\t" 'BEGIN{{OFS="\t"}} {{print $1,$2,$3,"DEL"}}' > {input.deletion}.bed
 			AnnotSV -genomeBuild {config[genomeBuild]} -SVinputFile {input.deletion}.bed -SVinputInfo 0 -svtBEDcol 4 -outputFile {output.del_anno}.temp
-			Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/scramble_del_edit.R {output.del_anno}.temp {config[scrambleDELdb]} {output.del_anno}.temp
-			rm {output.del_anno}.temp
+			Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/scramble_del_edit.R {output.del_anno}.temp.tsv {config[scrambleDELdb]} {output.del_anno}
+			rm {output.del_anno}.temp.tsv
 		fi
 		"""
 #--intronhgvs 100

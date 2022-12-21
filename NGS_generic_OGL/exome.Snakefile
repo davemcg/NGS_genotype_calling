@@ -396,7 +396,7 @@ rule coverage:
 		if [[ $(module list 2>&1 | grep "mosdepth" | wc -l) < 1 ]]; then module load {config[mosdepth_version]}; fi
 		if [[ $(module list 2>&1 | grep "R/" | wc -l) < 1 ]]; then module load {config[R_version]}; fi
 		cd coverage/mosdepth
-		mosdepth -t {threads} --no-per-base --by {config[bed]} --use-median --mapq 0 --fast-mode --thresholds 10,20,30 \
+		mosdepth -t {threads} --no-per-base --by {config[bed]} --mapq 0 --fast-mode --thresholds 10,20,30 \
 			{wildcards.sample}.md ../../{input.bam}
 		cd ../..
 		#mv {wildcards.sample}.md.* coverage/mosdepth/.
@@ -422,7 +422,8 @@ rule mean_coverage:
 		for file in {input}; do
 			filename=$(basename $file)
 			sm=$(echo $filename | sed 's/.md.mosdepth.summary.txt//')
-			tail -n 1 $file | cut -f 2,4 | sed 's/^/'"$sm"'\t/' >> coverage/{config[analysis_batch_name]}.mean.coverage.summary.tsv
+			on_target=$(tail -n 2 $file | awk 'NR>1{{print $3/p}} {{p=$3}}')
+			tail -n 1 $file | awk -v on_target="$on_target" -v sm="$sm" -F"\t" 'BEGIN{{OFS="\t"}}{{print sm,$2,$4,on_target}}' - >> coverage/{config[analysis_batch_name]}.mean.coverage.summary.tsv
  		done
 		touch {output}
 		"""
@@ -539,8 +540,8 @@ rule scramble_annotation:
 			module load {config[annotsv_version]} {config[crossmap_version]}
 			tail -n +2 {input.deletion} | awk -F"\t" 'BEGIN{{OFS="\t"}} {{print $1,$2,$3,"DEL"}}' > {input.deletion}.bed
 			AnnotSV -genomeBuild {config[genomeBuild]} -SVinputFile {input.deletion}.bed -SVinputInfo 0 -svtBEDcol 4 -outputFile {output.del_anno}.temp
-			Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/scramble_del_edit.R {output.del_anno}.temp {config[scrambleDELdb]} {output.del_anno}.temp
-			rm {output.del_anno}.temp
+			Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/scramble_del_edit.R {output.del_anno}.temp.tsv {config[scrambleDELdb]} {output.del_anno}
+			rm {output.del_anno}.temp.tsv
 		fi
 		"""
 #Try this strategy,if not working well, consider split by chr as in the GATK.

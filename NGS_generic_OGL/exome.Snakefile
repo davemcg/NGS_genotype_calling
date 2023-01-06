@@ -502,6 +502,7 @@ rule scramble_annotation:
 		anno = 'scramble_anno/{sample}.scramble.tsv',
 		anno_xlsx = 'scramble_anno/{sample}.scramble.xlsx',
 		del_anno = 'scramble_anno/{sample}.scramble.del.tsv'
+	resources: res=1
 	shell:
 		"""
 		if [[ $(module list 2>&1 | grep "annovar" | wc -l) < 1 ]]; then module load {config[annovar_version]}; fi
@@ -537,7 +538,7 @@ rule scramble_annotation:
 		then
 			touch {output.del_anno}
 		else
-			module load {config[annotsv_version]} {config[crossmap_version]}
+			if [[ $(module list 2>&1 | grep "annotsv" | wc -l) < 1 ]]; then module load {config[annotsv_version]}; fi
 			tail -n +2 {input.deletion} | awk -F"\t" 'BEGIN{{OFS="\t"}} {{print $1,$2,$3,"DEL"}}' > {input.deletion}.bed
 			AnnotSV -genomeBuild {config[genomeBuild]} -SVinputFile {input.deletion}.bed -SVinputInfo 0 -svtBEDcol 4 -outputFile {output.del_anno}.temp
 			Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/scramble_del_edit.R {output.del_anno}.temp.tsv {config[scrambleDELdb]} {output.del_anno}

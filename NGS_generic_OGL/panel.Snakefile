@@ -1029,6 +1029,7 @@ rule scramble_annotation:
 		anno = 'scramble_anno/{sample}.scramble.tsv',
 		anno_xlsx = 'scramble_anno/{sample}.scramble.xlsx',
 		del_anno = 'scramble_anno/{sample}.scramble.del.tsv'
+	resources: res=1
 	shell:
 		"""
 		if [[ $(module list 2>&1 | grep "R/" | wc -l) < 1 ]]; then module load {config[R_version]}; fi

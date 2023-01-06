@@ -64,7 +64,7 @@ case "${ngstype^^}" in
 		--cluster-config /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/panel.cluster.json \
 		--cluster "$sbcmd"  --latency-wait 120 --rerun-incomplete \
 		-k --restart-times 0 \
-		--resources parallel=4 \
+		--resources res=1 \
 		--configfile $@
 		;;
 	"EXOME"|"WES"|"ES")
@@ -73,7 +73,7 @@ case "${ngstype^^}" in
 		--cluster-config /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/exome.cluster.json \
 		--cluster "$sbcmd"  --latency-wait 120 --rerun-incomplete \
 		-k --restart-times 0 \
-		--resources parallel=4 \
+		--resources res=1 \
 		--configfile $@
 		;;
 	*)
@@ -82,11 +82,12 @@ case "${ngstype^^}" in
 		--cluster-config /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/cluster.json \
 		--cluster "$sbcmd"  --latency-wait 120 --rerun-incomplete \
 		-k --restart-times 0 \
-		--resources parallel=4 \
+		--resources res=1 \
 		--configfile $@
 		;;
 esac
 
+#replaced "parallel=4" with "res=1"
 # --notemp Ignore temp() declaration;
 # --dryrun
 # --unlock

@@ -465,7 +465,7 @@ rule coverage:
 		module load {config[mosdepth_version]}
 		module load {config[R_version]}
 		cd coverage/mosdepth
-		mosdepth -t {threads} --no-per-base --by {config[bed]} --use-median --mapq 0 --fast-mode --thresholds 10,20,30 \
+		mosdepth -t {threads} --no-per-base --by {config[eGbed]} --mapq 0 --fast-mode --thresholds 10,20,30 \
 			{wildcards.sample}.md ../../{input.bam}
 		cd ../..
 		#mv {wildcards.sample}.md.* coverage/mosdepth/.
@@ -824,7 +824,8 @@ rule scramble_annotation:
 	output:
 		avinput = temp('scramble_anno/{sample}.avinput'),
 		annovarR = temp('scramble_anno/{sample}.forR.txt'),
-		anno = 'scramble_anno/{sample}.scramble.tsv'
+		anno = 'scramble_anno/{sample}.scramble.tsv',
+		anno_xlsx = 'scramble_anno/{sample}.scramble.xlsx'
 	shell:
 		"""
 		if [[ $(module list 2>&1 | grep "annovar" | wc -l) < 1 ]]; then module load {config[annovar_version]}; fi
@@ -854,7 +855,7 @@ rule scramble_annotation:
 				--thread 1
 			awk -F"\t" 'BEGIN{{OFS="\t"}} NR==1 {{print "Func_refGene","Gene","Intronic","AA"}} NR>1 {{print $6,$7,$8,$10}}' scramble_anno/{wildcards.sample}."$ver"_multianno.txt | paste {input.mei} - > {output.annovarR}
 			rm scramble_anno/{wildcards.sample}."$ver"_multianno.txt
-			Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/scramble_anno.R {output.annovarR} {config[SCRAMBLEdb]} {config[OGL_Dx_research_genes]} {config[HGMDtranscript]} {wildcards.sample} {output.anno}
+			Rscript /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/scramble_anno.R {output.annovarR} {config[SCRAMBLEdb]} {config[OGL_Dx_research_genes]} {config[HGMDtranscript]} {wildcards.sample} {output.anno} {output.anno_xlsx}
 		fi
 		"""
 

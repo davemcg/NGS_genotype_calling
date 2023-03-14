@@ -19,7 +19,7 @@ coverage: 'TRUE'
 lane_pair_delim: ['_R1_001.fastq', '_R2_001.fastq']
 #samples: ['41001412010527_realigned_recal']
 #read_groups: ['@RG\\tID:Lineagen_41001412010527\\tSM:Lineagen_41001412010527\\tPL:ILLUMINA'] # not used in current version of Snakefiles
-bcmlocus_bed: '/data/OGL/resources/bcm/xgen-v2-chrX154mb.bed'
+bcmlocus_bed: '/data/OGL/resources/bcm/xgen-v2-chrX154mb_v1.bed'
 manta_version: 'manta/1.6.0-fork-jykr' #updated 5/17/2022 from manta/1.6.0 for errors for some samples
 annotsv_version: 'annotsv/3.0.5'
 deepvariant_version: 'deepvariant/1.3.0'

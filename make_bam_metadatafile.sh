@@ -8,3 +8,6 @@ module load samtools/1.11
 for file in old_bam/*.*am; do filename=$(basename $file); sample=$(echo $filename | cut -d. -f 1); RG=$(samtools view -H $file | grep "^@RG" | head -n 1 | sed 's/\t/\\t/g'); echo $sample,$filename,"$RG" >> metadata_file.csv; done
 
 #awk -F"," 'BEGIN{OFS=","} {sub("HUF_", "", $1); sub("_D1", "", $1); sub("HUF_", "", $3); sub("_D1", "", $3); print $0 }' metadata_file.csv > metadata_file.csv.bk && mv metadata_file.csv.bk metadata_file.csv
+
+#remove accession number (ie. 2264_) from sample name
+#awk -F"," 'BEGIN{OFS=","} {sub("^[0-9]+_", "", $1); sub("SM:[0-9]+_", "SM:", $3); print $0 }' metadata_file.csv > metadata_file.csv.bk && mv metadata_file.csv.bk metadata_file.csv

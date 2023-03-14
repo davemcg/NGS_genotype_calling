@@ -121,8 +121,8 @@
 	{
 		"partition" : "norm",
 		"time" : "12:00:00",
-		"mem" : "128g",
-		"extra" : "--gres=lscratch:500"
+		"mem" : "121g",
+		"extra" : "--gres=lscratch:600"
 	},
 	"align" :
 	{

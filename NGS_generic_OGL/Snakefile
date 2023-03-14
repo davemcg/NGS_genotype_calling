@@ -951,15 +951,17 @@ rule haplocheck:
 rule bcm_locus:
 	input:
 		bam = 'sample_bam/{sample}.markDup.bam',
-		bai = 'sample_bam/{sample}.markDup.bai',
-		#bam = 'bam/{sample}.cram',
-		#bai = 'bam/{sample}.crai'
+		bai = 'sample_bam/{sample}.markDup.bai'
 	output:
 		bam = 'bam/bcmlocus/{sample}.bcm.bam',
 		bai = 'bam/bcmlocus/{sample}.bcm.bai',
-		vcf = temp('bcmlocus/{sample}.vcf'),
-		avinput = temp('bcmlocus/{sample}.avinput'),
-		bcm_out = 'bcmlocus/{sample}.bcmlocus.tsv'
+		bcm_mosdepth = 'bcmlocus/mosdepth/{sample}.md.regions.bed.gz',
+		haplo_vcf = temp('bcmlocus/{sample}.haplo.vcf.gz'),
+		haplo_vcf_tbi = temp('bcmlocus/{sample}.haplo.vcf.gz.tbi'),
+		small_vcf = temp('bcmlocus/{sample}.small.vcf.gz'),
+		small_vcf_tbi = temp('bcmlocus/{sample}.small.vcf.gz.tbi'),
+		vcf = 'bcmlocus/{sample}.vcf.gz',
+		vcf_tbi = 'bcmlocus/{sample}.vcf.gz.tbi'
 	threads: 20
 	shell:
 		"""
@@ -973,25 +975,64 @@ rule bcm_locus:
 			<(sambamba view -S -f bam -l 0 -t 16 /dev/stdin)
 		mv {output.bam}.bai {output.bai}
 		if [[ $(module list 2>&1 | grep "mosdepth" | wc -l) < 1 ]]; then module load {config[mosdepth_version]}; fi
-		if [[ $(module list 2>&1 | grep "R/" | wc -l) < 1 ]]; then module load {config[R_version]}; fi
 		mkdir -p bcmlocus/mosdepth
 		cd bcmlocus/mosdepth
 		mosdepth -t {threads} --no-per-base --by {config[bcmlocus_bed]} --use-median --mapq 0 --fast-mode \
 			{wildcards.sample}.md ../../{output.bam}
 		cd ../..
-		if [[ $(module list 2>&1 | grep "samtools" | wc -l) < 1 ]]; then module load {config[samtools_version]}; fi
 		if [[ $(module list 2>&1 | grep "freebayes" | wc -l) < 1 ]]; then module load {config[freebayes_version]}; fi
 		if [[ $(module list 2>&1 | grep "annovar" | wc -l) < 1 ]]; then module load {config[annovar_version]}; fi
-		freebayes -f {config[GRCh38Decoy2]}  --max-complex-gap 90 -p 6 -C 3 -F 0.05 \
+		if [[ $(module list 2>&1 | grep "vcflib" | wc -l) < 1 ]]; then module load {config[vcflib_version]}; fi
+		module load {config[vt_version]}
+		freebayes -f {config[GRCh38Decoy2]} --max-complex-gap 90 -p 10 -C 3 -F 0.05 \
 			--genotype-qualities --strict-vcf --use-mapping-quality \
 			--targets /data/OGL/resources/bed/OPN1LWe2e5.bed \
 			{output.bam} \
+			| vcffilter -f "QUAL > 10" \
+			| bcftools +fill-tags - -Ou -- -t VAF \
 			| bcftools norm --multiallelics -any --output-type u - \
-			| bcftools annotate --set-id '%CHROM\:%POS%REF\>%ALT' -x ^INFO/AF --output-type u --no-version \
 			| bcftools norm --check-ref s --fasta-ref {config[GRCh38Decoy2]}  --output-type u --no-version - \
-			| bcftools norm -d exact --output-type v - \
-			> {output.vcf}
-		convert2annovar.pl -format vcf4old {output.vcf} -includeinfo --outfile {output.avinput}
+			| bcftools annotate --set-id 'haplo_%CHROM\:%POS%REF\>%ALT' -x ^INFO/AO,^FORMAT/GT,FORMAT/DP,FORMAT/VAF --output-type u --no-version \
+			| bcftools norm -d exact --output-type z -o {output.haplo_vcf}
+		tabix -p vcf {output.haplo_vcf}
+ 		freebayes -f {config[GRCh38Decoy2]} --limit-coverage 1000 --min-alternate-fraction 0.05 -C 3 -p 10 \
+			--min-mapping-quality 0 --genotype-qualities --strict-vcf --use-mapping-quality \
+			--targets /data/OGL/resources/bed/OPN1LWe1e6_MWe1.bed \
+			{output.bam} \
+			| vcffilter -f "QUAL > 10 & SAF > 0 & SAR > 0 & RPR > 0 & RPL > 0 & AO > 2 & DP > 5" \
+			| bcftools +fill-tags - -Ou -- -t VAF \
+			| bcftools norm --multiallelics -any --output-type u - \
+			| vt decompose_blocksub -p -m -d 2 - \
+			| bcftools norm --check-ref s --fasta-ref {config[GRCh38Decoy2]} --output-type u - \
+			| bcftools annotate --set-id 'sm_%CHROM\:%POS%REF\>%ALT' -x ^INFO/AO,^FORMAT/GT,FORMAT/DP,FORMAT/VAF --output-type v --no-version \
+			| bcftools norm -d exact --output-type z -o {output.small_vcf}
+		tabix -p vcf {output.small_vcf}
+		bcftools concat -a --rm-dups none --no-version \
+			{output.small_vcf} {output.haplo_vcf} \
+			-Oz -o {output.vcf}
+		tabix -p vcf {output.vcf}
+		"""
+
+localrules: bcm_locus_anno
+rule bcm_locus_anno:
+	input:
+		vcf = 'bcmlocus/{sample}.vcf.gz',
+		chrCoverage = 'coverage/mosdepth/{sample}.md.mosdepth.summary.txt',
+		bcm_mosdepth = 'bcmlocus/mosdepth/{sample}.md.regions.bed.gz'
+	output:
+		bcm_cn = 'bcmlocus/{sample}.bcm.cn.tsv',
+		bcm_cn_wide = 'bcmlocus/{sample}.bcm.cn.wide.tsv',
+		avinput = temp('bcmlocus/{sample}.avinput'),
+		bcm_variant = 'bcmlocus/{sample}.bcmlocus.tsv'
+	shell:
+		"""
+		if [[ $(module list 2>&1 | grep "samtools" | wc -l) < 1 ]]; then module load {config[samtools_version]}; fi
+		if [[ $(module list 2>&1 | grep "R/" | wc -l) < 1 ]]; then module load {config[R_version]}; fi
+		Rscript ~/git/NGS_genotype_calling/NGS_generic_OGL/bcmlocusCN.R \
+			{wildcards.sample} {input.chrCoverage} \
+			{input.bcm_mosdepth} {output.bcm_cn} {output.bcm_cn_wide}
+		if [[ $(module list 2>&1 | grep "annovar" | wc -l) < 1 ]]; then module load {config[annovar_version]}; fi
+		convert2annovar.pl -format vcf4old {input.vcf} -includeinfo --outfile {output.avinput}
 		if [[ {config[genomeBuild]} == "GRCh38" ]]; then
 			ver=hg38
 		else
@@ -1008,15 +1049,15 @@ rule bcm_locus:
 				--argument '-hgvs' \
 				--polish -nastring . \
 				--thread 1 \
-				--otherinfo
+				--otherinfo --intronhgvs 500 \
+				--tempdir /lscratch/$SLURM_JOB_ID
 			sed -i "1 s/Otherinfo1\tOtherinfo2\tOtherinfo3\tOtherinfo4\tOtherinfo5\tOtherinfo6\tOtherinfo7\tOtherinfo8\tOtherinfo9\tOtherinfo10/CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tGT_FIELDS/" bcmlocus/{wildcards.sample}.avinput."$ver"_multianno.txt
-			if [[ $(module list 2>&1 | grep "R/" | wc -l) < 1 ]]; then module load {config[R_version]}; fi
 			Rscript ~/git/NGS_genotype_calling/NGS_generic_OGL/bcmlocus.R \
 				/data/OGL/resources/bcmlocus.xlsx \
-				{wildcards.sample} bcmlocus/{wildcards.sample}.avinput."$ver"_multianno.txt {output.bcm_out}
+				{wildcards.sample} bcmlocus/{wildcards.sample}.avinput."$ver"_multianno.txt {output.bcm_variant}
 			rm bcmlocus/{wildcards.sample}.avinput."$ver"_multianno.txt
 		else
-			touch {output.bcm_out}
+			touch {output.bcm_variant}
 		fi
 		"""
 #java -Xmx16g -Dsamjdk.reference_fasta={config[ref_genome]} -jar $BAZAMPATH/bazam.jar -f "pair.r1.referenceIndex == pair.r2.referenceIndex" -bam {input.bam} --regions chrX:153929000-154373500 \
@@ -1026,14 +1067,19 @@ rule bcm_locus:
 localrules: combine_bcmlocus
 rule combine_bcmlocus:
 	input:
-		expand('bcmlocus/{sample}.bcmlocus.tsv', sample=list(SAMPLE_LANEFILE.keys()))
+		bcm_variant = expand('bcmlocus/{sample}.bcmlocus.tsv', sample=list(SAMPLE_LANEFILE.keys())),
+		bcm_cn_wide = expand('bcmlocus/{sample}.bcm.cn.wide.tsv', sample=list(SAMPLE_LANEFILE.keys()))
 	output:
 		'bcmlocus/combine.bcmlocus.done.txt'
 	shell:
 		"""
-		echo -e "CHROM\tPOS\tID\tREF\tALT\tQUAL\tFunc.refGeneWithVer\tGene.refGeneWithVer\tGeneDetail.refGeneWithVer\tExonicFunc.refGeneWithVer\tAAChange.refGeneWithVer\tHGVSp\tAnnotation\tFunction\tACMG_Class\tNote\tSample\tINFO\tFORMAT\tGT_FIELDS" > bcmlocus/{config[analysis_batch_name]}.bcmlocus.all.tsv
-		for file in {input}; do
-			tail -n +2 $file >> bcmlocus/{config[analysis_batch_name]}.bcmlocus.all.tsv
+		echo -e "CHROM\tPOS\tID\tREF\tALT\tQUAL\tFunc.refGeneWithVer\tGene.refGeneWithVer\tGeneDetail.refGeneWithVer\tExonicFunc.refGeneWithVer\tAAChange.refGeneWithVer\tHGVSp\tAnnotation\tFunction\tACMG_Class\tNote\tSample\tINFO\tFORMAT\tGT_FIELDS" > bcmlocus/{config[analysis_batch_name]}.bcmlocus.all.variant.tsv
+		head -n 1 {input.bcm_cn_wide[0]} > bcmlocus/{config[analysis_batch_name]}.bcmlocus.all.CN.tsv
+		for file in {input.bcm_variant}; do
+			tail -n +2 $file >> bcmlocus/{config[analysis_batch_name]}.bcmlocus.all.variant.tsv
+ 		done
+		for file in {input.bcm_cn_wide}; do
+			tail -n +2 $file >> bcmlocus/{config[analysis_batch_name]}.bcmlocus.all.CN.tsv
  		done
 		touch {output}
 		"""
@@ -1093,7 +1139,7 @@ rule freebayes_phasing:
 				| bcftools norm -d exact --output-type z - -o {output.vcf}
 		else
 			freebayes-parallel /data/OGL/resources/freebayesRegion/{config[genomeBuild]}/region.{wildcards.chr} {threads} -f {config[ref_genome]} \
-				--limit-coverage 500 {input.bam} --min-alternate-fraction 0.05 \
+				--limit-coverage 1000 {input.bam} --min-alternate-fraction 0.05 \
 				--min-mapping-quality 1 --genotype-qualities --strict-vcf --use-mapping-quality \
 				| bcftools norm --multiallelics -any --output-type v - \
 				| vt decompose_blocksub -p -m -d 2 - \

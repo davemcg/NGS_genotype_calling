@@ -56,9 +56,9 @@ if config['ped']:
 # for i in SAMPLE_SEX:
 #  	print (i, SAMPLE_SEX[i])
 
-if config['analysis_batch_name'] == 'YYYYMMDD':
-	currentDT = datetime.datetime.now()
-	config['analysis_batch_name'] = currentDT.strftime("%Y%m%d")
+# if config['analysis_batch_name'] == 'YYYYMMDD':
+# 	currentDT = datetime.datetime.now()
+# 	config['analysis_batch_name'] = currentDT.strftime("%Y%m%d")
 
 if config['inputFileType'].upper() in ['BAM', 'CRAM']:
 	def rg(wildcards):
@@ -1177,7 +1177,7 @@ rule bcm_locus:
 		if [[ $(module list 2>&1 | grep "samtools" | wc -l) < 1 ]]; then module load {config[samtools_version]}; fi
 		if [[ $(module list 2>&1 | grep "freebayes" | wc -l) < 1 ]]; then module load {config[freebayes_version]}; fi
 		if [[ $(module list 2>&1 | grep "annovar" | wc -l) < 1 ]]; then module load {config[annovar_version]}; fi
-		freebayes -f {config[ref_genome]} --max-complex-gap 90 -p 6 -C 3 -F 0.05 \
+		freebayes -f {config[ref_genome]} --max-complex-gap 80 -p 6 -C 3 -F 0.05 \
 			--genotype-qualities --strict-vcf --use-mapping-quality \
 			--targets /data/OGL/resources/bed/OPN1LWe2e5.bed \
 			{input.bam} \

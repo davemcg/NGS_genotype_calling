@@ -49,9 +49,9 @@ for line in metadata:
 	LANEFILE_READGROUP[lane_file] = [read_group]
 metadata.close()
 
-if config['analysis_batch_name'] == 'YYYYMMDD':
-	currentDT = datetime.datetime.now()
-	config['analysis_batch_name'] = currentDT.strftime("%Y%m%d")
+# if config['analysis_batch_name'] == 'YYYYMMDD':
+# 	currentDT = datetime.datetime.now()
+# 	config['analysis_batch_name'] = currentDT.strftime("%Y%m%d")
 
 if config['inputFileType'].upper() in ['BAM', 'CRAM']:
 	def rg(wildcards):
@@ -685,6 +685,7 @@ rule merge_freebayes:
 # 		module load {config[samtools_version]}
 # 		samtools depth {input.bam} | coverage_to_regions.py {config[ref_genome]}.fai 10000 > {output}
 # 		"""
+
 rule deepvariant:
 	input:
 		bam = 'sample_bam/{sample}.markDup.bam',
@@ -699,7 +700,7 @@ rule deepvariant:
 	threads: 32
 	shell:
 		"""
-		module load {config[deepvariant_version]}
+		module load {config[deepvariant_version]} parallel
 		PROJECT_WD=$PWD
 		N_SHARDS="32"
 		mkdir -p /lscratch/$SLURM_JOB_ID/{wildcards.sample}
@@ -713,8 +714,7 @@ rule deepvariant:
 			--output_vcf $WORK_DIR/$(basename {output.vcf}) \
 			--output_gvcf $WORK_DIR/$(basename {output.gvcf}) \
 			--sample_name {wildcards.sample} \
-			--intermediate_results_dir $WORK_DIR \
-			--call_variants_extra_args="use_openvino=true"
+			--intermediate_results_dir $WORK_DIR
 		cd $PROJECT_WD
 		cp $WORK_DIR/$(basename {output.vcf})* deepvariant/vcf
 		cp $WORK_DIR/$(basename {output.gvcf})* deepvariant/gvcf
@@ -730,6 +730,7 @@ rule deepvariant:
 		tabix -f -p vcf {output.phasedvcf}
 		"""
 #deepvariant PASS filter requires Alt AD > 1. I used > 2 for more stringent filtering.
+# v1.5.0 update, removed --call_variants_extra_args="use_openvino=true"
 
 localrules: merge_deepvariant_vcf
 rule merge_deepvariant_vcf:
@@ -974,7 +975,7 @@ rule bcm_locus:
 		if [[ $(module list 2>&1 | grep "samtools" | wc -l) < 1 ]]; then module load {config[samtools_version]}; fi
 		if [[ $(module list 2>&1 | grep "freebayes" | wc -l) < 1 ]]; then module load {config[freebayes_version]}; fi
 		if [[ $(module list 2>&1 | grep "annovar" | wc -l) < 1 ]]; then module load {config[annovar_version]}; fi
-		freebayes -f {config[GRCh38Decoy2]} --max-complex-gap 90 -p 6 -C 3 -F 0.05 \
+		freebayes -f {config[GRCh38Decoy2]} --max-complex-gap 80 -p 6 -C 3 -F 0.05 \
 			--genotype-qualities --strict-vcf --use-mapping-quality \
 			--targets /data/OGL/resources/bed/OPN1LWe2e5.bed \
 			{output.bam} \

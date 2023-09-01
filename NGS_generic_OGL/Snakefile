@@ -90,9 +90,9 @@ metadata.close()
 # for i in LANEFILE_READGROUP:
 # 	print (i, LANEFILE_READGROUP[i], len(LANEFILE_READGROUP[i]))
 
-if config['analysis_batch_name'] == 'YYYYMMDD':
-	currentDT = datetime.datetime.now()
-	config['analysis_batch_name'] = currentDT.strftime("%Y%m%d")
+# if config['analysis_batch_name'] == 'YYYYMMDD':
+# 	currentDT = datetime.datetime.now()
+# 	config['analysis_batch_name'] = currentDT.strftime("%Y%m%d")
 
 if config['inputFileType'].upper() in ['BAM', 'CRAM']:
 	def rg(wildcards):
@@ -199,8 +199,8 @@ if config['inputFileType'] == 'single_lane_fastq':
 			bam = lambda wildcards: expand('lane_bam/{lane}.bam', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]]))),
 			bai = lambda wildcards: expand('lane_bam/{lane}.bam.bai', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]])))
 		output:
-			bam = temp('sample_bam/{sample}.markDup.bam'),
-			bai = temp('sample_bam/{sample}.markDup.bai')
+			bam = 'sample_bam/{sample}.markDup.bam',
+			bai = 'sample_bam/{sample}.markDup.bai'
 		shell:
 			"""
 			cp -p -l {input.bam} {output.bam}
@@ -211,8 +211,8 @@ elif config['inputFileType'].upper() in ['BAM', 'CRAM']:
 		input:
 			lambda wildcards: join('old_bam/', str(SAMPLE_LANEFILE[wildcards.sample][0]))
 		output:
-			bam = temp('sample_bam/{sample}.markDup.bam'),
-			bai = temp('sample_bam/{sample}.markDup.bai')
+			bam = 'sample_bam/{sample}.markDup.bam',
+			bai = 'sample_bam/{sample}.markDup.bai'
 		threads: 56
 		params:
 			read_group = rg
@@ -336,8 +336,8 @@ else:
 			bam = lambda wildcards: expand('lane_bam/{lane}.bam', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]]))),
 			bai = lambda wildcards: expand('lane_bam/{lane}.bam.bai', lane = list(set([re.split(r'|'.join(config['lane_pair_delim']),x.split('/')[-1])[0] for x in SAMPLE_LANEFILE[wildcards.sample]])))
 		output:
-			bam = temp('sample_bam/{sample}.markDup.bam'),
-			bai = temp('sample_bam/{sample}.markDup.bai')
+			bam = 'sample_bam/{sample}.markDup.bam',
+			bai = 'sample_bam/{sample}.markDup.bai'
 		threads: 32
 		shell:
 			"""
@@ -984,7 +984,7 @@ rule bcm_locus:
 		if [[ $(module list 2>&1 | grep "annovar" | wc -l) < 1 ]]; then module load {config[annovar_version]}; fi
 		if [[ $(module list 2>&1 | grep "vcflib" | wc -l) < 1 ]]; then module load {config[vcflib_version]}; fi
 		module load {config[vt_version]}
-		freebayes -f {config[GRCh38Decoy2]} --max-complex-gap 90 -p 10 -C 3 -F 0.05 \
+		freebayes -f {config[GRCh38Decoy2]} --max-complex-gap 80 -p 10 -C 3 -F 0.05 \
 			--genotype-qualities --strict-vcf --use-mapping-quality \
 			--targets /data/OGL/resources/bed/OPN1LWe2e5.bed \
 			{output.bam} \
@@ -1008,7 +1008,7 @@ rule bcm_locus:
 			| bcftools norm -d exact --output-type z -o {output.small_vcf}
 		tabix -p vcf {output.small_vcf}
 		bcftools concat -a --rm-dups none --no-version \
-			{output.small_vcf} {output.haplo_vcf} \
+			{output.haplo_vcf} {output.small_vcf} \
 			-Oz -o {output.vcf}
 		tabix -p vcf {output.vcf}
 		"""

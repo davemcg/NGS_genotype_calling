@@ -3,7 +3,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32g
 
-
+# run "ulimit -S -u 16384" to set the process limit to unlimited if not done. It is needed for deepvariant for multiple samples
 # If panel, install Normality package and CoNVaDING, try perldoc -lm Statistics::Normality, to find the installation location, and add "use lib '/usr/local/Perl/5.24.3/lib/perl5/site_perl/5.24.3';" on line 12 (without double quotes) before "use Statistics::Normality 'shapiro_wilk_test';" Somehow, jobs by snakemake/6.0.5 did not identify the route without this extra line. CoNVaDING is now copied to OGL shared drive.
 # to run snakemake as batch job
 # run in the data folder for this project, fastq files must be in the folder fastq.
@@ -15,10 +15,10 @@ echo "NGS_genotype_calling.git.date: '$(cat /data/OGL/resources/NGS_genotype_cal
 #git log | head -n 5 > /data/OGL/resources/NGS_genotype_calling.git.log
 
 mkdir -p 00log
-module load snakemake/6.0.5 || exit 1
+module load snakemake/7.19.1 || exit 1
 #snakemake/6.8.2 act a little bit weird. Line no. is Snakefile messed up. 3/1/2022
-#previous version 6.0.5 2/18/2022
-#previous version 5.7.4/5.24.1
+#previous version 6.0.5 Aug 2023
+
 sbcmd="sbatch --cpus-per-task={threads} \
 --mem={cluster.mem} \
 --time={cluster.time} \

@@ -3,15 +3,15 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32g
 
-# run "ulimit -S -u 16384" to set the process limit to unlimited if not done. It is needed for deepvariant for multiple samples
+# add "ulimit -S -u unlimited" to set the process limit to unlimited if not done in ~/.bashrc. It is needed for deepvariant for multiple samples
 # If panel, install Normality package and CoNVaDING, try perldoc -lm Statistics::Normality, to find the installation location, and add "use lib '/usr/local/Perl/5.24.3/lib/perl5/site_perl/5.24.3';" on line 12 (without double quotes) before "use Statistics::Normality 'shapiro_wilk_test';" Somehow, jobs by snakemake/6.0.5 did not identify the route without this extra line. CoNVaDING is now copied to OGL shared drive.
 # to run snakemake as batch job
 # run in the data folder for this project, fastq files must be in the folder fastq.
 # sbatch --time=12:0:0 ~/git/NGS_genotype_calling/Snakemake.wrapper.sh config_panel.yaml (--dryrun, --notemp, --unlock)
 #When there is two or more *metadata_file*.csv present in the folder, then -e *metadata_file.csv will produce "binary operator expected". Thus changed to only single file.
 
-echo "NGS_genotype_calling.git: '$(cat /data/OGL/resources/NGS_genotype_calling.git.log | head -n 1)'" >> $1
-echo "NGS_genotype_calling.git.date: '$(cat /data/OGL/resources/NGS_genotype_calling.git.log | head -n 3 | tail -n 1 | sed s/"^Date:   "//)'" >> $1
+#echo "NGS_genotype_calling.git: '$(cat /data/OGL/resources/NGS_genotype_calling.git.log | head -n 1)'" >> $1
+#echo "NGS_genotype_calling.git.date: '$(cat /data/OGL/resources/NGS_genotype_calling.git.log | head -n 3 | tail -n 1 | sed s/"^Date:   "//)'" >> $1
 #git log | head -n 5 > /data/OGL/resources/NGS_genotype_calling.git.log
 
 mkdir -p 00log

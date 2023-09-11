@@ -39,7 +39,7 @@ gatk_version: 'GATK/3.8-0'
 bazam_version: 'bazam/1.0.1'
 bwa_version: 'bwa/0.7.17'
 bwa-mem2_version: 'bwa-mem2/2.2.1'
-biobambam2_version: 'biobambam2//2.0.185-release-20221211202123' #updated from 2.0.183-release-20210802180148 Aug 2023
+biobambam2_version: 'biobambam2/2.0.185-release-20221211202123' #updated from 2.0.183-release-20210802180148 Aug 2023
 samblaster_version: 'samblaster/0.1.26' #from 0.1.26 Aug 2023
 sambamba_version: 'sambamba/1.0.0' #from 0.8.1 Aug 2023
 annovar_version: 'annovar/2020-06-08' #updated from 2019-10-24 on 3/4/2022

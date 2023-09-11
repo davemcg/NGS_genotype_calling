@@ -313,7 +313,7 @@ rule fastqc:
 	threads: 8
 	shell:
 		"""
-		module load fastqc
+		module load fastqc/0.11.9
 		mkdir -p fastqc
 		mkdir -p fastqc/{wildcards.sample}
 		fastqc -t {threads} -o {output} {input.bam}
@@ -325,7 +325,7 @@ rule multiqc_fastqc:
 		directory('fastqc/multiqc_report')
 	shell:
 		"""
-		module load multiqc
+		module load multiqc/1.14
 		multiqc -f -o {output} fastqc/
 		"""
 

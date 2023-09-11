@@ -403,7 +403,7 @@ rule fastqc:
 	threads: 8
 	shell:
 		"""
-		module load fastqc
+		module load fastqc/0.11.9
 		mkdir -p fastqc
 		mkdir -p fastqc/{wildcards.sample}
 		fastqc -t {threads} -o {output} {input.bam}
@@ -415,7 +415,7 @@ rule multiqc_fastqc:
 		directory('fastqc/multiqc_report')
 	shell:
 		"""
-		module load multiqc
+		module load multiqc/1.14
 		multiqc -f -o {output} fastqc/
 		"""
 #finished <10 min for one sample job.
@@ -558,26 +558,28 @@ rule deepvariantS1:
 		rm -rf $WORK_DIR/input $WORK_DIR/output $WORK_DIR/logs $WORK_DIR/temp
 		mkdir -p $WORK_DIR/input $WORK_DIR/output $WORK_DIR/logs $WORK_DIR/temp
 		cp {input} {config[ref_genome]} {config[ref_genome]}.fai $DV_INPUT_DIR || exit 1
-		( time seq 0 $((N_SHARDS-1)) | parallel -j {threads} --eta --halt 2 --line-buffer \
+		( time seq 0 $((N_SHARDS-1)) | parallel -q --halt 2 --line-buffer \
 			make_examples --mode calling \
 			--ref  $DV_INPUT_DIR/$(basename {config[ref_genome]}) \
 			--reads $DV_INPUT_DIR/$(basename {input.bam}) \
 			--examples "${{EXAMPLES}}" \
+			--channels "insert_size" \
 			--gvcf "${{GVCF_TFRECORDS}}" \
+			--sample_name "{wildcards.sample}" \
 			--task {{}} \
 		) 2>&1 | tee "${{LOG}}/{wildcards.sample}.make_examples.log"
 		echo "Done." || exit 1
 		cp ${{DV_OUTPUT_DIR}}/{wildcards.sample}.examples.* ${{PROJECT}}/examples
 		cp ${{DV_OUTPUT_DIR}}/{wildcards.sample}.gvcf.* ${{PROJECT}}/gvcf_tfrecords || exit 1
 		"""
-
+#-j {threads} --eta #replaced with -q in parallel
 #45min; changed threads from 24 to 14 on 12/17/20, since p100 & v100 gpu has 56 cpus and 4 gpus per node. CPUs only used briefly during runs
 # "extra" : "--constraint='[gpuv100|gpup100|gpuv100x]' --gres=lscratch:100,gpu:1",
 rule deepvariantS2:
 	input:
 		'deepvariant/{sample}/examples'
 	output:
-		temp('deepvariant/{sample}/call_variants/{sample}.call_variants_output.tfrecord.gz')
+		temp(directory('deepvariant/{sample}/call_variants'))
 	threads: 8
 	shell:
 		"""
@@ -612,7 +614,7 @@ rule deepvariantS3:
 	input:
 		examples = 'deepvariant/{sample}/examples',
 		gvcf_tfrecords = 'deepvariant/{sample}/gvcf_tfrecords',
-		tfrecord = 'deepvariant/{sample}/call_variants/{sample}.call_variants_output.tfrecord.gz',
+		tfrecord_dir = 'deepvariant/{sample}/call_variants',
 		bam = 'sample_bam/{sample}.markDup.bam',
 		bai = 'sample_bam/{sample}.markDup.bai'
 	output:
@@ -646,6 +648,7 @@ rule deepvariantS3:
       		--outfile "${{OUTPUT_VCF}}" \
       		--nonvariant_site_tfrecord_path "${{GVCF_TFRECORDS}}" \
       		--gvcf_outfile "${{OUTPUT_GVCF}}" \
+			--sample_name "{wildcards.sample}" \
 		) 2>&1 | tee "${{LOG}}/{wildcards.sample}.postprocess_variants.log" || exit 1
 		cp ${{OUTPUT_VCF}}* ${{DV_OUTPUT_DIR}}/*.html deepvariant/vcf || exit 2
 		cp ${{OUTPUT_GVCF}}* deepvariant/gvcf || exit 2

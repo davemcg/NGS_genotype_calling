@@ -15,7 +15,9 @@ automap <- read_tsv(automap_file, col_names = TRUE, na = c("NA", "", "None", "."
   type_convert() %>% unite("key", `#Chr`:End, sep = "-", remove = FALSE) %>% mutate(key = sub("^chr", "", key))
 
 annotsv <- read_tsv(annotsv_file, col_names = TRUE, na = c("NA", "", "None", "."), col_types = cols(.default = col_character())) %>%
-  type_convert() %>% filter(Annotation_mode == "full") %>% unite("key", SV_chrom:SV_end, sep = "-", remove = FALSE) %>% 
+  type_convert() %>% filter(Annotation_mode == "full") %>%
+  mutate(SV_start = SV_start - 1) %>% 
+  unite("key", SV_chrom:SV_end, sep = "-", remove = FALSE) %>% 
   select(key, Gene_name, Gene_count, OMIM_ID, OMIM_morbid, OMIM_morbid_candidate, DDD_HI_percent)
 
 eyeGeneList <- read_xlsx(geneCategory_file, sheet = "analysis", na = c("NA", "", "None", ".")) %>% select(gene, panel_class) %>% pull(gene)

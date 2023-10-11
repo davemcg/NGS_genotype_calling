@@ -579,7 +579,7 @@ rule deepvariantS2:
 	input:
 		'deepvariant/{sample}/examples'
 	output:
-		temp(directory('deepvariant/{sample}/call_variants'))
+		temp('deepvariant/{sample}/{sample}.call_variants_output.tfrecord.gz')
 	threads: 8
 	shell:
 		"""
@@ -605,8 +605,8 @@ rule deepvariantS2:
     		--examples "${{EXAMPLES}}" \
     		--checkpoint "${{MODEL}}" \
 		) 2>&1 | tee "${{LOG}}/{wildcards.sample}.call_variants.log"
-		echo "Done." || exit 2
-		cp ${{CALL_VARIANTS_OUTPUT}} ${{PROJECT}}/call_variants || exit 3
+		echo "Done."
+		cp ${{CALL_VARIANTS_OUTPUT}} ${{PROJECT}}
 		"""
 
 #90min
@@ -614,7 +614,7 @@ rule deepvariantS3:
 	input:
 		examples = 'deepvariant/{sample}/examples',
 		gvcf_tfrecords = 'deepvariant/{sample}/gvcf_tfrecords',
-		tfrecord_dir = 'deepvariant/{sample}/call_variants',
+		tfrecord = 'deepvariant/{sample}/{sample}.call_variants_output.tfrecord.gz',
 		bam = 'sample_bam/{sample}.markDup.bam',
 		bai = 'sample_bam/{sample}.markDup.bai'
 	output:
@@ -640,7 +640,7 @@ rule deepvariantS3:
 		OUTPUT_GVCF="${{DV_OUTPUT_DIR}}/{wildcards.sample}.g.vcf.gz"
 		rm -rf $WORK_DIR/input $WORK_DIR/output $WORK_DIR/logs $WORK_DIR/temp
 		mkdir -p $WORK_DIR/input $WORK_DIR/output $WORK_DIR/logs $WORK_DIR/temp
-		cp ${{PROJECT}}/gvcf_tfrecords/* {config[ref_genome]} {config[ref_genome]}.fai ${{PROJECT}}/call_variants/${{CV_FILE}} ${{DV_OUTPUT_DIR}} || exit 1
+		cp ${{PROJECT}}/gvcf_tfrecords/* {config[ref_genome]} {config[ref_genome]}.fai ${{PROJECT}}/${{CV_FILE}} ${{DV_OUTPUT_DIR}} || exit 1
 		( time \
     		postprocess_variants \
       		--ref $DV_OUTPUT_DIR/$(basename {config[ref_genome]}) \

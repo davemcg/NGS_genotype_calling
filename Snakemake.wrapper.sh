@@ -10,8 +10,9 @@
 # sbatch --time=12:0:0 ~/git/NGS_genotype_calling/Snakemake.wrapper.sh config_panel.yaml (--dryrun, --notemp, --unlock, --rerun-triggers mtime) --rerun-triggers will not rerun previously successful job.
 #When there is two or more *metadata_file*.csv present in the folder, then -e *metadata_file.csv will produce "binary operator expected". Thus changed to only single file.
 
-#echo "NGS_genotype_calling.git: '$(cat /data/OGL/resources/NGS_genotype_calling.git.log | head -n 1)'" >> $1
-#echo "NGS_genotype_calling.git.date: '$(cat /data/OGL/resources/NGS_genotype_calling.git.log | head -n 3 | tail -n 1 | sed s/"^Date:   "//)'" >> $1
+echo "NGS_genotype_calling.git.version: '$(tail -n 1 /data/OGL/resources/NGS_genotype_calling.git.log)'" >> $1
+echo "NGS_genotype_calling.git: '$(cat /data/OGL/resources/NGS_genotype_calling.git.log | head -n 1)'" >> $1
+echo "NGS_genotype_calling.git.date: '$(cat /data/OGL/resources/NGS_genotype_calling.git.log | head -n 3 | tail -n 1 | sed s/"^Date:   "//)'" >> $1
 #git log | head -n 5 > /data/OGL/resources/NGS_genotype_calling.git.log
 
 mkdir -p 00log

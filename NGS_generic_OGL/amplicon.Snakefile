@@ -129,6 +129,14 @@ rule dummy:
 		touch {output}
 		"""
 
+localrules: align
+localrules: merge_lane_bam
+localrules: manta
+localrules: fastqc
+localrules: freebayes_phasing
+localrules: deepvariant
+localrules: scramble
+
 #		expand('INDELseek/{sample}.INDELseek.vcf', sample=list(SAMPLE_LANEFILE.keys())),
 #expand('sample_bam/{sample}.bam', sample=list(SAMPLE_LANEFILE.keys())),
 
@@ -280,19 +288,12 @@ rule merge_lane_bam:
 		module load {config[sambamba_version]}
 		case "{input.bam}" in
 			*\ *)
-				sambamba merge -t {threads} /lscratch/$SLURM_JOB_ID/{wildcards.sample}.bam {input.bam}
-				sambamba markdup -t {threads} -l 6 \
-					--tmpdir=/lscratch/$SLURM_JOB_ID/{wildcards.sample} \
-					/lscratch/$SLURM_JOB_ID/{wildcards.sample}.bam \
-					{output.bam}
+				sambamba merge -t {threads} {output.bam} {input.bam}
 				mv {output.bam}.bai {output.bai}
 				;;
 			*)
-				sambamba markdup -t {threads} -l 6 \
-					--tmpdir=/lscratch/$SLURM_JOB_ID/{wildcards.sample} \
-					{input.bam} \
-					{output.bam}
-				mv {output.bam}.bai {output.bai}
+				cp -p -l {input.bam} {output.bam}
+				cp -p -l {input.bai} {output.bai}
 				;;
 		esac
 		"""
@@ -1096,13 +1097,18 @@ rule manta:
 		configManta.py --referenceFasta {config[ref_genome]} \
 			--exome --runDir $RUNDIR --bam {input.bam}
 		$RUNDIR/runWorkflow.py -m local -j {threads} -g $((SLURM_MEM_PER_NODE / 1024))
-		cp $RUNDIR/results/variants/diploidSV.vcf.gz manta/{wildcards.sample}.diploidSV.vcf.gz
-		cp $RUNDIR/results/variants/diploidSV.vcf.gz.tbi manta/{wildcards.sample}.diploidSV.vcf.gz.tbi
-		module load {config[annotsv_version]}
-		AnnotSV -SVinputFile $RUNDIR/results/variants/diploidSV.vcf.gz \
-			-SVinputInfo 1 -genomeBuild {config[genomeBuild]} \
-			-outputDir $RUNDIR \
-			-outputFile $RUNDIR/manta.{wildcards.sample}.annotated.tsv
+		if [ -e $RUNDIR/results/variants/diploidSV.vcf.gz ];
+		then
+			cp $RUNDIR/results/variants/diploidSV.vcf.gz manta/{wildcards.sample}.diploidSV.vcf.gz
+			cp $RUNDIR/results/variants/diploidSV.vcf.gz.tbi manta/{wildcards.sample}.diploidSV.vcf.gz.tbi
+			module load {config[annotsv_version]}
+			AnnotSV -SVinputFile $RUNDIR/results/variants/diploidSV.vcf.gz \
+				-SVinputInfo 1 -genomeBuild {config[genomeBuild]} \
+				-outputDir $RUNDIR \
+				-outputFile $RUNDIR/manta.{wildcards.sample}.annotated.tsv
+		else
+			touch {output}
+		fi
 		if [ -e $RUNDIR/manta.{wildcards.sample}.annotated.tsv ];
 		then
 			cp $RUNDIR/manta.{wildcards.sample}.annotated.tsv {output}

@@ -710,7 +710,7 @@ rule deepvariant:
 		run_deepvariant --model_type WES --num_shards $N_SHARDS \
 			--ref {config[ref_genome]} \
 			--regions {config[padded_bed]} \
-			--reads $WORK_DIR/$(basename {input.bam})  \
+			--reads $WORK_DIR/$(basename {input.bam}) \
 			--output_vcf $WORK_DIR/$(basename {output.vcf}) \
 			--output_gvcf $WORK_DIR/$(basename {output.gvcf}) \
 			--sample_name {wildcards.sample} \

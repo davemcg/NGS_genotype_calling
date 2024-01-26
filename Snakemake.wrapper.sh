@@ -7,7 +7,7 @@
 # If panel, install Normality package and CoNVaDING, try perldoc -lm Statistics::Normality, to find the installation location, and add "use lib '/usr/local/Perl/5.24.3/lib/perl5/site_perl/5.24.3';" on line 12 (without double quotes) before "use Statistics::Normality 'shapiro_wilk_test';" Somehow, jobs by snakemake/6.0.5 did not identify the route without this extra line. CoNVaDING is now copied to OGL shared drive.
 # to run snakemake as batch job
 # run in the data folder for this project, fastq files must be in the folder fastq.
-# sbatch --time=12:0:0 ~/git/NGS_genotype_calling/Snakemake.wrapper.sh config_panel.yaml (--dryrun, --notemp, --unlock)
+# sbatch --time=12:0:0 ~/git/NGS_genotype_calling/Snakemake.wrapper.sh config_panel.yaml (--dryrun, --notemp, --unlock, --rerun-triggers mtime) --rerun-triggers will not rerun previously successful job.
 #When there is two or more *metadata_file*.csv present in the folder, then -e *metadata_file.csv will produce "binary operator expected". Thus changed to only single file.
 
 #echo "NGS_genotype_calling.git: '$(cat /data/OGL/resources/NGS_genotype_calling.git.log | head -n 1)'" >> $1
@@ -63,7 +63,16 @@ case "${ngstype^^}" in
 		-pr --local-cores 2 --jobs 1999 \
 		--cluster-config /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/panel.cluster.json \
 		--cluster "$sbcmd"  --latency-wait 120 --rerun-incomplete \
-		-k --restart-times 0 \
+		-k --restart-times 1 \
+		--resources res=1 \
+		--configfile $@
+		;;
+	"AMPLICON"|"AMP")
+		snakemake -s /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/amplicon.Snakefile \
+		-pr --local-cores 2 --jobs 1999 \
+		--cluster-config /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/panel.cluster.json \
+		--cluster "$sbcmd"  --latency-wait 120 --rerun-incomplete \
+		-k --restart-times 1 \
 		--resources res=1 \
 		--configfile $@
 		;;
@@ -72,7 +81,7 @@ case "${ngstype^^}" in
 		-pr --local-cores 2 --jobs 1999 \
 		--cluster-config /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/exome.cluster.json \
 		--cluster "$sbcmd"  --latency-wait 120 --rerun-incomplete \
-		-k --restart-times 0 \
+		-k --restart-times 1 \
 		--resources res=1 \
 		--configfile $@
 		;;
@@ -81,7 +90,7 @@ case "${ngstype^^}" in
 		-pr --local-cores 2 --jobs 1999 \
 		--cluster-config /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/cluster.json \
 		--cluster "$sbcmd"  --latency-wait 120 --rerun-incomplete \
-		-k --restart-times 0 \
+		-k --restart-times 1 \
 		--resources res=1 \
 		--configfile $@
 		;;

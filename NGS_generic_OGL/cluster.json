@@ -19,7 +19,7 @@
 	"deepvariantS2" :
 	{
 		"partition" : "gpu",
-		"extra" : "--constraint='gpup100' --gres=lscratch:100,gpu:1",
+		"extra" : "--constraint='[gpuv100|gpup100|gpuv100x|gpua100]' --gres=lscratch:100,gpu:1",
 		"time" : "3:00:00",
 		"mem" : "8g"
 	},

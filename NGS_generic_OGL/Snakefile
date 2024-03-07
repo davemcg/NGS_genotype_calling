@@ -986,7 +986,7 @@ rule bcm_locus:
 		if [[ $(module list 2>&1 | grep "freebayes" | wc -l) < 1 ]]; then module load {config[freebayes_version]}; fi
 		if [[ $(module list 2>&1 | grep "annovar" | wc -l) < 1 ]]; then module load {config[annovar_version]}; fi
 		if [[ $(module list 2>&1 | grep "vcflib" | wc -l) < 1 ]]; then module load {config[vcflib_version]}; fi
-		module load {config[vt_version]}
+		if [[ $(module list 2>&1 | grep "vt/" | wc -l) < 1 ]]; then module load {config[vt_version]}; fi
 		freebayes -f {config[GRCh38Decoy2]} --max-complex-gap 80 -p 10 -C 3 -F 0.05 \
 			--genotype-qualities --strict-vcf --use-mapping-quality \
 			--targets /data/OGL/resources/bed/OPN1LWe2e5.bed \
@@ -1007,11 +1007,11 @@ rule bcm_locus:
 			| bcftools norm --multiallelics -any --output-type u - \
 			| vt decompose_blocksub -p -m -d 2 - \
 			| bcftools norm --check-ref s --fasta-ref {config[GRCh38Decoy2]} --output-type u - \
-			| bcftools annotate --set-id 'sm_%CHROM\:%POS%REF\>%ALT' -x ^INFO/AO,^FORMAT/GT,FORMAT/DP,FORMAT/VAF --output-type v --no-version \
+			| bcftools annotate --set-id 'sml_%CHROM\:%POS%REF\>%ALT' -x ^INFO/AO,^FORMAT/GT,FORMAT/DP,FORMAT/VAF --output-type v --no-version \
 			| bcftools norm -d exact --output-type z -o {output.small_vcf}
 		tabix -p vcf {output.small_vcf}
 		bcftools concat -a --rm-dups none --no-version \
-			{output.haplo_vcf} {output.small_vcf} \
+			{output.small_vcf} {output.haplo_vcf} \
 			-Oz -o {output.vcf}
 		tabix -p vcf {output.vcf}
 		"""

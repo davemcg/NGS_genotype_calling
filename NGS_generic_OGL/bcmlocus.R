@@ -6,6 +6,7 @@ bcmlocus_file <- args[1]
 sampleName <- args[2]
 annovar_file <- args[3]
 annovar_edited_file <- args[4]
+annovar_edited_excelFile <- args[5]
 # CN calculation; rearrangedGemini_file <- args[3]
 
 library(tidyverse)
@@ -17,7 +18,7 @@ bcmlocus <- read_xlsx(bcmlocus_file, sheet = "bcmlocus", na = c("NA", "", "None"
   separate(AAChange.refGeneWithVer, c("Gene", "Transcript", "Exon", "HGVSc", "HGVSp"), sep = ":", remove = TRUE, convert = TRUE) %>% 
   select(caller,Gene,HGVSc:ACMG_Class)
 
-annovar <- read_tsv(annovar_file, col_names = TRUE, na = c("NA", "", "None"), col_types = cols(.default = col_character())) %>%
+annovar <- read_tsv(annovar_file, col_names = TRUE, na = c("NA", "", "None", "."), col_types = cols(.default = col_character())) %>%
   type_convert() %>%
   separate_rows(Gene.refGeneWithVer, sep = ";") %>% 
   filter(!Gene.refGeneWithVer %in% c("OPN1MW2", "OPN1MW3")) %>% 
@@ -26,16 +27,18 @@ annovar <- read_tsv(annovar_file, col_names = TRUE, na = c("NA", "", "None"), co
   separate(AAChange.refGeneWithVer, c("Gene", "Transcript", "Exon", "HGVSc", "HGVSp"), sep = ":", remove = FALSE, convert = TRUE) %>% 
   mutate(Note = "") %>% 
   mutate(Sample = sampleName) %>% 
-  filter(QUAL > 1) %>% 
+  filter(QUAL > 0) %>% 
   separate(ID, c("caller", "variant"), sep = "_", remove = FALSE)
 
 annovar_edit <- left_join(annovar, bcmlocus, by=c("caller","Gene","HGVSc", "HGVSp")) %>%
-  separate(GT_FIELDS, c("GT","DP","VAF"), sep = ":", convert = TRUE) %>%
-  separate(INFO, c("AO", "temp_DP"), sep = ";", remove = TRUE) %>% 
+  separate(GT_FIELDS, c("GT","DP","VAF","PS"), sep = ":", convert = TRUE) %>%
+  separate(INFO, c("AO", "temp_DP"), sep = ";", remove = FALSE) %>% 
   mutate(AO = as.integer(sub("AO=", "", AO))) %>% 
+  mutate(AO = ifelse(is.na(INFO), round(DP * VAF, 0), AO)) %>% 
   mutate(VAF=round(VAF, 2)) %>% 
+  mutate(GT = ifelse(caller == "haplo", "", GT)) %>% 
   select(CHROM, POS, ID, REF, ALT, QUAL, Func.refGeneWithVer, Gene.refGeneWithVer, GeneDetail.refGeneWithVer, ExonicFunc.refGeneWithVer, AAChange.refGeneWithVer,
-         HGVSp, Annotation, Function, ACMG_Class, Note, Sample,VAF,AO,DP) %>% 
+         HGVSp, Annotation, Function, ACMG_Class, Note, Sample,VAF,AO,DP,GT,PS) %>% 
   replace_na(list(Annotation = "", Function = "", ACMG_Class = ""))
 
 
@@ -54,5 +57,6 @@ annovar_edit <- left_join(annovar, bcmlocus, by=c("caller","Gene","HGVSc", "HGVS
 #   arrange(POS) %>% 
 #   replace_na(list(Annotation = "", Function = "", ACMG_Class = ""))
   
-write_tsv(annovar_edit, file = annovar_edited_file)
+write_tsv(annovar_edit, file = annovar_edited_file, na=".")
+openxlsx::write.xlsx(list("bcm" = annovar_edit), file = annovar_edited_excelFile, firstRow = TRUE, firstCol = TRUE)
 

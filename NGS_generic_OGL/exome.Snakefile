@@ -975,15 +975,34 @@ rule bcm_locus:
 		if [[ $(module list 2>&1 | grep "samtools" | wc -l) < 1 ]]; then module load {config[samtools_version]}; fi
 		if [[ $(module list 2>&1 | grep "freebayes" | wc -l) < 1 ]]; then module load {config[freebayes_version]}; fi
 		if [[ $(module list 2>&1 | grep "annovar" | wc -l) < 1 ]]; then module load {config[annovar_version]}; fi
-		freebayes -f {config[GRCh38Decoy2]} --max-complex-gap 80 -p 6 -C 3 -F 0.05 \
+		if [[ $(module list 2>&1 | grep "vcflib" | wc -l) < 1 ]]; then module load {config[vcflib_version]}; fi
+		if [[ $(module list 2>&1 | grep "vt/" | wc -l) < 1 ]]; then module load {config[vt_version]}; fi
+		freebayes -f {config[GRCh38Decoy2]} --max-complex-gap 80 -p 10 -C 3 -F 0.05 \
 			--genotype-qualities --strict-vcf --use-mapping-quality \
 			--targets /data/OGL/resources/bed/OPN1LWe2e5.bed \
 			{output.bam} \
+			| vcffilter -f "QUAL > 10" \
+			| bcftools +fill-tags - -Ou -- -t VAF \
 			| bcftools norm --multiallelics -any --output-type u - \
-			| bcftools annotate --set-id '%CHROM\:%POS%REF\>%ALT' -x ^INFO/AF --output-type u --no-version \
-			| bcftools norm --check-ref s --fasta-ref {config[GRCh38Decoy2]} --output-type u --no-version - \
-			| bcftools norm -d exact --output-type v - \
-			> {output.vcf}
+			| bcftools norm --check-ref s --fasta-ref {config[GRCh38Decoy2]}  --output-type u --no-version - \
+			| bcftools annotate --set-id 'haplo_%CHROM\:%POS%REF\>%ALT' -x ^INFO/AO,^FORMAT/GT,FORMAT/DP,FORMAT/VAF --output-type u --no-version \
+			| bcftools norm -d exact --output-type z -o {output.haplo_vcf}
+		tabix -p vcf {output.haplo_vcf}
+ 		freebayes -f {config[GRCh38Decoy2]} --limit-coverage 1000 --min-alternate-fraction 0.05 -C 3 -p 10 \
+			--min-mapping-quality 0 --genotype-qualities --strict-vcf --use-mapping-quality \
+			--targets /data/OGL/resources/bed/OPN1LWe1e6_MWe1.bed \
+			{output.bam} \
+			| vcffilter -f "QUAL > 10 & SAF > 0 & SAR > 0 & RPR > 0 & RPL > 0 & AO > 2 & DP > 5" \
+			| bcftools +fill-tags - -Ou -- -t VAF \
+			| bcftools norm --multiallelics -any --output-type u - \
+			| vt decompose_blocksub -p -m -d 2 - \
+			| bcftools norm --check-ref s --fasta-ref {config[GRCh38Decoy2]} --output-type u - \
+			| bcftools annotate --set-id 'sml_%CHROM\:%POS%REF\>%ALT' -x ^INFO/AO,^FORMAT/GT,FORMAT/DP,FORMAT/VAF --output-type v --no-version \
+			| bcftools norm -d exact --output-type z -o {output.small_vcf}
+		tabix -p vcf {output.small_vcf}
+		bcftools concat -a --rm-dups none --no-version \
+			{output.small_vcf} {output.haplo_vcf} \
+			-Oz -o {output.vcf}
 		convert2annovar.pl -format vcf4old {output.vcf} -includeinfo --outfile {output.avinput}
 		if [[ {config[genomeBuild]} == "GRCh38" ]]; then
 			ver=hg38
@@ -1006,7 +1025,7 @@ rule bcm_locus:
 			if [[ $(module list 2>&1 | grep "R/" | wc -l) < 1 ]]; then module load {config[R_version]}; fi
 			Rscript ~/git/NGS_genotype_calling/NGS_generic_OGL/bcmlocus.R \
 				/data/OGL/resources/bcmlocus.xlsx \
-				{wildcards.sample} bcmlocus/{wildcards.sample}.avinput."$ver"_multianno.txt {output.bcm_out}
+				{wildcards.sample} bcmlocus/{wildcards.sample}.avinput."$ver"_multianno.txt {output.bcm_out} {output.bcm_out}.xlsx
 			rm bcmlocus/{wildcards.sample}.avinput."$ver"_multianno.txt
 		else
 			touch {output.bcm_out}

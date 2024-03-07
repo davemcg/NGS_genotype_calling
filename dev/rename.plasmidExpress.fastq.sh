@@ -1,3 +1,4 @@
+#rename file 001_RGR015-002_reads.fastq.gz to RGR015-002_reads.fastq.gz
 cd fastq
 ls > ../rename.sh
 cd ..

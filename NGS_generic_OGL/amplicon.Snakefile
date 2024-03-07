@@ -129,7 +129,7 @@ rule dummy:
 		touch {output}
 		"""
 
-localrules: align
+#localrules: align
 localrules: merge_lane_bam
 localrules: manta
 localrules: fastqc

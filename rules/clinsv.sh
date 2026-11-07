@@ -7,6 +7,9 @@
 
 config=$1
 sample=$2
+#test
+#cd /data/OGL/development/genome/clinSV
+#bash ~/git/NGS_genotype_calling/rules/clinsv.sh config_generic.yaml NA12878
 
 #selecting mapped reads using subset_mapped_reads.sh reduced sample processing time to 44 hours.
 #selecting reads using subset_chr1-M_reads.sh ???
@@ -17,25 +20,30 @@ module load clinsv/1.1
 refdata_path=/usr/local/apps/clinsv/ref_hg38/clinsv/refdata-b38
 input_path=$PWD
 project_folder=/lscratch/$SLURM_JOB_ID/clinSV/$sample
+
 mkdir -p $project_folder
-singularity run --bind $refdata_path:/app/ref-data/refdata-b38 \
-	--bind $project_folder:/app/project_folder \
-	--bind $input_path:/app/input \
-	/usr/local/apps/clinsv/1.1/libexec/1.1.sif \
-	/app/clinsv/bin/clinsv \
-	-r all -f \
-	-p /app/project_folder/ \
-	-i "/app/input/sample_bam/$sample.markDup.bam" \
-	-ref /app/ref-data/refdata-b38
+
+singularity exec --bind $refdata_path:/app/ref-data/refdata-b38 \
+ --bind $project_folder:/app/project_folder \
+ --bind $input_path:/app/input \
+ /usr/local/apps/clinsv/1.1/libexec/v2.2.sif \
+ perl /app/clinsv/bin/clinsv \
+ -r all -f \
+ -p /app/project_folder/ \
+ -i "/app/input/sample_bam/$sample.markDup.bam" \
+ -ref /app/ref-data/refdata-b38
+
+mkdir -p clinSV/$sample
 mv $project_folder/SVs/joined/SV-CNV.vcf.gz clinSV/$sample/$sample.clinsv.SV-CNV.vcf.gz
 mv $project_folder/SVs/joined/SV-CNV.vcf.gz.tbi clinSV/$sample/$sample.clinsv.SV-CNV.vcf.gz.tbi
 mv $project_folder/SVs/joined/SV-CNV.PASS.vcf clinSV/$sample/$sample.clinsv.SV-CNV.PASS.vcf
 mv $project_folder/SVs/joined/SV-CNV.RARE_PASS_GENE.vcf clinSV/$sample/$sample.clinsv.SV-CNV.RARE_PASS_GENE.vcf
 mv $project_folder/results/$sample.QC_report.pdf clinSV/$sample/$sample.QC_report.pdf
+mv $project_folder/igv/*.xml clinSV/$sample/$sample.igv.xml
 
 module load $(grep "^samtools_version:" $config | head -n 1 | cut -d"'" -f 2)
-bgzip clinSV/$sample/$sample.clinsv.SV-CNV.PASS.vcf
-bgzip clinSV/$sample/$sample.clinsv.SV-CNV.RARE_PASS_GENE.vcf
+bgzip -f clinSV/$sample/$sample.clinsv.SV-CNV.PASS.vcf
+bgzip -f clinSV/$sample/$sample.clinsv.SV-CNV.RARE_PASS_GENE.vcf
 tabix -f -p vcf clinSV/$sample/$sample.clinsv.SV-CNV.PASS.vcf.gz
 tabix -f -p vcf clinSV/$sample/$sample.clinsv.SV-CNV.RARE_PASS_GENE.vcf.gz
 

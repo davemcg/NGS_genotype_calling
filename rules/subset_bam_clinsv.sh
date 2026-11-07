@@ -22,18 +22,19 @@ if (( $(module list 2>&1 | grep " R/" | wc -l) == 1 )); then module unload R; fi
 module load clinsv/1.1
 refdata_path=/usr/local/apps/clinsv/ref_hg38/clinsv/refdata-b38
 input_path=$PWD
-project_folder=$PWD/clinSV/$sample
+project_folder=/lscratch/$SLURM_JOB_ID/clinSV/$sample
 rm -rf $project_folder
 mkdir -p $project_folder
-singularity run --bind $refdata_path:/app/ref-data/refdata-b38 \
-	--bind $project_folder:/app/project_folder \
-	--bind $input_path:/app/input \
-	/usr/local/apps/clinsv/1.1/libexec/1.1.sif \
-	/app/clinsv/bin/clinsv \
-	-r all -f \
-	-p /app/project_folder/ \
-	-i "/app/input/sample_bam/subset/$sample.markDup.bam" \
-	-ref /app/ref-data/refdata-b38
+singularity exec --bind $refdata_path:/app/ref-data/refdata-b38 \
+ --bind $project_folder:/app/project_folder \
+ --bind $input_path:/app/input \
+ /usr/local/apps/clinsv/1.1/libexec/v2.2.sif \
+ perl /app/clinsv/bin/clinsv \
+ -r all -f \
+ -p /app/project_folder/ \
+ -i "/app/input/sample_bam/subset/$sample.markDup.bam" \
+ -ref /app/ref-data/refdata-b38
+
 cp clinSV/$sample/SVs/joined/SV-CNV.vcf.gz clinSV/$sample.clinsv.SV-CNV.vcf.gz
 cp clinSV/$sample/SVs/joined/SV-CNV.vcf.gz.tbi clinSV/$sample.clinsv.SV-CNV.vcf.gz.tbi
 cp clinSV/$sample/SVs/joined/SV-CNV.PASS.vcf clinSV/$sample.clinsv.SV-CNV.PASS.vcf

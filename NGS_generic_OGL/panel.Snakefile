@@ -185,9 +185,9 @@ if config['cutadapt'] == 'TRUE':
 			export TMPDIR=/lscratch/$SLURM_JOB_ID
 			echo {params.read_group}
 			module load {config[bwa-mem2_version]} {config[samblaster_version]} {config[sambamba_version]}
-			bwa-mem2 mem -t {threads} -K 100000000 -M -Y -B 4 -O 6 -E 1 -R {params.read_group} \
+			bwa-mem2 mem -t {threads} -K 100000000 -Y -R {params.read_group} \
 				{config[bwa-mem2_ref]} {input} \
-			 	| samblaster -M --acceptDupMarks --addMateTags --quiet \
+			 	| samblaster --acceptDupMarks --addMateTags --quiet \
 				| sambamba sort -u --compression-level 6 --tmpdir=/lscratch/$SLURM_JOB_ID -t {threads} -o {output.bam} \
 					<(sambamba view -S -f bam --compression-level 0 -t $SLURM_CPUS_PER_TASK /dev/stdin)
 			"""
@@ -216,8 +216,8 @@ elif config['inputFileType'].upper() in ['BAM', 'CRAM']:
  			case "{input}" in
 				*bam)
 					java -Xmx12g -jar $BAZAMPATH/bazam.jar -bam {input} \
-					| bwa-mem2 mem -t 8 -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[bwa-mem2_ref]} - \
-			 		| samblaster -M --addMateTags --quiet \
+					| bwa-mem2 mem -t 8 -K 100000000 -Y -p -R {params.read_group} {config[bwa-mem2_ref]} - \
+			 		| samblaster --addMateTags --quiet \
 					| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t 8 -o {output.bam} \
 						<(sambamba view -S -f bam -l 0 -t 8 /dev/stdin)
 					mv {output.bam}.bai {output.bai}
@@ -225,8 +225,8 @@ elif config['inputFileType'].upper() in ['BAM', 'CRAM']:
 					;;
 				*cram)
 					java -Xmx12g -Dsamjdk.reference_fasta={config[old_cram_ref]} -jar $BAZAMPATH/bazam.jar -bam {input} \
-					| bwa-mem2 mem -t 8 -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[bwa-mem2_ref]} - \
-			 		| samblaster -M --addMateTags --quiet \
+					| bwa-mem2 mem -t 8 -K 100000000 -Y -p -R {params.read_group} {config[bwa-mem2_ref]} - \
+			 		| samblaster --addMateTags --quiet \
 					| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t 8 -o {output.bam} \
 						<(sambamba view -S -f bam -l 0 -t 6 /dev/stdin)
 					mv {output.bam}.bai {output.bai}
@@ -254,9 +254,9 @@ else:
 			export TMPDIR=/lscratch/$SLURM_JOB_ID
 			echo {params.read_group}
 			module load {config[bwa-mem2_version]} {config[samblaster_version]} {config[sambamba_version]}
-			bwa-mem2 mem -t {threads} -K 100000000 -M -Y -B 4 -O 6 -E 1 -R {params.read_group} \
+			bwa-mem2 mem -t {threads} -K 100000000 -Y -R {params.read_group} \
 				{config[bwa-mem2_ref]} {input} \
-			 	| samblaster -M --acceptDupMarks --addMateTags --quiet \
+			 	| samblaster --acceptDupMarks --addMateTags --quiet \
 				| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t {threads} -o {output.bam} \
 					<(sambamba view -S -f bam -l 0 -t $SLURM_CPUS_PER_TASK /dev/stdin)
 			"""

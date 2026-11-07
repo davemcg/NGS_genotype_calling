@@ -17,14 +17,14 @@ module load $(grep "^samtools_version:" $config | head -n 1 | cut -d"'" -f 2)
 export TMPDIR=/lscratch/$SLURM_JOB_ID
 module load bazam/1.0.1 bwa/0.7.17 samblaster/0.1.26 sambamba/1.0.0
 mkdir -p sample_bam/subset/
-#samtools view --threads $SLURM_CPUS_PER_TASK -b sample_bam/$sample.markDup.bam --output sample_bam/subset/$sample.markDup.chrX.bam chrX
-#samtools index -@ $SLURM_CPUS_PER_TASK sample_bam/subset/$sample.markDup.chrX.bam
+samtools view --threads $SLURM_CPUS_PER_TASK -b sample_bam/$sample.markDup.bam --output $TMPDIR/$sample.chrX.bam chrX
+samtools index -@ $SLURM_CPUS_PER_TASK  $TMPDIR/$sample.chrX.bam
 
 RG=$(samtools view -H sample_bam/"$sample".markDup.bam | grep "^@RG" | head -n 1 | sed 's/\t/\\t/g')
 echo $RG
 echo "Start realignment"
 date
-java -Xmx32g -jar $BAZAMPATH/bazam.jar -bam sample_bam/$sample.markDup.bam --regions chrX:153929000-154373500 | bwa mem -t 16 -M -Y -B 4 -O 6 -E 1 -p -R $RG /data/OGL/resources/genomes/GRCh38/GRCh38Decoy2.fa - | samblaster -M --addMateTags --quiet | sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t 16 -o bcmlocus/bam/$sample.bcm.bam <(sambamba view -S -f bam -l 0 -t 16 /dev/stdin)
+java -Xmx32g -jar $BAZAMPATH/bazam.jar -bam $TMPDIR/$sample.chrX.bam --regions chrX:153929000-154373500 | bwa mem -t 16 -M -Y -B 4 -O 6 -E 1 -p -R $RG /data/OGL/resources/genomes/GRCh38/GRCh38Decoy2.fa - | samblaster -M --addMateTags --quiet | sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t 16 -o bcmlocus/bam/$sample.bcm.bam <(sambamba view -S -f bam -l 0 -t 16 /dev/stdin)
 date
 echo "Realignment completed"
 

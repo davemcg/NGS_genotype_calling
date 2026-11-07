@@ -19,5 +19,6 @@ while IFS=$'\t' read -r sm filename; do
   fi
   header=$(zcat fastq/$filename | head -n 1)
   id=$(echo $header | cut -d: -f 3,4 | sed 's/\:/\./g')
-  echo "$sm,$filename,@RG\\\tID:$id"_"$sm\\\tSM:$sm\\\tLB:$lib"_"$sm\\\tPL:ILLUMINA" >> $metadata_file
+  pu=$(echo $header | cut -d: -f 3,4,10 | sed 's/\:/\./g')
+  echo "$sm,$filename,@RG\\\tID:$id"_"$sm\\\tSM:$sm\\\tLB:$lib"_"$sm\\\tPU:$pu\\\tPL:ILLUMINA" >> $metadata_file
 done < $mapping_file

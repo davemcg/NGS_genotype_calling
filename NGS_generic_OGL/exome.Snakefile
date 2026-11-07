@@ -32,14 +32,17 @@ def chr_bam_to_single_bam(wildcards):
 # upwards of a dozen files for a single sample
 SAMPLE_LANEFILE = dict()
 LANEFILE_READGROUP = dict()
+SAMPLE_OLD_REF = dict()
 metadata = open(config['metadata_file'])
 for line in metadata:
-	read_group = line.split(',')[2][:-1]
-	lane_file = line.split(',')[1]
-	sample = line.split(',')[0]
 	# skip header
 	if line.startswith("#"):
 		continue
+	fields = line.strip().split(',')
+	sample = fields[0]
+	lane_file = fields[1]
+	read_group = fields[2]
+	old_ref = fields[3] if len(fields) > 3 else ""
 	if sample not in SAMPLE_LANEFILE:
 		SAMPLE_LANEFILE[sample] = [lane_file]
 	else:
@@ -47,6 +50,7 @@ for line in metadata:
 		old_lane_file.append(lane_file)
 		SAMPLE_LANEFILE[sample] = old_lane_file
 	LANEFILE_READGROUP[lane_file] = [read_group]
+	SAMPLE_OLD_REF[lane_file] = [old_ref]
 metadata.close()
 
 # if config['analysis_batch_name'] == 'YYYYMMDD':
@@ -59,6 +63,10 @@ if config['inputFileType'].upper() in ['BAM', 'CRAM', 'BAM-REALIGN', 'CRAM-REALI
 		lane_file = str(wildcards)
 		rg_out = str(LANEFILE_READGROUP[str(SAMPLE_LANEFILE[lane_file][0])]).replace("['", "").replace("']","")
 		return(rg_out)
+	def old_ref(wildcards):
+		lane_file = str(wildcards)
+		old_ref_out = str(SAMPLE_OLD_REF[str(SAMPLE_LANEFILE[lane_file][0])]).replace("['", "").replace("']","")
+		return(old_ref_out)
 else:
 	def rg(wildcards):
 		# returns the read group given in the config['metadata_file']
@@ -80,7 +88,8 @@ if config['genomeBuild'].upper() in ['GRCH37', 'HG19']:
 	CHRS=["1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","X","Y","MT_contigs"]
 	MT_CONTIGS = "MT GL000207.1 GL000226.1 GL000229.1 GL000231.1 GL000210.1 GL000239.1 GL000235.1 GL000201.1 GL000247.1 GL000245.1 GL000197.1 GL000203.1 GL000246.1 GL000249.1 GL000196.1 GL000248.1 GL000244.1 GL000238.1 GL000202.1 GL000234.1 GL000232.1 GL000206.1 GL000240.1 GL000236.1 GL000241.1 GL000243.1 GL000242.1 GL000230.1 GL000237.1 GL000233.1 GL000204.1 GL000198.1 GL000208.1 GL000191.1 GL000227.1 GL000228.1 GL000214.1 GL000221.1 GL000209.1 GL000218.1 GL000220.1 GL000213.1 GL000211.1 GL000199.1 GL000217.1 GL000216.1 GL000215.1 GL000205.1 GL000219.1 GL000224.1 GL000223.1 GL000195.1 GL000212.1 GL000222.1 GL000200.1 GL000193.1 GL000194.1 GL000225.1 GL000192.1 NC_007605"
 elif config['genomeBuild'].upper() in ['GRCH38', 'HG38']:
-	CHRS=["chr1","chr2","chr3","chr4","chr5","chr6","chr7","chr8","chr9","chr10","chr11","chr12","chr13","chr14","chr15","chr16","chr17","chr18","chr19","chr20","chr21","chr22","chrX","chrY","MT_contigs"]
+	CHRS=["chr1","chr2","chr3","chr4","chr5","chr6","chr7","chr8","chr9","chr10","chr11","chr12","chr13","chr14","chr15","chr16","chr17","chr18","chr19","chr20","chr21","chr22","chrX","chrY"]
+	#removed ,"MT_contigs" 10/20/2026
 	MT_CONTIGS = "chrM chr1_KI270706v1_random chr1_KI270707v1_random chr1_KI270708v1_random chr1_KI270709v1_random chr1_KI270710v1_random chr1_KI270711v1_random chr1_KI270712v1_random chr1_KI270713v1_random chr1_KI270714v1_random chr2_KI270715v1_random chr2_KI270716v1_random chr3_GL000221v1_random chr4_GL000008v2_random chr5_GL000208v1_random chr9_KI270717v1_random chr9_KI270718v1_random chr9_KI270719v1_random chr9_KI270720v1_random chr11_KI270721v1_random chr14_GL000009v2_random chr14_GL000225v1_random chr14_KI270722v1_random chr14_GL000194v1_random chr14_KI270723v1_random chr14_KI270724v1_random chr14_KI270725v1_random chr14_KI270726v1_random chr15_KI270727v1_random chr16_KI270728v1_random chr17_GL000205v2_random chr17_KI270729v1_random chr17_KI270730v1_random chr22_KI270731v1_random chr22_KI270732v1_random chr22_KI270733v1_random chr22_KI270734v1_random chr22_KI270735v1_random chr22_KI270736v1_random chr22_KI270737v1_random chr22_KI270738v1_random chr22_KI270739v1_random chrY_KI270740v1_random chrUn_KI270302v1 chrUn_KI270304v1 chrUn_KI270303v1 chrUn_KI270305v1 chrUn_KI270322v1 chrUn_KI270320v1 chrUn_KI270310v1 chrUn_KI270316v1 chrUn_KI270315v1 chrUn_KI270312v1 chrUn_KI270311v1 chrUn_KI270317v1 chrUn_KI270412v1 chrUn_KI270411v1 chrUn_KI270414v1 chrUn_KI270419v1 chrUn_KI270418v1 chrUn_KI270420v1 chrUn_KI270424v1 chrUn_KI270417v1 chrUn_KI270422v1 chrUn_KI270423v1 chrUn_KI270425v1 chrUn_KI270429v1 chrUn_KI270442v1 chrUn_KI270466v1 chrUn_KI270465v1 chrUn_KI270467v1 chrUn_KI270435v1 chrUn_KI270438v1 chrUn_KI270468v1 chrUn_KI270510v1 chrUn_KI270509v1 chrUn_KI270518v1 chrUn_KI270508v1 chrUn_KI270516v1 chrUn_KI270512v1 chrUn_KI270519v1 chrUn_KI270522v1 chrUn_KI270511v1 chrUn_KI270515v1 chrUn_KI270507v1 chrUn_KI270517v1 chrUn_KI270529v1 chrUn_KI270528v1 chrUn_KI270530v1 chrUn_KI270539v1 chrUn_KI270538v1 chrUn_KI270544v1 chrUn_KI270548v1 chrUn_KI270583v1 chrUn_KI270587v1 chrUn_KI270580v1 chrUn_KI270581v1 chrUn_KI270579v1 chrUn_KI270589v1 chrUn_KI270590v1 chrUn_KI270584v1 chrUn_KI270582v1 chrUn_KI270588v1 chrUn_KI270593v1 chrUn_KI270591v1 chrUn_KI270330v1 chrUn_KI270329v1 chrUn_KI270334v1 chrUn_KI270333v1 chrUn_KI270335v1 chrUn_KI270338v1 chrUn_KI270340v1 chrUn_KI270336v1 chrUn_KI270337v1 chrUn_KI270363v1 chrUn_KI270364v1 chrUn_KI270362v1 chrUn_KI270366v1 chrUn_KI270378v1 chrUn_KI270379v1 chrUn_KI270389v1 chrUn_KI270390v1 chrUn_KI270387v1 chrUn_KI270395v1 chrUn_KI270396v1 chrUn_KI270388v1 chrUn_KI270394v1 chrUn_KI270386v1 chrUn_KI270391v1 chrUn_KI270383v1 chrUn_KI270393v1 chrUn_KI270384v1 chrUn_KI270392v1 chrUn_KI270381v1 chrUn_KI270385v1 chrUn_KI270382v1 chrUn_KI270376v1 chrUn_KI270374v1 chrUn_KI270372v1 chrUn_KI270373v1 chrUn_KI270375v1 chrUn_KI270371v1 chrUn_KI270448v1 chrUn_KI270521v1 chrUn_GL000195v1 chrUn_GL000219v1 chrUn_GL000220v1 chrUn_GL000224v1 chrUn_KI270741v1 chrUn_GL000226v1 chrUn_GL000213v1 chrUn_KI270743v1 chrUn_KI270744v1 chrUn_KI270745v1 chrUn_KI270746v1 chrUn_KI270747v1 chrUn_KI270748v1 chrUn_KI270749v1 chrUn_KI270750v1 chrUn_KI270751v1 chrUn_KI270752v1 chrUn_KI270753v1 chrUn_KI270754v1 chrUn_KI270755v1 chrUn_KI270756v1 chrUn_KI270757v1 chrUn_GL000214v1 chrUn_KI270742v1 chrUn_GL000216v2 chrUn_GL000218v1 chrEBV"
 else:
 	print("ref_genome is ", config['ref_genome'])
@@ -109,6 +118,7 @@ rule all:
 		'deepvariant/deepvariant_phased_glnexusVcf.merge.done' if 'deepvariant' in config['output_type'] else 'dummy.txt',
 		'clair3/clair3.merge.done' if 'clair3' in config['output_type'] else 'dummy.txt',
 		'coverage/mean.coverage.done' if 'coverage' in config['output_type'] else 'dummy.txt',
+		'mito/haplocheck.done' if 'mtDNAserver2' in config['output_type'] else 'dummy.txt',
 		expand('manta/manta.{sample}.annotated.tsv', sample=list(SAMPLE_LANEFILE.keys())) if 'manta' in config['output_type'] else 'dummy.txt',
 		expand('scramble_anno/{sample}.scramble.tsv', sample=list(SAMPLE_LANEFILE.keys())) if 'SCRAMble' in config['output_type'] else 'dummy.txt',
 		expand('AutoMap/{sample}/{sample}.HomRegions.annot.tsv', sample=list(SAMPLE_LANEFILE.keys())) if 'AutoMap' in config['output_type'] else 'dummy.txt',
@@ -140,10 +150,10 @@ if config['inputFileType'] == 'single_lane_fastq':
 			"""
 			export TMPDIR=/lscratch/$SLURM_JOB_ID
 			echo {params.read_group}
-			module load {config[bwa-mem2_version]} {config[samblaster_version]} {config[sambamba_version]}
-			bwa-mem2 mem -t $(({threads}-2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -R {params.read_group} \
-				{config[bwa-mem2_ref]} {input} \
-			 	| samblaster -M --addMateTags --quiet \
+			module load {config[bwa-mem3_version]} {config[samblaster_version]} {config[sambamba_version]}
+			bwa-mem3 mem -t $(({threads}-2)) -K 100000000 -Y -R {params.read_group} \
+				{config[bwa-mem3_ref]} {input} \
+			 	| samblaster --addMateTags --quiet \
 				| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads}-2)) -o {output.bam} \
 					<(sambamba view -S -f bam -l 0 -t $(({threads}-2)) /dev/stdin)
 			"""
@@ -169,33 +179,211 @@ elif config['inputFileType'].upper() in ['BAM-REALIGN', 'CRAM-REALIGN']:
 			bai = 'sample_bam/{sample}.markDup.bam.bai'
 		threads: 32
 		params:
-			read_group = rg
+			old_ref_file = old_ref
 		shell:
 			"""
 			export TMPDIR=/lscratch/$SLURM_JOB_ID
-			module load {config[bazam_version]} {config[bwa-mem2_version]} {config[samblaster_version]} {config[sambamba_version]}
-			BAMFILE={input}
-			if [ -e {input}.bai ] || [ -e ${{BAMFILE%.bam}}.bai ] || [ -e {input}.crai ] || [ -e ${{BAMFILE%.cram}}.crai ] ; then
+			module load {config[samtools_version]}
+			input={input}
+			if [ -e {input}.bai ] || [ -e ${{input%.bam}}.bai ] || [ -e {input}.crai ] || [ -e ${{input%.cram}}.crai ] ; then
 				echo "index present"
 			else
+				module load {config[samtools_version]}
 				samtools index -@ $(({threads}-2)) {input}
 			fi
-			case "{input}" in
-				*bam)
-					java -Xmx16g -jar $BAZAMPATH/bazam.jar -bam {input} \
-					| bwa-mem2 mem -t $(({threads}/2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[bwa-mem2_ref]} - \
-			 		| samblaster -M --addMateTags --quiet \
-					| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads}/2)) -o {output.bam} \
-						<(sambamba view -S -f bam -l 0 -t $(({threads}/2)) /dev/stdin)
-					;;
-				*cram)
-					java -Xmx16g -Dsamjdk.reference_fasta={config[old_cram_ref]} -jar $BAZAMPATH/bazam.jar -bam {input} \
-					| bwa-mem2 mem -t $(({threads}/2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -p -R {params.read_group} {config[bwa-mem2_ref]} - \
-			 		| samblaster -M --addMateTags --quiet \
-					| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads}/2)) -o {output.bam} \
-						<(sambamba view -S -f bam -l 0 -t $(({threads}/2)) /dev/stdin)
-					;;
+			#
+			fastq_dir=/lscratch/$SLURM_JOB_ID/fastq
+			mapping_csv=/lscratch/$SLURM_JOB_ID/mapping.{wildcards.sample}.csv
+			module load {config[gatk_version]}
+			tmpdir="/lscratch/$SLURM_JOB_ID"
+			mkdir -p "$fastq_dir"
+			###############################################################################
+			# Check input type
+			###############################################################################
+			case "$input" in
+			    *.bam)
+			        gatk_ref_args=()
+			        samtools_ref_args=()
+			        ;;
+			    *.cram)
+			        pg_line=$(samtools view -H $input | grep '^@PG')
+			        case "$pg_line" in
+			          *"NCBI/GRCh38Decoy/genome.fa"*)
+			            old_ref="/data/OGL/resources/genomes/NCBI/GRCh38Decoy/genome.fa"
+			            ;;
+			          *"GATK"*"Homo_sapiens_assembly38.fasta"*)
+			            old_ref="/data/OGL/resources/genomes/GATK_resource_bundle/Homo_sapiens_assembly38.fasta"
+			            ;;
+			          *)
+			            old_ref={params.old_ref_file}
+						echo "$old_ref"
+			            ;;
+			        esac
+			        gatk_ref_args=(-R "$old_ref")
+			        samtools_ref_args=(-T "$old_ref")
+			        ;;
+			    *)
+			        echo "ERROR: input must end in .bam or .cram" >&2
+			        exit 1
+			        ;;
 			esac
+			###############################################################################
+			# BAM/CRAM -> FASTQ.gz, one pair per read group
+			###############################################################################
+			echo "Converting:"
+			echo "  $input"
+			gatk \
+			    --java-options "-Xmx20g -Djava.io.tmpdir=$tmpdir" \
+			    SamToFastq \
+			    -I "$input" \
+			    "${{gatk_ref_args[@]}}" \
+			    --RG_TAG ID \
+			    --OUTPUT_PER_RG true \
+			    --COMPRESS_OUTPUTS_PER_RG true \
+			    --OUTPUT_DIR "$fastq_dir" \
+			    --TMP_DIR "$tmpdir"
+			###############################################################################
+			# Rename:
+			#
+			#   RG_1.fastq.gz -> RG_R1_001.fastq.gz
+			#   RG_2.fastq.gz -> RG_R2_001.fastq.gz
+			###############################################################################
+			echo "Renaming FASTQ files..."
+
+			for fq in "$fastq_dir"/*_1.fastq.gz; do
+			    [[ -e "$fq" ]] || continue
+			    mv -- \
+			        "$fq" \
+			        "${{fq%_1.fastq.gz}}_R1_001.fastq.gz"
+			done
+			for fq in "$fastq_dir"/*_2.fastq.gz; do
+			    [[ -e "$fq" ]] || continue
+			    mv -- \
+			        "$fq" \
+			        "${{fq%_2.fastq.gz}}_R2_001.fastq.gz"
+			done
+			###############################################################################
+			# Extract original header
+			###############################################################################
+			header="$tmpdir/{wildcards.sample}.header.sam"
+			samtools view \
+			    "${{samtools_ref_args[@]}}" \
+			    -H \
+			    "$input" \
+			    > "$header"
+
+			###############################################################################
+			# Create mapping CSV
+			###############################################################################
+
+			#echo 'sample,fastq,read_group' > "$mapping_csv"
+
+			awk -F'\t' '$1=="@RG"' "$header" |
+			while IFS= read -r rg_line; do
+
+			    ###########################################################################
+			    # RG ID
+			    ###########################################################################
+
+			    rgid=$(
+			        printf '%s\n' "$rg_line" |
+			        awk -F'\t' '
+			        {{
+			            for (i=1; i<=NF; i++) {{
+			                if ($i ~ /^ID:/) {{
+			                    sub(/^ID:/, "", $i)
+			                    print $i
+			                    exit
+			                }}
+			            }}
+			        }}'
+			    )
+
+			    ###########################################################################
+			    # Sample name
+			    ###########################################################################
+
+			    sample=$(
+			        printf '%s\n' "$rg_line" |
+			        awk -F'\t' '
+			        {{
+			            for (i=1; i<=NF; i++) {{
+			                if ($i ~ /^SM:/) {{
+			                    sub(/^SM:/, "", $i)
+			                    print $i
+			                    exit
+			                }}
+			            }}
+			        }}'
+			    )
+
+			    if [[ -z "$rgid" ]]; then
+			        echo "ERROR: @RG entry does not contain ID:" >&2
+			        printf '%s\n' "$rg_line" >&2
+			        exit 1
+			    fi
+
+			    if [[ -z "$sample" ]]; then
+			        echo "ERROR: @RG $rgid does not contain SM" >&2
+			        exit 1
+			    fi
+
+			    ###########################################################################
+			    # Convert literal TABs in @RG line to \t for bwa-mem2 -R
+			    ###########################################################################
+
+			    bwa_rg=${{rg_line//$'\t'/\\\\t}}
+
+			    r1="${{rgid}}_R1_001.fastq.gz"
+			    r2="${{rgid}}_R2_001.fastq.gz"
+
+			    for fq in "$r1" "$r2"; do
+
+			        if [[ ! -f "$fastq_dir/$fq" ]]; then
+			            echo "WARNING: FASTQ not found: $fastq_dir/$fq" >&2
+			            continue
+			        fi
+
+			        printf '%s,%s,%s\n' \
+			            "$sample" \
+			            "$fq" \
+			            "$bwa_rg" \
+			            >> "$mapping_csv"
+
+			    done
+
+			done
+			###### alignment #####
+			module load {config[bwa-mem3_version]} {config[samblaster_version]} {config[sambamba_version]}
+
+			lane_bam_dir=/lscratch/$SLURM_JOB_ID/lane_bam
+			mkdir -p "$lane_bam_dir"
+			all_lane_bam=()
+			NUM_BAM=0
+			while IFS=',' read -r sample fastq1 read_group; do
+				[[ "$fastq1" == *_R1_001.fastq.gz ]] || continue
+
+			    fastq2="${{fastq1/_R1_001.fastq.gz/_R2_001.fastq.gz}}"
+
+			    prefix=${{fastq1%_R1_001.fastq.gz}}
+			    lane_bam="$lane_bam_dir/${{prefix}}.bam"
+				bwa-mem3 mem -t $(({threads}-2)) -K 100000000 -Y -R "$read_group" \
+					{config[bwa-mem3_ref]} $fastq_dir/$fastq1 $fastq_dir/$fastq2 \
+					| samblaster --addMateTags --quiet \
+					| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads}-2)) -o $lane_bam \
+					<(sambamba view -S -f bam -l 0 -t $(({threads}-2)) /dev/stdin)
+				all_lane_bam+=("$lane_bam")
+				((NUM_BAM+=1))
+			done < "$mapping_csv"
+
+			###### merge lane bams #####
+			if (( $NUM_BAM > 1 )); then
+				sambamba markdup -t {threads} -l 6 "${{all_lane_bam[@]}}" {output.bam} --tmpdir="/lscratch/$SLURM_JOB_ID"
+			else
+				cp "${{all_lane_bam[0]}}" {output.bam}
+				cp "${{all_lane_bam[0]}}.bai" {output.bai}
+			fi
+
 			"""
 elif config['inputFileType'].upper() in ['BAM']:
 	localrules: copybam
@@ -205,7 +393,7 @@ elif config['inputFileType'].upper() in ['BAM']:
 		output:
 			bam = 'sample_bam/{sample}.markDup.bam',
 			bai = 'sample_bam/{sample}.markDup.bam.bai'
-		threads: 32
+		threads: 8
 		resources: res=1
 		shell:
 			"""
@@ -258,15 +446,15 @@ else:
 			bai = temp('lane_bam/{lane}.bam.bai')
 		params:
 			read_group = rg
-		threads: 32
+		threads: 16
 		shell:
 			"""
 			export TMPDIR=/lscratch/$SLURM_JOB_ID
 			echo {params.read_group}
-			module load {config[bwa-mem2_version]} {config[samblaster_version]} {config[sambamba_version]}
-			bwa-mem2 mem -t $(({threads}-2)) -K 100000000 -M -Y -B 4 -O 6 -E 1 -R {params.read_group} \
-				{config[bwa-mem2_ref]} {input} \
-			 	| samblaster -M --acceptDupMarks --addMateTags --quiet \
+			module load {config[bwa-mem3_version]} {config[samblaster_version]} {config[sambamba_version]}
+			bwa-mem3 mem -t $(({threads}-2)) -K 100000000 -Y -R {params.read_group} \
+				{config[bwa-mem3_ref]} {input} \
+			 	| samblaster --acceptDupMarks --addMateTags --quiet \
 				| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t $(({threads}-2)) -o {output.bam} \
 					<(sambamba view -S -f bam -l 0 -t $(({threads}-2)) /dev/stdin)
 			"""
@@ -280,27 +468,8 @@ else:
 		threads: 16
 		shell:
 			"""
-			module load {config[sambamba_version]} {config[biobambam2_version]}
-			mkdir -p sample_bam/markDupMetrics
-			case "{input.bam}" in
-				*\ *)
-					sambamba merge -t {threads} /lscratch/$SLURM_JOB_ID/{wildcards.sample}.bam {input.bam}
-					bammarkduplicates markthreads={threads} level=6 verbose=0 \
-						M=sample_bam/markDupMetrics/{wildcards.sample}.markDup.methrics.tsv \
-						tmpfile=/lscratch/$SLURM_JOB_ID/{wildcards.sample} \
-						I=/lscratch/$SLURM_JOB_ID/{wildcards.sample}.bam \
-						O={output.bam} \
-						index=1 indexfilename={output.bai}
-					;;
-				*)
-					bammarkduplicates markthreads={threads} level=6 verbose=0 \
-						M=sample_bam/markDupMetrics/{wildcards.sample}.markDup.methrics.tsv \
-						tmpfile=/lscratch/$SLURM_JOB_ID/{wildcards.sample} \
-						I={input.bam} \
-						O={output.bam} \
-						index=1 indexfilename={output.bai}
-					;;
-			esac
+			module load {config[sambamba_version]}
+			sambamba markdup -t {threads} -l 6 {input.bam} {output.bam} --tmpdir="/lscratch/$SLURM_JOB_ID"
 			"""
 #2/28/21 added (then removed again) --ignoreUnmated to samblaster because of error Can't find first and/or second of pair in sam block of length 1 for id: C7F3HANXX:5:1112:14712:22259
 #5/17/2022: add --remove-duplicates to sambamba markdup so that manta will not produce error? --Used manta/1.6.0-fork-jykr.
@@ -647,7 +816,7 @@ rule freebayes_phasing:
 localrules: automap_roh
 rule automap_roh:
 	input:
-		vcf = 'clair3/vcf/{sample}.clr3.filtered.vcf.gz'
+		vcf = 'freebayes/vcf/{sample}.phased.vcf.gz' if 'freebayes' in config['output_type'] else 'clair3/vcf/{sample}.clr3.filtered.vcf.gz'
 	output:
 		tsv = temp('AutoMap/{sample}/{sample}.HomRegions.tsv'),
 		bed = temp('AutoMap/{sample}/{sample}.HomRegions.bed'),
@@ -1085,8 +1254,8 @@ rule bcm_locus:
 		samtools view --threads $SLURM_CPUS_PER_TASK -b {input.bam} --output $TMPDIR/{wildcards.sample}.chrX.bam chrX
 		samtools index -@ $SLURM_CPUS_PER_TASK $TMPDIR/{wildcards.sample}.chrX.bam
 		java -Xmx32g -jar $BAZAMPATH/bazam.jar -bam $TMPDIR/{wildcards.sample}.chrX.bam --regions chrX:153929000-154373500 \
-		| bwa mem -t 4 -M -Y -B 4 -O 6 -E 1 -p -R $RG {config[GRCh38Decoy2]} - \
-		| samblaster -M --addMateTags --quiet \
+		| bwa mem -t 4 -Y -p -R $RG {config[GRCh38Decoy2]} - \
+		| samblaster --addMateTags --quiet \
 		| sambamba sort -u --tmpdir=/lscratch/$SLURM_JOB_ID -t 4 -o {output.bam} \
 			<(sambamba view -S -f bam -l 0 -t 16 /dev/stdin)
 		rm $TMPDIR/{wildcards.sample}.chrX.bam $TMPDIR/{wildcards.sample}.chrX.bam.bai
@@ -1175,6 +1344,112 @@ rule combine_bcmlocus:
 			bcmlocus/{config[analysis_batch_name]}.bcmlocus.all.variant.tsv \
 			bcmlocus/{config[analysis_batch_name]}.bcmlocus.all.variant.xlsx
 		rm bcmlocus/{config[analysis_batch_name]}.bcmlocus.all.variant.tsv
+		touch {output}
+		"""
+
+localrules: mtDNAserver2
+rule mtDNAserver2:
+	input:
+		bam = 'sample_bam/{sample}.markDup.bam',
+		bai = 'sample_bam/{sample}.markDup.bam.bai'
+	output:
+		variant = 'mito/mitomap/{sample}.AnnotatedVariants.txt',
+		haplocheck = temp('mito/{sample}.haplocheck.txt')
+	resources: res=1
+	shell:
+		"""
+		if [[ $(module list 2>&1 | grep "samtools" | wc -l) -lt 1 ]]; then module load {config[samtools_version]}; fi
+		if [[ $(module list 2>&1 | grep "nextflow" | wc -l) -lt 1 ]]; then module load nextflow/25.10.0; fi
+		export NXF_SINGULARITY_CACHEDIR=/data/OGL/resources/git/mtdna-server-2/work/singularity
+		WORK_DIR=$PWD
+		LWORK_DIR=/lscratch/$SLURM_JOB_ID
+		MUTSERVE_HOME="/data/OGL/resources/git/mutserve"
+		samtools view -b {input.bam} chrM -o $LWORK_DIR/{wildcards.sample}.chrM.bam
+		samtools index $LWORK_DIR/{wildcards.sample}.chrM.bam
+		cd /lscratch/$SLURM_JOB_ID
+		sed -e "s#bamfile#{wildcards.sample}.chrM.bam#" \
+			-e "s#mtDNA-server-2#mtDNA-server-2/{wildcards.sample}#" \
+			/data/OGL/resources/git/mtdna-server-2.config > mtdna-server-2.{wildcards.sample}.config
+		nextflow run /data/OGL/resources/git/mtdna-server-2/main.nf -c mtdna-server-2.{wildcards.sample}.config \
+		  --output_reports mtDNA-server-2/{wildcards.sample} \
+		  -profile singularity
+		rm -rf mtDNA-server-2/{wildcards.sample}/mutserve_raw_files {wildcards.sample}.chrM.bam*
+		rm -rf $WORK_DIR/mito/{wildcards.sample}/*
+		mkdir -p $WORK_DIR/mito/{wildcards.sample} $WORK_DIR/mito/mitomap/
+		mv mtDNA-server-2/{wildcards.sample}/* $WORK_DIR/mito/{wildcards.sample}
+		cd $WORK_DIR
+		awk -F'\\t' -v OFS='\\t' '
+			BEGIN {{
+		        q = sprintf("%c", 34)
+		    }}
+
+		    NR==FNR {{
+		        if (FNR > 1) {{
+		            gsub(/^"|"$/, "", $2)
+		            gsub(/^"|"$/, "", $3)
+		            gsub(/^"|"$/, "", $4)
+
+		            hap = hap (hap ? ";" : "") $2
+		            rank = rank (rank ? ";" : "") $3
+		            qual = qual (qual ? ";" : "") $4
+		        }}
+		        next
+		    }}
+
+		    FNR == 1 {{
+		        print $0, q "Haplogroup" q, q "Rank" q, q "Quality" q
+		        next
+		    }}
+
+		    {{
+		        print $0, q hap q, q rank q, q qual q
+		    }}
+		    ' \
+		    mito/{wildcards.sample}/haplogroups.txt \
+		    mito/{wildcards.sample}/haplocheck.txt \
+     		| sed 's/\\.chrM\\.bam//' > {output.haplocheck}
+
+		if [[ $(module list 2>&1 | grep "vcfanno" | wc -l) -lt 1 ]]; then module load {config[vcfanno_version]}; fi
+		if [[ $(module list 2>&1 | grep " R/" | wc -l) -lt 1 ]]; then module load {config[R_version]}; fi
+		awk -F'\t' 'BEGIN {{
+		    OFS="\t"
+		    print "##fileformat=VCFv4.2"
+		    print "##contig=<ID=chrM,length=16569>"
+    		print "##FORMAT=<ID=GT,Number=1,Type=String,Description=\\\"Genotype\\\">"
+		    print "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\\\"Approximate read depth (reads with MQ=255 or with bad mates are filtered)\\\">"
+		    print "##FORMAT=<ID=GQ,Number=1,Type=Integer,Description=\\\"Genotype Quality\\\">"
+		    print "#CHROM","POS","ID","REF","ALT","QUAL","FILTER","INFO","FORMAT","S1"
+		}}
+		NR > 1 {{
+			id="chrM-" $3 "-" $4 "-" $5
+		    print "chrM",$3,id,$4,$5,"30","PASS",".","GT:GQ:DP","0/1:50:100"
+		}}' mito/{wildcards.sample}/variants.annotated.txt \
+		  | bcftools norm --multiallelics -any --output-type u - \
+		  | bcftools norm --check-ref w --fasta-ref $MUTSERVE_HOME/rCRS.fasta --output-type v - \
+		  | bgzip -f > $LWORK_DIR/{wildcards.sample}.mt.norm.vcf.gz
+		tabix -p vcf -f $LWORK_DIR/{wildcards.sample}.mt.norm.vcf.gz
+		vcfanno ~/git/NGS_genotype_calling/NGS_generic_OGL/mitomap.conf $LWORK_DIR/{wildcards.sample}.mt.norm.vcf.gz \
+		 > $LWORK_DIR/{wildcards.sample}.mt.mm.vcf
+		bcftools query -H -f '%ID\t%INFO/Pubmed\t%INFO/mitomapDisease\t%INFO/mitomapDiseaseStatus\n' $LWORK_DIR/{wildcards.sample}.mt.mm.vcf \
+		 | sed -e '1 s/^#//' -e '1 s/\[[0-9]*\]//g' \
+		 > $LWORK_DIR/{wildcards.sample}.mt.mm.tsv
+		Rscript ~/git/NGS_genotype_calling/NGS_generic_OGL/mtDNA-server2.mitomap.R \
+		  mito/{wildcards.sample}/variants.annotated.txt \
+		  $LWORK_DIR/{wildcards.sample}.mt.mm.tsv \
+		  {output.variant}
+ 		"""
+localrules: merge_haplocheck
+rule merge_haplocheck:
+	input:
+		haplocheck = expand('mito/{sample}.haplocheck.txt', sample=list(SAMPLE_LANEFILE.keys()))
+	output:
+		'mito/haplocheck.done'
+	shell:
+		"""
+		head -n 1 {input.haplocheck[0]} > mito/{config[analysis_batch_name]}.haplocheck.tsv
+		for file in {input.haplocheck}; do
+			tail -n +2 $file >> mito/{config[analysis_batch_name]}.haplocheck.tsv
+ 		done
 		touch {output}
 		"""
 

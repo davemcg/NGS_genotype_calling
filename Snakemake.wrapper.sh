@@ -61,7 +61,8 @@ else
 	header=$(zcat $fastq1 | head -n 1)
 	id=$(echo $header | cut -d: -f 3,4 | sed 's/\:/\./g')
 	sm=$(echo $filename | cut -d_ -f 1-2 | sed 's/\-/\_/g' | sed 's/_/x/')
-	echo "$sm,$filename,@RG\\\tID:$id"_"$sm\\\tSM:$sm\\\tLB:$lib"_"$sm\\\tPL:ILLUMINA" >> $metadata_file
+  pu=$(echo $header | cut -d: -f 3,4,10 | sed 's/\:/\./g')
+	echo "$sm,$filename,@RG\\\tID:$id"_"$sm\\\tSM:$sm\\\tLB:$lib"_"$sm\\\tPU:$pu\\\tPL:ILLUMINA" >> $metadata_file
 	done
 fi
 #if sample name has underscore, then sm=$(echo $filename | cut -d_ -f 1,2)
@@ -84,7 +85,7 @@ case "${ngstype^^}" in
 		--cluster-config /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/panel.cluster.json \
 		--cluster "$sbcmd"  --latency-wait 120 --rerun-incomplete \
 		-k --restart-times 1 \
-		--resources res=1 \
+		--resources res=4 \
 		--configfile $@
 		;;
 	"AMPLICON"|"AMP")
@@ -93,7 +94,7 @@ case "${ngstype^^}" in
 		--cluster-config /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/panel.cluster.json \
 		--cluster "$sbcmd"  --latency-wait 120 --rerun-incomplete \
 		-k --restart-times 1 \
-		--resources res=1 \
+		--resources res=4 \
 		--configfile $@
 		;;
 	"EXOME"|"WES"|"ES")
@@ -102,7 +103,7 @@ case "${ngstype^^}" in
 		--cluster-config /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/exome.cluster.json \
 		--cluster "$sbcmd"  --latency-wait 120 --rerun-incomplete \
 		-k --restart-times 1 \
-		--resources res=1 \
+    --resources res=4 \
 		--configfile $@
 		;;
 	*)
@@ -111,11 +112,11 @@ case "${ngstype^^}" in
 		--cluster-config /home/$USER/git/NGS_genotype_calling/NGS_generic_OGL/cluster.json \
 		--cluster "$sbcmd"  --latency-wait 120 --rerun-incomplete \
 		-k --restart-times 1 \
-		--resources res=1 \
+		--resources res=4 \
 		--configfile $@
 		;;
 esac
-
+#--resources res=1 \ res=4 for ES/GS workflow. 11/6/2026
 if (( $(echo $WORK_DIR | grep "/data/OGL" | wc -l) > 0 )); then
  find $WORK_DIR -type f ! -group OGL -print -exec chgrp OGL -- {} +
 fi

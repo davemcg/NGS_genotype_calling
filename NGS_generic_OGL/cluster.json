@@ -40,7 +40,7 @@
 	"dv_whatshap" :
 	{
 		"partition" : "norm",
-		"extra" : "--gres=lscratch:200",
+		"extra" : "--gres=lscratch:100",
 		"time" : "6:00:00",
 		"threads" : "26",
 		"mem" : "120g"
@@ -76,9 +76,9 @@
 	"clinsv" :
 	{
 		"partition" : "norm",
-		"extra" : "--gres=lscratch:200",
+		"extra" : "--gres=lscratch:300",
 		"time" : "28:00:00",
-		"mem" : "48g"
+		"mem" : "64g"
 	},
 	"orf15" :
 	{
@@ -165,8 +165,8 @@
 	},
 	"align" :
 	{
-		"partition" : "norm",
-		"time" : "5:00:00",
+		"partition" : "norm,quick",
+		"time" : "4:00:00",
 		"mem" : "100g",
 		"extra" : "--gres=lscratch:800"
 	},
